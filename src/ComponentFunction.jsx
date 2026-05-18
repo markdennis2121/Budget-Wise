@@ -435,23 +435,88 @@ const AddExpenseModal = function(props) {
   var mutateOneTime = insertOneTime.mutate;
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateHistory = insertHistory.mutate;
+
+  var settingsQuery = useQuery('user_settings');
+  var allSettings = settingsQuery.data || [];
+  var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
+  var updateSettings = useMutation('user_settings', 'update');
+  var mutateUpdateSettings = updateSettings.mutate;
+
+  var baseSources = useMemo(function() {
+    if (userSettings && userSettings.income_sources) {
+      return typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+    }
+    var sal = userSettings ? (parseFloat(userSettings.monthly_salary) || 0) : 0;
+    return [{ id: 'main-salary', name: 'Main Salary', amount: sal }];
+  }, [userSettings]);
+
+  var fundState = useState('');
+  var selectedFund = fundState[0]; var setSelectedFund = fundState[1];
+  useEffect(function() {
+    if (baseSources && baseSources[0] && !selectedFund) {
+      setSelectedFund(baseSources[0].name);
+    }
+  }, [baseSources, selectedFund]);
+
+  var showCustomState = useState(false);
+  var showCustomInput = showCustomState[0]; var setShowCustomInput = showCustomState[1];
+  var customNameState = useState('');
+  var customNameInput = customNameState[0]; var setCustomNameInput = customNameState[1];
+
+  var handleAddCustomSource = function() {
+    if (!customNameInput.trim()) return;
+    var name = customNameInput.trim();
+    var exists = baseSources.some(function(src) { return src.name.toLowerCase() === name.toLowerCase(); });
+    if (exists) {
+      setSelectedFund(name);
+      setCustomNameInput('');
+      setShowCustomInput(false);
+      return;
+    }
+    var newSource = { id: generateId(), name: name, amount: 0.00 };
+    var updatedList = baseSources.concat(newSource);
+    
+    if (userSettings) {
+      mutateUpdateSettings({ id: userSettings.id, income_sources: updatedList }).then(function() {
+        setSelectedFund(name);
+        setCustomNameInput('');
+        setShowCustomInput(false);
+      }).catch(function() {
+        setErrorMsg('Failed to create source.');
+      });
+    } else {
+      setSelectedFund(name);
+      setCustomNameInput('');
+      setShowCustomInput(false);
+    }
+  };
+
   var handleSave = function() {
-    if (!expName.trim()) { setErrorMsg('Please enter expense name.'); return; }
+    if (!expName.trim()) { setErrorMsg('Please enter name.'); return; }
     var amt = parseFloat(expAmount);
     if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
     setErrorMsg('');
+    var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    var fundVal = selectedFund || (baseSources[0] ? baseSources[0].name : 'Main Salary');
+
     if (expType === 'one_time') {
       var expId = generateId();
-      var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: 'general' };
+      var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: fundVal };
       mutateOneTime(newOneTime).then(function() {
-        return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: '' });
+        return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: timeStr + ' • Fund: ' + fundVal });
       }).then(function() {
         setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); onSaved(); onClose();
       }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
-    } else {
-      var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: 'general' };
+    } else if (expType === 'recurring') {
+      var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: fundVal };
       mutateRecurring(newRecurring).then(function() {
         setExpName(''); setExpAmount(''); setDueDate(getTodayStr()); onSaved(); onClose();
+      }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
+    } else if (expType === 'income') {
+      var expId = generateId();
+      mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'Income', date: expDate, status: 'Received', notes: timeStr + ' • Source: ' + fundVal, category: fundVal })
+      .then(function() {
+        setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); onSaved(); onClose();
       }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
     }
   };
@@ -459,7 +524,7 @@ const AddExpenseModal = function(props) {
     React.createElement(View, { testID: 'View-13', style: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop }, componentId: 'add-expense-overlay' },
       React.createElement(View, { testID: 'View-14', style: { backgroundColor: cardColor, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insetsBottom + 24, maxHeight: '90%' }, componentId: 'add-expense-content' },
         React.createElement(View, { testID: 'View-15', style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 } },
-          React.createElement(Text, { testID: 'Text-26', style: { fontSize: 20, fontWeight: 'bold', color: textPrimary } }, 'Add Expense'),
+          React.createElement(Text, { testID: 'Text-26', style: { fontSize: 20, fontWeight: 'bold', color: textPrimary } }, expType === 'income' ? 'Add Income' : 'Add Expense'),
           React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-11', onPress: onClose, componentId: 'add-expense-close-btn' },
             React.createElement(MaterialIcons, { testID: 'MaterialIcons-4', name: 'close', size: 24, color: textSecondary })
           )
@@ -470,20 +535,26 @@ const AddExpenseModal = function(props) {
               style: { flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'one_time' ? primaryColor : 'transparent' },
               componentId: 'type-onetime-btn'
             },
-              React.createElement(Text, { testID: 'Text-27', style: { color: expType === 'one_time' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 14 } }, 'One-Time')
+              React.createElement(Text, { testID: 'Text-27', style: { color: expType === 'one_time' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 13 } }, 'One-Time')
             ),
             React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-13', onPress: function() { setExpType('recurring'); },
               style: { flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'recurring' ? primaryColor : 'transparent' },
               componentId: 'type-recurring-btn'
             },
-              React.createElement(Text, { testID: 'Text-28', style: { color: expType === 'recurring' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 14 } }, 'Recurring')
+              React.createElement(Text, { testID: 'Text-28', style: { color: expType === 'recurring' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 13 } }, 'Recurring')
+            ),
+            React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-income', onPress: function() { setExpType('income'); },
+              style: { flex: 1, padding: 10, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'income' ? primaryColor : 'transparent' },
+              componentId: 'type-income-btn'
+            },
+              React.createElement(Text, { testID: 'Text-income', style: { color: expType === 'income' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 13 } }, 'Income')
             )
           ),
           errorMsg ? React.createElement(View, { testID: 'View-17', style: { backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 14 } },
             React.createElement(Text, { testID: 'Text-29', style: { color: dangerColor, fontSize: 13 } }, errorMsg)
           ) : null,
-          React.createElement(Text, { testID: 'Text-30', style: { fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 } }, 'EXPENSE NAME'),
-          React.createElement(TextInput, { testID: 'TextInput-7', value: expName, onChangeText: setExpName, placeholder: 'e.g. Rent, Groceries',
+          React.createElement(Text, { testID: 'Text-30', style: { fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 } }, expType === 'income' ? 'INCOME NAME' : 'EXPENSE NAME'),
+          React.createElement(TextInput, { testID: 'TextInput-7', value: expName, onChangeText: setExpName, placeholder: expType === 'income' ? 'e.g. Freelance, Side Hustle' : 'e.g. Rent, Groceries',
             autoCapitalize: 'words',
             style: { backgroundColor: backgroundColor, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: textPrimary, marginBottom: 16 },
             componentId: 'add-expense-name-input'
@@ -500,18 +571,53 @@ const AddExpenseModal = function(props) {
             style: { backgroundColor: backgroundColor, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: textPrimary, marginBottom: 16 },
             componentId: 'add-expense-amount-input'
           }),
-          expType === 'one_time' ? React.createElement(View, { testID: 'View-18' },
+          (expType === 'one_time' || expType === 'income') ? React.createElement(View, { testID: 'View-18' },
             React.createElement(Text, { testID: 'Text-32', style: { fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 } }, 'DATE'),
             React.createElement(DatePickerInput, { testID: 'DatePickerInput-1', value: expDate, onChange: setExpDate, placeholder: 'Select date', componentId: 'add-expense-date-picker' })
           ) : React.createElement(View, { testID: 'View-19' },
             React.createElement(Text, { testID: 'Text-33', style: { fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 } }, 'DUE DATE'),
             React.createElement(DatePickerInput, { testID: 'DatePickerInput-2', value: dueDate, onChange: setDueDate, placeholder: 'Select due date', componentId: 'add-expense-duedate-picker' })
           ),
+          React.createElement(View, { testID: 'View-fund-selector-section', style: { marginTop: 16 } },
+            React.createElement(Text, { testID: 'Text-fund-selector-label', style: { fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 8 } }, expType === 'income' ? 'CREDIT TO SOURCE FUND' : 'DEDUCT FROM ENVELOPE FUND'),
+            React.createElement(View, { testID: 'View-fund-list', style: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 } },
+              baseSources.map(function(src) {
+                var isSelected = selectedFund === src.name;
+                return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-fund-option-' + src.id, key: src.id,
+                  onPress: function() { setSelectedFund(src.name); },
+                  style: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? primaryColor : theme.colors.border, backgroundColor: isSelected ? '#ECFDF5' : '#FFFFFF', alignItems: 'center' },
+                  componentId: 'fund-opt-' + src.id
+                },
+                  React.createElement(Text, { testID: 'Text-fund-opt-text-' + src.id, style: { fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : textPrimary } }, src.name)
+                );
+              }),
+              React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-add-custom-fund',
+                onPress: function() { setShowCustomInput(!showCustomInput); },
+                style: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: primaryColor, backgroundColor: '#F0FDF4', flexDirection: 'row', alignItems: 'center' },
+                componentId: 'add-custom-fund-btn'
+              },
+                React.createElement(MaterialIcons, { testID: 'MaterialIcons-add-custom-fund', name: 'add', size: 14, color: primaryColor, style: { marginRight: 4 } }),
+                React.createElement(Text, { testID: 'Text-add-custom-fund', style: { fontSize: 13, fontWeight: '600', color: primaryColor } }, 'Add Custom')
+              )
+            ),
+            showCustomInput ? React.createElement(View, { testID: 'View-custom-fund-input-row', style: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'center', backgroundColor: '#F9FAFB', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: '#E5E7EB' } },
+              React.createElement(TextInput, { testID: 'TextInput-custom-fund-name', value: customNameInput, onChangeText: setCustomNameInput, placeholder: 'e.g. Sari-Sari Store',
+                style: { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, color: textPrimary },
+                componentId: 'custom-fund-name-input'
+              }),
+              React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-save-custom-fund', onPress: handleAddCustomSource,
+                style: { backgroundColor: primaryColor, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+                componentId: 'save-custom-fund-btn'
+              },
+                React.createElement(Text, { testID: 'Text-save-custom-fund', style: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' } }, 'Add')
+              )
+            ) : null
+          ),
           React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-14', onPress: handleSave,
             style: { backgroundColor: primaryColor, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 },
             componentId: 'add-expense-save-btn'
           },
-            React.createElement(Text, { testID: 'Text-34', style: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' } }, 'Save Expense')
+            React.createElement(Text, { testID: 'Text-34', style: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' } }, expType === 'income' ? 'Save Income' : 'Save Expense')
           )
         )
       )
@@ -537,33 +643,107 @@ const useDashboardState = function(userId) {
   var curMonth = getCurrentMonthStr();
   var oneTimeExpenses = allOneTime.filter(function(o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
   var refetchOneTime = oneTimeQuery.refetch;
+  var historyQuery = useQuery('expense_history');
+  var allHistory = historyQuery.data || [];
+  var userHistory = allHistory.filter(function(h) { return h.user_id === userId; });
+  var refetchHistory = historyQuery.refetch;
   var modalState = useState(false);
   var showAddModal = modalState[0]; var setShowAddModal = modalState[1];
-  var totalRecurringPaid = useMemo(function() {
-    return recurringExpenses.reduce(function(sum, r) {
-      if (r.status === 'Paid' || r.status === 'Paid in Advance') { return sum + (parseFloat(r.amount) || 0); }
-      return sum;
-    }, 0);
-  }, [recurringExpenses]);
-  var totalOneTime = useMemo(function() {
-    return oneTimeExpenses.reduce(function(sum, o) { return sum + (parseFloat(o.amount) || 0); }, 0);
-  }, [oneTimeExpenses]);
-  var totalExpenses = totalRecurringPaid + totalOneTime;
-  var remaining = salary - totalExpenses;
+  
+  var fundBalances = useMemo(function() {
+    var baseSources = [];
+    if (userSettings && userSettings.income_sources) {
+      baseSources = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+    } else {
+      baseSources = [{ id: 'main-salary', name: 'Main Salary', amount: salary }];
+    }
+    
+    var funds = baseSources.map(function(src) {
+      return {
+        id: src.id || generateId(),
+        name: src.name || 'Main Salary',
+        baseAmount: parseFloat(src.amount) || 0,
+        extraIncome: 0,
+        expenses: 0
+      };
+    });
+    
+    userHistory.forEach(function(h) {
+      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
+        var amt = parseFloat(h.amount) || 0;
+        var fund = funds.find(function(f) { return f.name.toLowerCase() === h.expense_name.toLowerCase(); });
+        if (!fund) {
+          fund = funds.find(function(f) { return h.expense_name.toLowerCase().indexOf(f.name.toLowerCase()) !== -1; });
+        }
+        if (!fund) {
+          var assocFundName = h.category || 'Main Salary';
+          fund = funds.find(function(f) { return f.name.toLowerCase() === assocFundName.toLowerCase(); });
+        }
+        if (!fund) fund = funds[0];
+        if (fund) fund.extraIncome += amt;
+      }
+    });
+    
+    recurringExpenses.forEach(function(r) {
+      if (r.status === 'Paid' || r.status === 'Paid in Advance') {
+        var amt = parseFloat(r.amount) || 0;
+        var assocFundName = r.category || 'Main Salary';
+        var fund = funds.find(function(f) { return f.name.toLowerCase() === assocFundName.toLowerCase() || f.id === assocFundName; });
+        if (!fund) fund = funds[0];
+        if (fund) fund.expenses += amt;
+      }
+    });
+    
+    oneTimeExpenses.forEach(function(o) {
+      var amt = parseFloat(o.amount) || 0;
+      var assocFundName = o.category || 'Main Salary';
+      var fund = funds.find(function(f) { return f.name.toLowerCase() === assocFundName.toLowerCase() || f.id === assocFundName; });
+      if (!fund) fund = funds[0];
+      if (fund) fund.expenses += amt;
+    });
+    
+    return funds.map(function(f) {
+      var totalIn = f.baseAmount + f.extraIncome;
+      var rem = totalIn - f.expenses;
+      var spentPct = totalIn > 0 ? Math.min(100, Math.round((f.expenses / totalIn) * 100)) : 0;
+      return {
+        id: f.id,
+        name: f.name,
+        baseAmount: f.baseAmount,
+        extraIncome: f.extraIncome,
+        totalIncome: totalIn,
+        expenses: f.expenses,
+        remaining: rem,
+        spentPercent: spentPct
+      };
+    });
+  }, [salary, userSettings, userHistory, curMonth, recurringExpenses, oneTimeExpenses]);
+
+  var totalIncome = useMemo(function() {
+    return fundBalances.reduce(function(sum, f) { return sum + f.totalIncome; }, 0);
+  }, [fundBalances]);
+
+  var totalExpenses = useMemo(function() {
+    return fundBalances.reduce(function(sum, f) { return sum + f.expenses; }, 0);
+  }, [fundBalances]);
+
+  var remaining = totalIncome - totalExpenses;
+  var savingsRate = totalIncome > 0 ? Math.max(0, Math.round((remaining / totalIncome) * 100)) : 0;
+  
   var upcomingBills = useMemo(function() {
     return recurringExpenses.filter(function(r) {
       return r.status === 'Pending' && (isWithin5Days(r.due_date) || isOverdue(r.due_date));
     });
   }, [recurringExpenses]);
   var refetchAll = useCallback(function() {
-    refetchSettings(); refetchRecurring(); refetchOneTime();
-  }, [refetchSettings, refetchRecurring, refetchOneTime]);
+    refetchSettings(); refetchRecurring(); refetchOneTime(); refetchHistory();
+  }, [refetchSettings, refetchRecurring, refetchOneTime, refetchHistory]);
   return {
-    salary: salary, settingsLoading: settingsLoading,
+    salary: totalIncome, settingsLoading: settingsLoading,
     recurringExpenses: recurringExpenses, oneTimeExpenses: oneTimeExpenses,
     totalExpenses: totalExpenses, remaining: remaining,
     upcomingBills: upcomingBills, showAddModal: showAddModal, setShowAddModal: setShowAddModal,
-    refetchAll: refetchAll
+    refetchAll: refetchAll, savingsRate: savingsRate, fundBalances: fundBalances
   };
 };
 // @end:DashboardScreen-state
@@ -603,7 +783,7 @@ const DashboardScreen = function(props) {
           React.createElement(View, { testID: 'View-25', style: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', marginBottom: 8 } },
             React.createElement(MaterialIcons, { testID: 'MaterialIcons-5', name: 'attach-money', size: 20, color: primaryColor })
           ),
-          React.createElement(Text, { testID: 'Text-40', style: { fontSize: 12, color: textSecondary, marginBottom: 4 } }, 'Monthly Salary'),
+          React.createElement(Text, { testID: 'Text-40', style: { fontSize: 12, color: textSecondary, marginBottom: 4 } }, 'Total Income'),
           React.createElement(Text, { testID: 'Text-41', style: { fontSize: 18, fontWeight: 'bold', color: textPrimary } }, formatCurrency(state.salary))
         ),
         React.createElement(View, { testID: 'View-26', style: { flex: 1, backgroundColor: cardColor, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'expenses-card' },
@@ -613,6 +793,54 @@ const DashboardScreen = function(props) {
           React.createElement(Text, { testID: 'Text-42', style: { fontSize: 12, color: textSecondary, marginBottom: 4 } }, 'Total Expenses'),
           React.createElement(Text, { testID: 'Text-43', style: { fontSize: 18, fontWeight: 'bold', color: dangerColor } }, formatCurrency(state.totalExpenses))
         )
+      ),
+      React.createElement(View, { testID: 'View-savings-card', style: { backgroundColor: '#ECFDF5', borderRadius: 14, padding: 16, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: primaryColor, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }, componentId: 'savings-rate-card' },
+        React.createElement(View, { testID: 'View-savings-info', style: { flex: 1, marginRight: 16 } },
+          React.createElement(Text, { testID: 'Text-savings-title', style: { fontSize: 13, color: '#065F46', fontWeight: 'bold', marginBottom: 4 } }, '✨ Net Savings Rate'),
+          React.createElement(Text, { testID: 'Text-savings-desc', style: { fontSize: 12, color: '#047857' } }, state.savingsRate >= 50 ? 'Spectacular saving habits! Keep it up!' : (state.savingsRate >= 30 ? 'Excellent! You are on a solid path!' : (state.savingsRate >= 10 ? 'Good! Try to save a bit more.' : 'Budget is tight. Keep an eye on expenses!')))
+        ),
+        React.createElement(View, { testID: 'View-savings-percentage', style: { alignItems: 'flex-end' } },
+          React.createElement(Text, { testID: 'Text-savings-val', style: { fontSize: 24, fontWeight: 'bold', color: primaryColor } }, String(state.savingsRate) + '%'),
+          React.createElement(View, { testID: 'View-savings-bar-container', style: { width: 80, height: 6, backgroundColor: '#A7F3D0', borderRadius: 3, marginTop: 4, overflow: 'hidden' } },
+            React.createElement(View, { testID: 'View-savings-bar', style: { width: String(Math.min(100, state.savingsRate)) + '%', height: '100%', backgroundColor: primaryColor } })
+          )
+        )
+      ),
+      React.createElement(View, { testID: 'View-envelopes-section', style: { marginBottom: 20 }, componentId: 'envelopes-section' },
+        React.createElement(Text, { testID: 'Text-envelopes-header', style: { fontSize: 16, fontWeight: 'bold', color: textPrimary, marginBottom: 12 } }, '📂 Active Envelope Funds'),
+        state.fundBalances.map(function(fund, idx) {
+          var barColor = fund.spentPercent >= 85 ? dangerColor : (fund.spentPercent >= 50 ? warningColor : primaryColor);
+          var trackColor = fund.spentPercent >= 85 ? '#FEE2E2' : (fund.spentPercent >= 50 ? '#FEF3C7' : '#D1FAE5');
+          return React.createElement(View, { testID: 'View-envelope-card-' + idx, key: fund.id,
+            style: { backgroundColor: cardColor, borderRadius: 14, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+            componentId: 'envelope-item-' + idx
+          },
+            React.createElement(View, { testID: 'View-envelope-header-' + idx, style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 } },
+              React.createElement(View, { testID: 'View-envelope-title-container-' + idx, style: { flexDirection: 'row', alignItems: 'center' } },
+                React.createElement(MaterialIcons, { testID: 'MaterialIcons-envelope-' + idx, name: 'folder-special', size: 18, color: primaryColor, style: { marginRight: 6 } }),
+                React.createElement(Text, { testID: 'Text-envelope-name-' + idx, style: { fontSize: 15, fontWeight: '600', color: textPrimary } }, fund.name)
+              ),
+              React.createElement(Text, { testID: 'Text-envelope-spent-' + idx, style: { fontSize: 12, fontWeight: 'bold', color: barColor } }, String(fund.spentPercent) + '% Spent')
+            ),
+            React.createElement(View, { testID: 'View-envelope-bar-container-' + idx, style: { height: 8, backgroundColor: trackColor, borderRadius: 4, marginBottom: 10, overflow: 'hidden' } },
+              React.createElement(View, { testID: 'View-envelope-bar-' + idx, style: { width: String(fund.spentPercent) + '%', height: '100%', backgroundColor: barColor } })
+            ),
+            React.createElement(View, { testID: 'View-envelope-stats-' + idx, style: { flexDirection: 'row', justifyContent: 'space-between' } },
+              React.createElement(View, { testID: 'View-envelope-left-' + idx },
+                React.createElement(Text, { testID: 'Text-envelope-in-lbl-' + idx, style: { fontSize: 11, color: textSecondary } }, 'Total Fund'),
+                React.createElement(Text, { testID: 'Text-envelope-in-val-' + idx, style: { fontSize: 13, fontWeight: '600', color: textPrimary } }, formatCurrency(fund.totalIncome))
+              ),
+              React.createElement(View, { testID: 'View-envelope-mid-' + idx, style: { alignItems: 'center' } },
+                React.createElement(Text, { testID: 'Text-envelope-out-lbl-' + idx, style: { fontSize: 11, color: textSecondary } }, 'Deductions'),
+                React.createElement(Text, { testID: 'Text-envelope-out-val-' + idx, style: { fontSize: 13, fontWeight: '600', color: dangerColor } }, formatCurrency(fund.expenses))
+              ),
+              React.createElement(View, { testID: 'View-envelope-right-' + idx, style: { alignItems: 'flex-end' } },
+                React.createElement(Text, { testID: 'Text-envelope-rem-lbl-' + idx, style: { fontSize: 11, color: textSecondary } }, 'Remaining'),
+                React.createElement(Text, { testID: 'Text-envelope-rem-val-' + idx, style: { fontSize: 13, fontWeight: 'bold', color: fund.remaining >= 0 ? primaryColor : dangerColor } }, formatCurrency(fund.remaining))
+              )
+            )
+          );
+        })
       ),
       state.upcomingBills.length > 0 ? React.createElement(View, { testID: 'View-28', style: { marginBottom: 20 }, componentId: 'upcoming-section' },
         React.createElement(Text, { testID: 'Text-44', style: { fontSize: 16, fontWeight: 'bold', color: textPrimary, marginBottom: 12 } }, '⚠️ Attention Required'),
@@ -637,7 +865,7 @@ const DashboardScreen = function(props) {
       React.createElement(View, { testID: 'View-32', style: { backgroundColor: cardColor, borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'budget-breakdown' },
         React.createElement(Text, { testID: 'Text-48', style: { fontSize: 16, fontWeight: 'bold', color: textPrimary, marginBottom: 16 } }, 'Budget Breakdown'),
         React.createElement(View, { testID: 'View-33', style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 } },
-          React.createElement(Text, { testID: 'Text-49', style: { color: textSecondary, fontSize: 14 } }, 'Monthly Salary'),
+          React.createElement(Text, { testID: 'Text-49', style: { color: textSecondary, fontSize: 14 } }, 'Total Income'),
           React.createElement(Text, { testID: 'Text-50', style: { color: textPrimary, fontSize: 14, fontWeight: '600' } }, formatCurrency(state.salary))
         ),
         React.createElement(View, { testID: 'View-34', style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 } },
@@ -938,10 +1166,10 @@ const HistoryScreen = function() {
   var userOneTime = allOneTime.filter(function(o) { return o.user_id === userId; });
   var combinedHistory = useMemo(function() {
     var histItems = userHistory.map(function(h) {
-      return { id: h.id, name: h.expense_name, amount: parseFloat(h.amount) || 0, type: h.expense_type, date: h.date, status: h.status };
+      return { id: h.id, name: h.expense_name, amount: parseFloat(h.amount) || 0, type: h.expense_type, date: h.date, status: h.status, notes: h.notes };
     });
     var oneTimeItems = userOneTime.map(function(o) {
-      return { id: o.id, name: o.name, amount: parseFloat(o.amount) || 0, type: 'One-Time', date: o.date, status: 'Spent' };
+      return { id: o.id, name: o.name, amount: parseFloat(o.amount) || 0, type: 'One-Time', date: o.date, status: 'Spent', notes: '' };
     });
     var allItems = histItems.concat(oneTimeItems);
     var seen = {};
@@ -972,15 +1200,20 @@ const HistoryScreen = function() {
     });
   }, [combinedHistory, typeFilter, statusFilter, search]);
   var totalShown = useMemo(function() {
-    return filteredHistory.reduce(function(s, i) { return s + i.amount; }, 0);
+    return filteredHistory.reduce(function(s, i) {
+      if (i.type === 'Income') return s + i.amount;
+      return s - i.amount;
+    }, 0);
   }, [filteredHistory]);
   var getStatusColor = function(status) {
+    if (status === 'Received') return primaryColor;
     if (status === 'Paid') return primaryColor;
     if (status === 'Paid in Advance') return infoColor;
     if (status === 'Spent') return dangerColor;
     return warningColor;
   };
   var getTypeIcon = function(type) {
+    if (type === 'Income') return 'trending-up';
     return type === 'Recurring' ? 'repeat' : 'shopping-bag';
   };
   return React.createElement(View, { testID: 'View-58', style: { flex: 1, backgroundColor: theme.colors.background }, componentId: 'history-screen' },
@@ -998,7 +1231,7 @@ const HistoryScreen = function() {
       ),
       React.createElement(View, { testID: 'View-62', style: { flexDirection: 'row', gap: 8 } },
         React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial' } },
-          ['All','Recurring','One-Time'].map(function(t) {
+          ['All','Recurring','One-Time','Income'].map(function(t) {
             return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-23', key: t, onPress: function() { setTypeFilter(t); },
               style: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: typeFilter === t ? primaryColor : backgroundColor, borderWidth: 1, borderColor: typeFilter === t ? primaryColor : '#D1FAE5' },
               componentId: 'type-filter-' + t
@@ -1006,7 +1239,7 @@ const HistoryScreen = function() {
               React.createElement(Text, { testID: 'Text-82', style: { color: typeFilter === t ? '#FFFFFF' : textSecondary, fontSize: 12, fontWeight: '600' } }, t)
             );
           }),
-          ['All','Pending','Paid','Paid in Advance','Spent'].map(function(s) {
+          ['All','Pending','Paid','Paid in Advance','Spent','Received'].map(function(s) {
             return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', key: s, onPress: function() { setStatusFilter(s); },
               style: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: statusFilter === s ? infoColor : backgroundColor, borderWidth: 1, borderColor: statusFilter === s ? infoColor : '#D1FAE5' },
               componentId: 'status-filter-' + s
@@ -1017,9 +1250,9 @@ const HistoryScreen = function() {
         )
       )
     ),
-    React.createElement(View, { testID: 'View-63', style: { backgroundColor: '#F0FDF4', paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, componentId: 'history-summary' },
-      React.createElement(Text, { testID: 'Text-84', style: { color: textSecondary, fontSize: 13 } }, 'Total shown:'),
-      React.createElement(Text, { testID: 'Text-85', style: { color: dangerColor, fontSize: 15, fontWeight: 'bold' } }, formatCurrency(totalShown))
+    React.createElement(View, { testID: 'View-63', style: { backgroundColor: totalShown >= 0 ? '#E6F4EA' : '#FEF2F2', paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, componentId: 'history-summary' },
+      React.createElement(Text, { testID: 'Text-84', style: { color: textSecondary, fontSize: 13 } }, totalShown >= 0 ? 'Net Income shown:' : 'Net Expenses shown:'),
+      React.createElement(Text, { testID: 'Text-85', style: { color: totalShown >= 0 ? primaryColor : dangerColor, fontSize: 15, fontWeight: 'bold' } }, (totalShown >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalShown)))
     ),
     loading ? React.createElement(View, { testID: 'View-64', style: { flex: 1, alignItems: 'center', justifyContent: 'center' }, componentId: 'history-loading' },
       React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-5', size: 'large', color: primaryColor })
@@ -1034,19 +1267,20 @@ const HistoryScreen = function() {
       renderItem: function(itemData) {
         var item = itemData.item;
         var idx = itemData.index;
+        var isIncome = item.type === 'Income';
         return React.createElement(View, { testID: 'View-66', style: { backgroundColor: cardColor, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
           componentId: 'history-item-' + idx
         },
-          React.createElement(View, { testID: 'View-67', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: item.type === 'Recurring' ? '#D1FAE5' : '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { testID: 'MaterialIcons-14', name: getTypeIcon(item.type), size: 20, color: item.type === 'Recurring' ? primaryColor : '#7C3AED' })
+          React.createElement(View, { testID: 'View-67', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#D1FAE5' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE'), alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { testID: 'MaterialIcons-14', name: getTypeIcon(item.type), size: 20, color: isIncome ? primaryColor : (item.type === 'Recurring' ? warningColor : '#7C3AED') })
           ),
           React.createElement(View, { testID: 'View-68', style: { flex: 1 } },
             React.createElement(Text, { testID: 'Text-87', style: { fontSize: 15, fontWeight: '600', color: textPrimary } }, item.name),
-            React.createElement(Text, { testID: 'Text-88', style: { fontSize: 12, color: textSecondary, marginTop: 2 } }, formatDate(item.date) + ' • ' + item.type)
+            React.createElement(Text, { testID: 'Text-88', style: { fontSize: 12, color: textSecondary, marginTop: 2 } }, formatDate(item.date) + (item.notes ? ' ' + item.notes : '') + ' • ' + item.type)
           ),
           React.createElement(View, { testID: 'View-69', style: { alignItems: 'flex-end' } },
-            React.createElement(Text, { testID: 'Text-89', style: { fontSize: 15, fontWeight: 'bold', color: dangerColor } }, '-' + formatCurrency(item.amount)),
-            React.createElement(View, { testID: 'View-70', style: { backgroundColor: item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#D1FAE5' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB')), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 } },
+            React.createElement(Text, { testID: 'Text-89', style: { fontSize: 15, fontWeight: 'bold', color: isIncome ? primaryColor : dangerColor } }, (isIncome ? '+' : '-') + formatCurrency(item.amount)),
+            React.createElement(View, { testID: 'View-70', style: { backgroundColor: item.status === 'Received' ? '#D1FAE5' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#D1FAE5' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 } },
               React.createElement(Text, { testID: 'Text-90', style: { fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' } }, item.status)
             )
           )
@@ -1075,30 +1309,60 @@ const SettingsScreen = function(props) {
   var salaryInput = salaryState[0]; var setSalaryInput = salaryState[1];
   var savedState = useState(false);
   var showSaved = savedState[0]; var setShowSaved = savedState[1];
-  useEffect(function() {
-    if (userSettings && userSettings.monthly_salary) {
-      setSalaryInput(String(userSettings.monthly_salary));
-    }
-  }, [userSettings]);
+
+  var newNameState = useState('');
+  var newSourceName = newNameState[0]; var setNewSourceName = newNameState[1];
+  var newAmtState = useState('');
+  var newSourceAmount = newAmtState[0]; var setNewSourceAmount = newAmtState[1];
+
   var updateSettings = useMutation('user_settings', 'update');
   var mutateUpdate = updateSettings.mutate;
   var insertSettings = useMutation('user_settings', 'insert');
   var mutateInsert = insertSettings.mutate;
-  var handleSaveSalary = function() {
-    var amt = parseFloat(salaryInput);
-    if (isNaN(amt) || amt < 0) {
-      Platform.OS === 'web' ? window.alert('Please enter a valid salary amount.') : Alert.alert('Invalid Amount', 'Please enter a valid salary amount.');
+
+  var baseSources = useMemo(function() {
+    if (userSettings && userSettings.income_sources) {
+      return typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+    }
+    var sal = userSettings ? (parseFloat(userSettings.monthly_salary) || 0) : 0;
+    return [{ id: 'main-salary', name: 'Main Salary', amount: sal }];
+  }, [userSettings]);
+
+  var handleAddSourceSetting = function() {
+    if (!newSourceName.trim()) {
+      Platform.OS === 'web' ? window.alert('Please enter source name.') : Alert.alert('Error', 'Please enter source name.');
       return;
     }
+    var amt = parseFloat(newSourceAmount);
+    if (isNaN(amt) || amt < 0) {
+      Platform.OS === 'web' ? window.alert('Please enter a valid monthly amount.') : Alert.alert('Error', 'Please enter a valid monthly amount.');
+      return;
+    }
+    var newSrc = { id: generateId(), name: newSourceName.trim(), amount: amt };
+    var newList = baseSources.concat(newSrc);
+    
     if (userSettings) {
-      mutateUpdate({ id: userSettings.id, data: { monthly_salary: amt } }).then(function() {
-        refetch(); setShowSaved(true);
+      mutateUpdate({ id: userSettings.id, income_sources: newList }).then(function() {
+        setNewSourceName(''); setNewSourceAmount(''); refetch(); setShowSaved(true);
         setTimeout(function() { setShowSaved(false); }, 2000);
       });
     } else {
-      mutateInsert({ id: generateId(), user_id: userId, monthly_salary: amt }).then(function() {
-        refetch(); setShowSaved(true);
+      mutateInsert({ id: generateId(), user_id: userId, monthly_salary: 0, income_sources: newList }).then(function() {
+        setNewSourceName(''); setNewSourceAmount(''); refetch(); setShowSaved(true);
         setTimeout(function() { setShowSaved(false); }, 2000);
+      });
+    }
+  };
+
+  var handleDeleteSourceSetting = function(id) {
+    if (baseSources.length <= 1) {
+      Platform.OS === 'web' ? window.alert('You must have at least one income source.') : Alert.alert('Error', 'You must have at least one income source.');
+      return;
+    }
+    var newList = baseSources.filter(function(src) { return src.id !== id; });
+    if (userSettings) {
+      mutateUpdate({ id: userSettings.id, income_sources: newList }).then(function() {
+        refetch();
       });
     }
   };
@@ -1137,34 +1401,60 @@ const SettingsScreen = function(props) {
           React.createElement(View, { testID: 'View-79', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#D1FAE5', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
             React.createElement(MaterialIcons, { testID: 'MaterialIcons-15', name: 'attach-money', size: 22, color: primaryColor })
           ),
-          React.createElement(Text, { testID: 'Text-96', style: { fontSize: 17, fontWeight: 'bold', color: textPrimary } }, 'Monthly Salary')
+          React.createElement(Text, { testID: 'Text-96', style: { fontSize: 17, fontWeight: 'bold', color: textPrimary } }, 'My Income Sources')
         ),
-        React.createElement(Text, { testID: 'Text-97', style: { fontSize: 13, color: textSecondary, marginBottom: 8 } }, 'Set your monthly income to track your budget accurately'),
-        React.createElement(View, { testID: 'View-80', style: { flexDirection: 'row', alignItems: 'center', gap: 12 } },
-          React.createElement(View, { testID: 'View-81', style: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: backgroundColor, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 10, paddingHorizontal: 14 } },
-            React.createElement(Text, { testID: 'Text-98', style: { fontSize: 18, color: primaryColor, fontWeight: 'bold', marginRight: 4 } }, '₱'),
-            React.createElement(TextInput, { testID: 'TextInput-10', value: salaryInput,
-              onChangeText: function(text) {
-                var s = text.replace(/[^0-9.]/g, '');
-                var parts = s.split('.');
-                if (parts.length > 2) { s = parts[0] + '.' + parts.slice(1).join(''); }
-                setSalaryInput(s);
-              },
-              placeholder: '0.00', keyboardType: 'decimal-pad',
-              style: { flex: 1, paddingVertical: 14, fontSize: 16, color: textPrimary },
-              componentId: 'salary-input'
-            })
-          ),
-          React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-25', onPress: handleSaveSalary,
-            style: { backgroundColor: primaryColor, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 14 },
-            componentId: 'save-salary-btn'
+        React.createElement(Text, { testID: 'Text-97', style: { fontSize: 13, color: textSecondary, marginBottom: 12 } }, 'Add or delete active recurring monthly income sources'),
+        baseSources.map(function(src, sIdx) {
+          return React.createElement(View, { testID: 'View-setting-source-row-' + sIdx, key: src.id,
+            style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }
           },
-            React.createElement(Text, { testID: 'Text-99', style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 } }, 'Save')
+            React.createElement(View, { testID: 'View-setting-source-lbl-' + sIdx, style: { flexDirection: 'row', alignItems: 'center' } },
+              React.createElement(MaterialIcons, { testID: 'MaterialIcons-source-bullet-' + sIdx, name: 'label-outline', size: 16, color: primaryColor, style: { marginRight: 6 } }),
+              React.createElement(Text, { testID: 'Text-setting-source-name-' + sIdx, style: { fontSize: 14, fontWeight: '600', color: textPrimary } }, src.name)
+            ),
+            React.createElement(View, { testID: 'View-setting-source-right-' + sIdx, style: { flexDirection: 'row', alignItems: 'center', gap: 12 } },
+              React.createElement(Text, { testID: 'Text-setting-source-amount-' + sIdx, style: { fontSize: 14, fontWeight: 'bold', color: primaryColor } }, formatCurrency(src.amount)),
+              baseSources.length > 1 ? React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-delete-source-' + sIdx,
+                onPress: function() { handleDeleteSourceSetting(src.id); },
+                style: { padding: 4 }
+              },
+                React.createElement(MaterialIcons, { testID: 'MaterialIcons-delete-source-' + sIdx, name: 'delete-outline', size: 18, color: dangerColor })
+              ) : null
+            )
+          );
+        }),
+        React.createElement(View, { testID: 'View-add-source-form', style: { marginTop: 16, backgroundColor: '#F9FAFB', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' } },
+          React.createElement(Text, { testID: 'Text-add-source-title', style: { fontSize: 12, fontWeight: 'bold', color: textSecondary, marginBottom: 8 } }, '➕ ADD NEW INCOME SOURCE'),
+          React.createElement(TextInput, { testID: 'TextInput-new-source-name', value: newSourceName, onChangeText: setNewSourceName, placeholder: 'Source name (e.g. Side Gig)',
+            style: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: textPrimary, marginBottom: 8 },
+            componentId: 'setting-source-name-input'
+          }),
+          React.createElement(View, { testID: 'View-add-source-bottom-row', style: { flexDirection: 'row', gap: 10, alignItems: 'center' } },
+            React.createElement(View, { testID: 'View-add-source-amount-wrap', style: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, paddingHorizontal: 12 } },
+              React.createElement(Text, { testID: 'Text-add-source-curr', style: { fontSize: 14, color: textSecondary, marginRight: 4 } }, '₱'),
+              React.createElement(TextInput, { testID: 'TextInput-new-source-amount', value: newSourceAmount,
+                onChangeText: function(text) {
+                  var s = text.replace(/[^0-9.]/g, '');
+                  var parts = s.split('.');
+                  if (parts.length > 2) { s = parts[0] + '.' + parts.slice(1).join(''); }
+                  setNewSourceAmount(s);
+                },
+                placeholder: '0.00', keyboardType: 'decimal-pad',
+                style: { flex: 1, paddingVertical: 10, fontSize: 14, color: textPrimary },
+                componentId: 'setting-source-amount-input'
+              })
+            ),
+            React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-add-source-btn', onPress: handleAddSourceSetting,
+              style: { backgroundColor: primaryColor, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12 },
+              componentId: 'setting-add-source-btn'
+            },
+              React.createElement(Text, { testID: 'Text-add-source-btn-lbl', style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 } }, 'Add')
+            )
           )
         ),
         showSaved ? React.createElement(View, { testID: 'View-82', style: { backgroundColor: '#D1FAE5', borderRadius: 8, padding: 10, marginTop: 12, flexDirection: 'row', alignItems: 'center' } },
           React.createElement(MaterialIcons, { testID: 'MaterialIcons-16', name: 'check-circle', size: 18, color: primaryColor }),
-          React.createElement(Text, { testID: 'Text-100', style: { color: primaryColor, fontSize: 13, marginLeft: 8, fontWeight: '600' } }, 'Salary updated successfully!')
+          React.createElement(Text, { testID: 'Text-100', style: { color: primaryColor, fontSize: 13, marginLeft: 8, fontWeight: '600' } }, 'Income sources updated successfully!')
         ) : null
       ),
       React.createElement(View, { testID: 'View-83', style: { backgroundColor: cardColor, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'app-info-card' },
