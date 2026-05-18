@@ -441,9 +441,10 @@ const AddExpenseModal = function(props) {
     if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
     setErrorMsg('');
     if (expType === 'one_time') {
-      var newOneTime = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: 'general' };
+      var expId = generateId();
+      var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: 'general' };
       mutateOneTime(newOneTime).then(function() {
-        return mutateHistory({ id: generateId(), user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: '' });
+        return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: '' });
       }).then(function() {
         setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); onSaved(); onClose();
       }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
@@ -944,9 +945,15 @@ const HistoryScreen = function() {
     });
     var allItems = histItems.concat(oneTimeItems);
     var seen = {};
+    var seenKeys = {};
     var unique = allItems.filter(function(item) {
       if (seen[item.id]) return false;
       seen[item.id] = true;
+      if (item.type === 'One-Time') {
+        var key = item.name + '_' + item.amount + '_' + item.date;
+        if (seenKeys[key]) return false;
+        seenKeys[key] = true;
+      }
       return true;
     });
     unique.sort(function(a, b) {
