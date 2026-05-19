@@ -3,36 +3,36 @@ import { Platform } from 'react-native';
 
 const lightTheme = {
   colors: {
-    primary: '#F97316',
-    accent: '#FB923C',
-    background: '#FFF7ED',
-    card: '#FFFFFF',
-    textPrimary: '#1E293B',
-    textSecondary: '#64748B',
-    border: '#FED7AA',
-    success: '#10B981',
+    primary: '#10B981',
+    accent: '#059669',
+    background: '#FFFFFF',
+    card: '#F9FAFB',
+    textPrimary: '#111827',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    success: '#22C55E',
     error: '#EF4444',
     warning: '#F59E0B',
-    info: '#F97316',
-    inputBg: '#FAFAFA'
+    info: '#10B981',
+    inputBg: '#FFFFFF'
   },
   isDark: false
 };
 
 const darkTheme = {
   colors: {
-    primary: '#F97316',
-    accent: '#EA580C',
-    background: '#0F172A',
-    card: '#1E293B',
-    textPrimary: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    border: '#334155',
-    success: '#10B981',
-    error: '#F87171',
+    primary: '#10B981',
+    accent: '#059669',
+    background: '#0B0F19',
+    card: '#1F2937',
+    textPrimary: '#F9FAFB',
+    textSecondary: '#9CA3AF',
+    border: '#374151',
+    success: '#22C55E',
+    error: '#EF4444',
     warning: '#FBBF24',
-    info: '#F97316',
-    inputBg: '#0F172A'
+    info: '#10B981',
+    inputBg: '#111827'
   },
   isDark: true
 };

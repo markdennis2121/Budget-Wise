@@ -529,6 +529,114 @@ const SavingsManagerModal = function({ visible, onClose, state, userSettings, mu
   );
 };
 
+const NotificationCenterModal = function({ visible, onClose, state, theme, insets }) {
+  var handleTestNotification = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+          const permission = await window.Notification.requestPermission();
+          if (permission === 'granted') {
+            new window.Notification("Penny System Test", {
+              body: "Notification channel verified. Everything is working correctly."
+            });
+          } else {
+            alert("Please enable notification permissions in your browser settings!");
+          }
+        }
+      } else {
+        const { LocalNotifications } = require('@capacitor/local-notifications');
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: 9999,
+              title: "Penny System Test",
+              body: "Notification channel verified. Everything is working correctly.",
+              sound: 'default'
+            }
+          ]
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to send test notification", e);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insets.top }}>
+        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '85%' }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="notifications-none" size={24} color={theme.colors.primary} />
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Alerts & Reminders</Text>
+            </View>
+            <TouchableOpacity onPress={onClose}>
+              <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 20 }}>
+            {/* Active Subscriptions / Reminders */}
+            <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 6, letterSpacing: 0.5 }}>SYSTEM TRIGGERS</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>Daily Budget Check</Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Daily log nudge scheduled at 8:00 PM</Text>
+                </View>
+                <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#065F46' }}>ACTIVE</Text>
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 6 }} />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>Upcoming Bill Alerts</Text>
+                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Fires 1 day before due date at 9:00 AM</Text>
+                </View>
+                <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#065F46' }}>ACTIVE</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Upcoming Alerts List */}
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Scheduled Bill Reminders</Text>
+            
+            {state.upcomingBills.length === 0 ? (
+              <View style={{ alignItems: 'center', padding: 24, backgroundColor: theme.colors.background, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+                <MaterialIcons name="notifications-none" size={32} color={theme.colors.textSecondary} style={{ marginBottom: 8 }} />
+                <Text style={{ fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center' }}>
+                  No upcoming bills scheduled for reminders in the next 5 days.
+                </Text>
+              </View>
+            ) : (
+              state.upcomingBills.map(bill => (
+                <View key={bill.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: theme.colors.background, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: theme.colors.border }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }} numberOfLines={1}>{bill.name}</Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
+                      Alert fires on: {new Date(new Date(bill.due_date).getTime() - 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at 9:00 AM
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.primary }}>{formatCurrency(bill.amount)}</Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          <TouchableOpacity onPress={handleTestNotification} style={{ backgroundColor: theme.colors.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: theme.colors.textSecondary, fontSize: 13, fontWeight: '600' }}>Run Notification Diagnostics</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const AddAccountModal = function({ visible, onClose, accounts, userSettings, mutateUpdateSettings, onSaved }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
@@ -538,15 +646,19 @@ const AddAccountModal = function({ visible, onClose, accounts, userSettings, mut
 
   useEffect(() => {
     if (visible) {
-      setName('');
+      setName('GCash');
       setType('GCash');
       setStartingBalance('');
     }
   }, [visible]);
 
   var handleCreate = function() {
-    if (!name.trim()) return;
-    if (accounts.find(a => a.name.toLowerCase() === name.trim().toLowerCase())) {
+    var finalName = type === 'Custom' ? name.trim() : (WALLET_STYLES[type]?.name || type);
+    if (!finalName) {
+      Platform.OS === 'web' ? window.alert('Please enter an account name.') : Alert.alert('Error', 'Please enter an account name.');
+      return;
+    }
+    if (accounts.find(a => a.name.toLowerCase() === finalName.toLowerCase())) {
       Platform.OS === 'web' ? window.alert('Account already exists!') : Alert.alert('Error', 'Account already exists!');
       return;
     }
@@ -554,7 +666,7 @@ const AddAccountModal = function({ visible, onClose, accounts, userSettings, mut
     var newId = 'acc-' + generateId();
     var newAcc = { 
       id: newId, 
-      name: name.trim(), 
+      name: finalName, 
       type: type, 
       starting_balance: parseFloat(startingBalance) || 0,
       color: walletStyle.color
@@ -579,20 +691,35 @@ const AddAccountModal = function({ visible, onClose, accounts, userSettings, mut
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
           
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ACCOUNT NAME</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. GCash Personal, BPI Savings"
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
-          />
+          {type === 'Custom' && (
+            <>
+              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ACCOUNT NAME</Text>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="e.g. BDO Personal, GCash Business"
+                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
+              />
+            </>
+          )}
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>WALLET / BANK TYPE</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             {Object.keys(WALLET_STYLES).map(t => {
               var isSelected = type === t;
               return (
-                <TouchableOpacity key={t} onPress={() => setType(t)} style={{ marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSelected ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border }}>
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => {
+                    setType(t);
+                    if (t !== 'Custom') {
+                      setName(WALLET_STYLES[t]?.name || t);
+                    } else {
+                      setName('');
+                    }
+                  }}
+                  style={{ marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSelected ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border }}
+                >
                   <Text style={{ color: isSelected ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{t}</Text>
                 </TouchableOpacity>
               );
@@ -1374,6 +1501,18 @@ const SpentManagerModal = function({ visible, onClose, filter, oneTimeExpenses, 
   );
 };
 
+const getEnvelopeIcon = function(name) {
+  var lower = (name || '').toLowerCase();
+  if (lower.includes('housing') || lower.includes('rent') || lower.includes('home') || lower.includes('house')) return 'home';
+  if (lower.includes('food') || lower.includes('dine') || lower.includes('eat') || lower.includes('grocery') || lower.includes('restaurant')) return 'restaurant';
+  if (lower.includes('transport') || lower.includes('car') || lower.includes('travel') || lower.includes('commute') || lower.includes('gas') || lower.includes('fare')) return 'directions-car';
+  if (lower.includes('saving')) return 'savings';
+  if (lower.includes('health') || lower.includes('medical') || lower.includes('hospital') || lower.includes('drug') || lower.includes('clinic')) return 'local-hospital';
+  if (lower.includes('school') || lower.includes('education') || lower.includes('book') || lower.includes('course') || lower.includes('class')) return 'school';
+  if (lower.includes('utility') || lower.includes('bill') || lower.includes('electric') || lower.includes('water') || lower.includes('internet') || lower.includes('phone')) return 'receipt';
+  return 'label-important';
+};
+
 const DashboardScreen = function(props) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
@@ -1392,6 +1531,7 @@ const DashboardScreen = function(props) {
   var [showEditAccountModal, setShowEditAccountModal] = useState(false);
   var [selectedAccount, setSelectedAccount] = useState(null);
   var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
+  var [showNotificationCenter, setShowNotificationCenter] = useState(false);
   var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
   var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
@@ -1407,6 +1547,12 @@ const DashboardScreen = function(props) {
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Welcome back</Text>
             <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 20 }}>{userName}</Text>
           </View>
+          <TouchableOpacity 
+            onPress={function() { setShowNotificationCenter(true); }}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+          >
+            <MaterialIcons name="notifications-active" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
         
         <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 20, flexDirection: 'column', gap: 14 }}>
@@ -1551,7 +1697,7 @@ const DashboardScreen = function(props) {
           {state.envelopeBalances.map(env => (
             <TouchableOpacity key={env.id} onPress={function() { setSpentFilter(env.id); setShowSpentModal(true); }} style={{ width: '48%', backgroundColor: theme.colors.card, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <MaterialIcons name="mail-outline" size={20} color={theme.colors.primary} />
+                <MaterialIcons name={getEnvelopeIcon(env.name)} size={20} color={theme.colors.primary} />
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textSecondary }}>
                     {env.available < 0 ? 'OVERSPENT' : ''}
@@ -1613,6 +1759,7 @@ const DashboardScreen = function(props) {
       
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
+      <NotificationCenterModal visible={showNotificationCenter} onClose={function() { setShowNotificationCenter(false); }} state={state} theme={theme} insets={insets} />
     </View>
   );
 };

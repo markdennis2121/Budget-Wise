@@ -5,7 +5,6 @@ import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
-import AppLogo from '../assets/login_mascot.png';
 import { generateId, getTodayStr } from '../utils/helpers';
 
 const RegisterScreen = function(props) {
@@ -62,7 +61,6 @@ const RegisterScreen = function(props) {
     React.createElement(ScrollView, { testID: 'ScrollView-5', contentContainerStyle: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }
     },
       React.createElement(View, { testID: 'View-9', style: { alignItems: 'center', marginBottom: 32 }, componentId: 'register-logo' },
-        React.createElement(Image, { source: AppLogo, style: { width: 100, height: 100, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 } }),
         React.createElement(Text, { testID: 'Text-17', style: { fontSize: 26, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Join Penny Today!')
       ),
       React.createElement(View, { testID: 'View-11', style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'register-card' },

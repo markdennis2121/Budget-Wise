@@ -6,9 +6,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
-import AppLogo from '../assets/login_mascot.png';
+import { NativeBiometric } from 'capacitor-native-biometric';
 
-const PIN_LENGTH = 8;
+const PIN_LENGTH = 6;
 
 const LoginScreen = function(props) {
   var navigation = props.navigation;
@@ -36,8 +36,38 @@ const LoginScreen = function(props) {
   var pinEntry = allUsers.reduce(function(found, u) {
     if (found) return found;
     var s = allSettings.find(function(st) { return st.user_id === u.id && st.pin_code; });
-    return s ? { user: u, pinCode: s.pin_code } : null;
+    return s ? { user: u, pinCode: s.pin_code, biometricsEnabled: s.biometrics_enabled } : null;
   }, null);
+
+  var triggerModalBiometrics = async function() {
+    try {
+      var availableRes = await NativeBiometric.isAvailable();
+      if (availableRes.isAvailable) {
+        await NativeBiometric.verifyIdentity({
+          reason: "Sign in to Penny",
+          title: "Biometric Login",
+          subtitle: "Use fingerprint or Face ID"
+        });
+        if (pinEntry) {
+          setShowPinModal(false);
+          setPin('');
+          userCtx.setCurrentUser(pinEntry.user);
+          navigation.replace('MainApp');
+        }
+      }
+    } catch (e) {
+      console.log("Biometrics failed", e);
+    }
+  };
+
+  useEffect(function() {
+    if (showPinModal && pinEntry?.biometricsEnabled) {
+      var timer = setTimeout(() => {
+        triggerModalBiometrics();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showPinModal]);
 
   // Handle PIN digit entry
   useEffect(function() {
@@ -146,7 +176,6 @@ const LoginScreen = function(props) {
           // Handle bar
           React.createElement(View, { style: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, marginBottom: 24 } }),
 
-          React.createElement(Image, { source: AppLogo, style: { width: 72, height: 72, marginBottom: 12 } }),
           React.createElement(Text, { style: { fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 } }, 'Enter your PIN'),
           React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 24 } }, pinEntry ? pinEntry.user.name : ''),
 
@@ -168,9 +197,16 @@ const LoginScreen = function(props) {
                 React.createElement(Text, { style: { fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary } }, num)
               );
             }),
-            React.createElement(TouchableOpacity, { onPress: handleClosePinModal, style: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' } },
-              React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: '600', textAlign: 'center' } }, 'Cancel')
-            ),
+            pinEntry?.biometricsEnabled
+              ? React.createElement(TouchableOpacity, { 
+                  onPress: triggerModalBiometrics, 
+                  style: { width: 68, height: 68, borderRadius: 34, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border } 
+                },
+                  React.createElement(MaterialIcons, { name: 'fingerprint', size: 28, color: theme.colors.primary })
+                )
+              : React.createElement(TouchableOpacity, { onPress: handleClosePinModal, style: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' } },
+                  React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: '600', textAlign: 'center' } }, 'Cancel')
+                ),
             React.createElement(TouchableOpacity, { onPress: function() { handlePinPress('0'); },
               style: { width: 68, height: 68, borderRadius: 34, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border } },
               React.createElement(Text, { style: { fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary } }, '0')

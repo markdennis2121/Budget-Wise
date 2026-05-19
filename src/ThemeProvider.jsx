@@ -5,17 +5,17 @@ export const ThemeContext = createContext({});
 export const ThemeProvider = ({ children }) => {
   const theme = useMemo(() => ({
     colors: {
-      primary: '#F97316',
-      accent: '#10B981',
-      background: '#FFF7ED',
-      card: '#FFFFFF',
+      primary: '#10B981',
+      accent: '#059669',
+      background: '#FFFFFF',
+      card: '#F9FAFB',
       textPrimary: '#111827',
       textSecondary: '#6B7280',
-      border: '#FED7AA',
-      success: '#F97316',
+      border: '#E5E7EB',
+      success: '#22C55E',
       error: '#EF4444',
       warning: '#F59E0B',
-      info: '#3B82F6',
+      info: '#10B981',
     },
   }), []);
 

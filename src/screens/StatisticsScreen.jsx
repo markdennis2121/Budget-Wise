@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, Platform } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, Platform, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'platform-hooks';
@@ -98,6 +98,70 @@ const StatisticsScreen = function() {
   var savingsRate = totalMonthlyIncome > 0 ? Math.round((savings / totalMonthlyIncome) * 100) : 0;
   var spendPct = totalMonthlyIncome > 0 ? Math.min(100, Math.round((totalMonthSpent / totalMonthlyIncome) * 100)) : 0;
 
+  var [selectedEnvIndex, setSelectedEnvIndex] = useState(null);
+
+  const SEGMENT_COLORS = [
+    '#FF6B6B', // Vibrant Coral Red
+    '#4D96FF', // Sky Blue
+    '#6BCB77', // Emerald Green
+    '#FFD93D', // Golden Yellow
+    '#9B5DE5', // Amethyst Purple
+    '#F15BB5', // Hot Pink
+    '#00F5D4', // Turquoise
+    '#FF9F1C', // Deep Amber
+  ];
+
+  var coloredSpending = useMemo(function() {
+    return envelopeSpending.map(function(env, idx) {
+      return {
+        ...env,
+        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+      };
+    });
+  }, [envelopeSpending]);
+
+  var svgSegments = useMemo(function() {
+    var radius = 35;
+    var strokeWidth = 10;
+    var circ = 2 * Math.PI * radius;
+    var accumulatedPercent = 0;
+
+    return coloredSpending.map(function(env, idx) {
+      var pct = env.spent / totalMonthSpent;
+      var strokeDashoffset = circ - (pct * circ);
+      var strokeDasharray = circ;
+      var angle = accumulatedPercent * 360 - 90;
+      accumulatedPercent += pct;
+
+      var isSelected = selectedEnvIndex === idx;
+
+      return React.createElement('circle', {
+        key: idx,
+        cx: 50,
+        cy: 50,
+        r: radius,
+        fill: 'transparent',
+        stroke: env.color,
+        strokeWidth: isSelected ? strokeWidth + 2 : strokeWidth,
+        strokeDasharray: strokeDasharray,
+        strokeDashoffset: strokeDashoffset,
+        transform: 'rotate(' + angle + ' 50 50)',
+        strokeLinecap: 'round',
+        style: {
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          opacity: selectedEnvIndex === null || isSelected ? 1 : 0.4
+        },
+        onClick: function() {
+          setSelectedEnvIndex(selectedEnvIndex === idx ? null : idx);
+        }
+      });
+    });
+  }, [coloredSpending, selectedEnvIndex, totalMonthSpent]);
+
+  var centerLabel = selectedEnvIndex !== null ? coloredSpending[selectedEnvIndex].name : 'Total Spent';
+  var centerValue = selectedEnvIndex !== null ? formatCurrency(coloredSpending[selectedEnvIndex].spent) : formatCurrency(totalMonthSpent);
+
   // 6-month trend
   var last6Months = getLast6Months();
   var monthlyTotals = useMemo(function() {
@@ -173,7 +237,7 @@ const StatisticsScreen = function() {
         )
       ),
 
-      // ── Top Envelopes ─────────────────────────────────────────────────────
+      // ── Spending by Envelope (Interactive Doughnut Chart) ───────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
           React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
@@ -187,18 +251,77 @@ const StatisticsScreen = function() {
               React.createElement(MaterialIcons, { name: 'inbox', size: 44, color: theme.colors.border }),
               React.createElement(Text, { style: { color: theme.colors.textSecondary, marginTop: 10, fontSize: 14 } }, 'No spending recorded yet')
             )
-          : envelopeSpending.map(function(env, i) {
-              var pct = maxEnvSpent > 0 ? Math.round((env.spent / maxEnvSpent) * 100) : 0;
-              return React.createElement(View, { key: i, style: { marginBottom: i < envelopeSpending.length - 1 ? 14 : 0 } },
-                React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 } },
-                  React.createElement(Text, { style: { fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary } }, env.name),
-                  React.createElement(Text, { style: { fontSize: 13, fontWeight: 'bold', color: theme.colors.primary } }, formatCurrency(env.spent))
-                ),
-                React.createElement(View, { style: { height: 8, backgroundColor: theme.colors.border, borderRadius: 4, overflow: 'hidden' } },
-                  React.createElement(View, { style: { width: pct + '%', height: '100%', backgroundColor: theme.colors.primary, borderRadius: 4 } })
+          : React.createElement(View, null,
+              // Centered SVG Doughnut Chart
+              React.createElement(View, { style: { alignItems: 'center', justifyContent: 'center', marginVertical: 12 } },
+                React.createElement(View, { style: { alignItems: 'center', justifyContent: 'center', width: 180, height: 180 } },
+                  React.createElement('svg', {
+                    viewBox: '0 0 100 100',
+                    style: { width: 180, height: 180, position: 'absolute' }
+                  },
+                    svgSegments
+                  ),
+                  React.createElement(TouchableOpacity, {
+                    onPress: function() { setSelectedEnvIndex(null); },
+                    style: {
+                      width: 110,
+                      height: 110,
+                      borderRadius: 55,
+                      backgroundColor: theme.colors.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      elevation: 4,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3
+                    }
+                  },
+                    React.createElement(Text, { numberOfLines: 1, style: { fontSize: 9, color: theme.colors.textSecondary, textTransform: 'uppercase', fontWeight: 'bold', textAlign: 'center', width: 90 } }, centerLabel),
+                    React.createElement(Text, { numberOfLines: 1, style: { fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, marginTop: 2, textAlign: 'center', width: 95 } }, centerValue)
+                  )
                 )
-              );
-            })
+              ),
+
+              // Interactive category list below the chart
+              React.createElement(View, { style: { marginTop: 16 } },
+                coloredSpending.map(function(env, i) {
+                  var isSelected = selectedEnvIndex === i;
+                  var isAnySelected = selectedEnvIndex !== null;
+                  var pct = maxEnvSpent > 0 ? Math.round((env.spent / maxEnvSpent) * 100) : 0;
+                  var sharePct = totalMonthSpent > 0 ? Math.round((env.spent / totalMonthSpent) * 100) : 0;
+                  
+                  return React.createElement(TouchableOpacity, {
+                    key: i,
+                    onPress: function() { setSelectedEnvIndex(isSelected ? null : i); },
+                    style: {
+                      padding: 10,
+                      borderRadius: 10,
+                      backgroundColor: isSelected ? 'rgba(255,237,213,0.4)' : 'transparent',
+                      borderWidth: 1,
+                      borderColor: isSelected ? theme.colors.primary : 'transparent',
+                      marginBottom: i < coloredSpending.length - 1 ? 8 : 0,
+                      opacity: !isAnySelected || isSelected ? 1 : 0.6,
+                      transition: 'all 0.2s ease'
+                    }
+                  },
+                    React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 } },
+                      React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+                        React.createElement(View, { style: { width: 12, height: 12, borderRadius: 6, backgroundColor: env.color, marginRight: 8 } }),
+                        React.createElement(Text, { style: { fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary } }, env.name)
+                      ),
+                      React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+                        React.createElement(Text, { style: { fontSize: 13, fontWeight: 'bold', color: theme.colors.textPrimary } }, formatCurrency(env.spent)),
+                        React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginLeft: 6 } }, `(${sharePct}%)`)
+                      )
+                    ),
+                    React.createElement(View, { style: { height: 8, backgroundColor: theme.colors.border, borderRadius: 4, overflow: 'hidden' } },
+                      React.createElement(View, { style: { width: pct + '%', height: '100%', backgroundColor: env.color, borderRadius: 4 } })
+                    )
+                  );
+                })
+              )
+            )
       ),
 
       // ── 6-Month Trend ─────────────────────────────────────────────────────

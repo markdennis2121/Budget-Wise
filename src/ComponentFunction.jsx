@@ -1,13 +1,16 @@
-import React, { useMemo } from 'react';
-import { View, Text, StatusBar } from 'react-native';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { View, Text, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { UserProvider } from './contexts/UserContext';
+import { UserProvider, useUser } from './contexts/UserContext';
 import { ThemeProvider, primaryColor } from './contexts/ThemeContext';
 import { formatDate } from './utils/helpers';
+import { useQuery } from 'platform-hooks';
 import MainNavigator from './navigation/MainNavigator';
+import PinLockScreen from './screens/PinLockScreen';
+import { scheduleDailyReminder } from './utils/notifications';
 
 const EXPIRATION_DATE = '2026-05-25';
 
@@ -33,6 +36,117 @@ const TrialExpiredScreen = function() {
   );
 };
 
+const AppContent = function() {
+  var userCtx = useUser();
+  var currentUser = userCtx.currentUser;
+  
+  var settingsQuery = useQuery('user_settings');
+  var allSettings = settingsQuery.data || [];
+  var userSettings = allSettings.find(function(s) { return s.user_id === (currentUser ? currentUser.id : ''); });
+
+  var [isLocked, setIsLocked] = useState(true);
+  var prevUser = useRef(currentUser);
+
+  // When current user changes, handle lock/unlock transition
+  useEffect(() => {
+    if (!currentUser) {
+      setIsLocked(true);
+    } else if (!prevUser.current && currentUser) {
+      // User just successfully logged in from null (the Login Screen), so unlock automatically
+      setIsLocked(false);
+    }
+    prevUser.current = currentUser;
+  }, [currentUser]);
+
+  var hasPin = userSettings && userSettings.pin_code;
+
+  if (currentUser && hasPin && isLocked) {
+    return React.createElement(PinLockScreen, { onUnlock: () => setIsLocked(false) });
+  }
+
+  return React.createElement(NavigationContainer, {}, React.createElement(MainNavigator));
+};
+
+const TermsAndConditionsScreen = function(props) {
+  var onAccept = props.onAccept;
+  var [checked, setChecked] = useState(false);
+
+  return React.createElement(View, {
+    style: { flex: 1, backgroundColor: '#FFEDD5', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingTop: 40, paddingBottom: 20 }
+  },
+    React.createElement(View, {
+      style: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 24, flex: 1, width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, justifyContent: 'space-between' }
+    },
+      React.createElement(View, { style: { alignItems: 'center', marginBottom: 16 } },
+        React.createElement(View, {
+          style: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }
+        },
+          React.createElement(MaterialIcons, { name: 'gavel', size: 28, color: primaryColor })
+        ),
+        React.createElement(Text, {
+          style: { fontSize: 20, fontWeight: 'bold', color: '#111827' }
+        }, 'Welcome to Penny!'),
+        React.createElement(Text, {
+          style: { fontSize: 13, color: '#6B7280', marginTop: 4 }
+        }, 'Please agree to our terms to get started')
+      ),
+
+      React.createElement(ScrollView, {
+        style: { flex: 1, borderWidth: 1, borderColor: '#FED7AA', borderRadius: 12, padding: 14, backgroundColor: '#FFFDFB', marginBottom: 16 }
+      },
+        React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '1. Local Data Privacy'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Penny stores all your budgeting data, income sources, accounts, and transactions locally on your device. We do not upload, track, or share your financial data with any remote servers. Your data is entirely yours and remains strictly private.'),
+        
+        React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '2. Native Security'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'If you enable the PIN lock or Biometric lock, your fingerprint or Face ID is verified directly by your phone\'s local hardware using native OS-level prompts. Penny never accesses or stores your actual biometric print details.'),
+        
+        React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '3. Permission and Notifications'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Penny requests Local Notification permissions to schedule daily reminder prompts and alerts for upcoming bills. These alerts are handled locally by your device\'s system alarm scheduler.'),
+        
+        React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '4. Disclaimer of Liability'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 8 } }, 'Penny is a personal ledger tool provided "as is". The user is responsible for backing up their data. We are not responsible for any financial decisions or data loss occurring due to hardware failure, device loss, or manual app deletion.')
+      ),
+
+      React.createElement(View, null,
+        // Checkbox Section
+        React.createElement(TouchableOpacity, {
+          onPress: function() { setChecked(!checked); },
+          style: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, paddingVertical: 4 }
+        },
+          React.createElement(MaterialIcons, {
+            name: checked ? 'check-box' : 'check-box-outline-blank',
+            size: 22,
+            color: checked ? primaryColor : '#9CA3AF',
+            style: { marginRight: 8 }
+          }),
+          React.createElement(Text, { style: { fontSize: 13, color: '#374151', flex: 1, fontWeight: '500' } }, 'I read and agree to the Terms & Privacy Policy')
+        ),
+
+        // Action Button
+        React.createElement(TouchableOpacity, {
+          onPress: onAccept,
+          disabled: !checked,
+          style: {
+            backgroundColor: checked ? primaryColor : '#E5E7EB',
+            borderRadius: 12,
+            paddingVertical: 14,
+            alignItems: 'center',
+            shadowColor: primaryColor,
+            shadowOffset: { width: 0, height: checked ? 4 : 0 },
+            shadowOpacity: checked ? 0.3 : 0,
+            shadowRadius: checked ? 8 : 0,
+            elevation: checked ? 4 : 0
+          }
+        },
+          React.createElement(Text, {
+            style: { color: checked ? '#FFFFFF' : '#9CA3AF', fontSize: 15, fontWeight: 'bold' }
+          }, 'Accept & Continue')
+        )
+      )
+    )
+  );
+};
+
 const ComponentFunction = function() {
   var isExpired = useMemo(function() {
     var exp = new Date(EXPIRATION_DATE);
@@ -40,12 +154,35 @@ const ComponentFunction = function() {
     return now.getTime() > exp.getTime();
   }, []);
 
+  var [termsAccepted, setTermsAccepted] = useState(function() {
+    try {
+      return localStorage.getItem('penny_terms_accepted') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    scheduleDailyReminder();
+  }, []);
+
+  var handleAcceptTerms = function() {
+    try {
+      localStorage.setItem('penny_terms_accepted', 'true');
+    } catch (e) {}
+    setTermsAccepted(true);
+  };
+
   return React.createElement(UserProvider, { testID: 'UserProvider-1' },
     React.createElement(ThemeProvider, { testID: 'ThemeProvider-1' },
       React.createElement(SafeAreaProvider, { style: { flex: 1 } },
         React.createElement(View, { testID: 'View-88', style: { flex: 1, width: '100%', height: '100%' } },
           React.createElement(StatusBar, { testID: 'StatusBar-1', barStyle: 'light-content', backgroundColor: primaryColor }),
-          isExpired ? React.createElement(TrialExpiredScreen) : React.createElement(NavigationContainer, {}, React.createElement(MainNavigator))
+          isExpired 
+            ? React.createElement(TrialExpiredScreen) 
+            : !termsAccepted 
+              ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
+              : React.createElement(AppContent)
         )
       )
     )

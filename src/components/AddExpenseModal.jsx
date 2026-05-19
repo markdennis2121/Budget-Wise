@@ -5,6 +5,7 @@ import { useQuery, useMutation } from 'platform-hooks';
 import { primaryColor, textPrimary, textSecondary, backgroundColor, cardColor, dangerColor } from '../contexts/ThemeContext';
 import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
 import DatePickerInput from './DatePickerInput';
+import { scheduleBillNotification } from '../utils/notifications';
 
 const WALLET_STYLES = {
   GCash: { color: '#1E3A8A', name: 'GCash', logo: 'account-balance-wallet' },
@@ -144,6 +145,7 @@ const AddExpenseModal = function(props) {
     } else if (expType === 'recurring') {
       var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: selectedFund, account_id: selectedAccount };
       mutateRecurring(newRecurring).then(function() {
+        scheduleBillNotification(newRecurring);
         setExpName(''); setExpAmount(''); setDueDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
       }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
     } else if (expType === 'income') {

@@ -11,7 +11,7 @@ const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 
-const PIN_LENGTH = 8;
+const PIN_LENGTH = 6;
 
 const SettingsScreen = function(props) {
   var navigation = props.navigation;
@@ -34,10 +34,24 @@ const SettingsScreen = function(props) {
 
   var updateSettings = useMutation('user_settings', 'update');
   var mutateUpdate = updateSettings.mutate;
+  var insertSettings = useMutation('user_settings', 'insert');
+  var mutateInsert = insertSettings.mutate;
+
+  // Dynamically initialize settings for this user if none exists
+  React.useEffect(() => {
+    if (userId && !settingsQuery.loading && !userSettings) {
+      mutateInsert({
+        id: generateId(),
+        user_id: userId,
+        pin_code: null,
+        biometrics_enabled: false
+      }).then(() => refetch());
+    }
+  }, [userId, settingsQuery.loading, userSettings]);
 
   var handleSavePin = () => {
     if (newPin.length !== PIN_LENGTH) {
-      Platform.OS === 'web' ? window.alert('PIN must be 8 digits') : Alert.alert('Error', 'PIN must be 8 digits');
+      Platform.OS === 'web' ? window.alert('PIN must be 6 digits') : Alert.alert('Error', 'PIN must be 6 digits');
       return;
     }
     if (userSettings) {
@@ -55,7 +69,7 @@ const SettingsScreen = function(props) {
     var msg = 'Remove PIN lock?';
     var onConfirm = () => {
       if (userSettings) {
-        mutateUpdate({ id: userSettings.id, data: { pin_code: null } }).then(() => refetch());
+        mutateUpdate({ id: userSettings.id, data: { pin_code: null, biometrics_enabled: false } }).then(() => refetch());
       }
     };
     if (Platform.OS === 'web') {
@@ -108,7 +122,7 @@ const SettingsScreen = function(props) {
         React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
           React.createElement(View, null,
             React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'App PIN Lock'),
-            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, userSettings?.pin_code ? '8-Digit PIN Enabled' : 'Disabled')
+            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, userSettings?.pin_code ? '6-Digit PIN Enabled' : 'Disabled')
           ),
           userSettings?.pin_code ? 
             React.createElement(TouchableOpacity, { onPress: handleRemovePin, style: { backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
@@ -120,12 +134,26 @@ const SettingsScreen = function(props) {
             )
         ),
         pinMode && !userSettings?.pin_code ? React.createElement(View, { style: { marginTop: 16, backgroundColor: theme.colors.background, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border } },
-          React.createElement(Text, { style: { fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8 } }, 'Enter 8-digit PIN'),
+          React.createElement(Text, { style: { fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8 } }, 'Enter 6-digit PIN'),
           React.createElement(View, { style: { flexDirection: 'row', gap: 10 } },
-            React.createElement(TextInput, { value: newPin, onChangeText: setNewPin, placeholder: '12345678', keyboardType: 'numeric', maxLength: 8, secureTextEntry: true, style: { flex: 1, backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: theme.colors.textPrimary, letterSpacing: 4 } }),
+            React.createElement(TextInput, { value: newPin, onChangeText: setNewPin, placeholder: '123456', keyboardType: 'numeric', maxLength: 6, secureTextEntry: true, style: { flex: 1, backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: theme.colors.textPrimary, letterSpacing: 6 } }),
             React.createElement(TouchableOpacity, { onPress: handleSavePin, style: { backgroundColor: theme.colors.info, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' } },
               React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 } }, 'Save')
             )
+          )
+        ) : null,
+        userSettings?.pin_code ? React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 16 } },
+          React.createElement(View, null,
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Biometric Lock'),
+            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, 'Fingerprint / Face ID authentication')
+          ),
+          React.createElement(TouchableOpacity, { 
+            onPress: () => {
+              mutateUpdate({ id: userSettings.id, data: { biometrics_enabled: !userSettings?.biometrics_enabled } }).then(() => refetch());
+            }, 
+            style: { width: 50, height: 28, borderRadius: 14, backgroundColor: userSettings?.biometrics_enabled ? theme.colors.primary : theme.colors.border, justifyContent: 'center', padding: 2 } 
+          },
+            React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: userSettings?.biometrics_enabled ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
           )
         ) : null,
         showPinSaved ? React.createElement(View, { style: { backgroundColor: '#FFEDD5', borderRadius: 8, padding: 10, marginTop: 12, flexDirection: 'row', alignItems: 'center' } },

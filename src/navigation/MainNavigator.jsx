@@ -26,11 +26,27 @@ const TabNavigator = function() {
   return React.createElement(View, { testID: 'View-87', style: { flex: 1, width: '100%', height: '100%', overflow: 'hidden' } },
     React.createElement(Tab.Navigator, { testID: 'Navigator-1', screenOptions: {
         headerShown: false,
-        tabBarStyle: { position: 'absolute', bottom: 0, height: Platform.OS === 'web' ? TAB_MENU_HEIGHT : TAB_MENU_HEIGHT + insets.bottom, borderTopWidth: 0, backgroundColor: theme.colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 8 },
-        tabBarItemStyle: { padding: 0 },
+        tabBarStyle: { 
+          position: 'absolute', 
+          bottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16, 
+          left: 16, 
+          right: 16, 
+          height: 60, 
+          borderRadius: 24, 
+          borderWidth: 1, 
+          borderColor: theme.colors.border,
+          backgroundColor: theme.colors.card, 
+          shadowColor: '#000', 
+          shadowOffset: { width: 0, height: 4 }, 
+          shadowOpacity: 0.08, 
+          shadowRadius: 12, 
+          elevation: 6,
+          paddingBottom: 0
+        },
+        tabBarItemStyle: { paddingVertical: 6 },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 }
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginBottom: 2 }
       }
     },
       React.createElement(Tab.Screen, { testID: 'Screen-1', name: 'Dashboard',
@@ -45,6 +61,13 @@ const TabNavigator = function() {
         options: {
           tabBarLabel: 'Bills',
           tabBarIcon: function(p) { return React.createElement(MaterialIcons, { testID: 'MaterialIcons-19', name: 'repeat', size: 24, color: p.color }); }
+        }
+      }),
+      React.createElement(Tab.Screen, { testID: 'Screen-Statistics', name: 'Statistics',
+        component: StatisticsScreen,
+        options: {
+          tabBarLabel: 'Analytics',
+          tabBarIcon: function(p) { return React.createElement(MaterialIcons, { testID: 'MaterialIcons-Statistics', name: 'insert-chart', size: 24, color: p.color }); }
         }
       }),
       React.createElement(Tab.Screen, { testID: 'Screen-3', name: 'History',
@@ -66,7 +89,15 @@ const TabNavigator = function() {
 };
 
 const MainNavigator = function() {
-  return React.createElement(Stack.Navigator, { testID: 'Navigator-2', screenOptions: { headerShown: false }, initialRouteName: 'Login' },
+  var userCtx = useUser();
+  var currentUser = userCtx.currentUser;
+  var initialRoute = currentUser ? 'MainApp' : 'Login';
+
+  return React.createElement(Stack.Navigator, { 
+    testID: 'Navigator-2', 
+    screenOptions: { headerShown: false }, 
+    initialRouteName: initialRoute 
+  },
     React.createElement(Stack.Screen, { testID: 'Screen-5', name: 'Login', component: LoginScreen }),
     React.createElement(Stack.Screen, { testID: 'Screen-6', name: 'Register', component: RegisterScreen }),
     React.createElement(Stack.Screen, { testID: 'Screen-7', name: 'MainApp', component: TabNavigator })
