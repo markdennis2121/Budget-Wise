@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, TextInput, Modal, Alert, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import AddExpenseModal from '../components/AddExpenseModal';
 import DatePickerInput from '../components/DatePickerInput';
+import logoImg from '../assets/logo.png';
 import { formatCurrency, generateId, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue, formatDate } from '../utils/helpers';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -1901,14 +1902,17 @@ const DashboardScreen = function(props) {
         
         {/* Header Block (Moves/Scrolls with everything else!) */}
         <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Welcome back</Text>
-              <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 20 }}>{userName}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Image source={logoImg} style={{ width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.6)' }} />
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>PENNY BUDGETING</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' }}>Hi, {userName}!</Text>
+              </View>
             </View>
             <TouchableOpacity 
               onPress={function() { setShowNotificationCenter(true); setHasViewedAlerts(true); }}
-              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
             >
               <MaterialIcons name="notifications-active" size={24} color="#FFFFFF" />
               {!hasViewedAlerts && state.recurringExpenses && state.recurringExpenses.filter(r => r.status === 'Pending').length > 0 && (
