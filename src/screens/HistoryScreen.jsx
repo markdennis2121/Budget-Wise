@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +29,12 @@ const HistoryScreen = function() {
   var statusFilter = statusFilterState[0]; var setStatusFilter = statusFilterState[1];
   var searchState = useState('');
   var search = searchState[0]; var setSearch = searchState[1];
+  var [visibleCount, setVisibleCount] = useState(5);
+  
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [typeFilter, statusFilter, search]);
+
   var oneTimeQuery = useQuery('one_time_expenses');
   var allOneTime = oneTimeQuery.data || [];
   var userOneTime = allOneTime.filter(function(o) { return o.user_id === userId; });
@@ -106,19 +112,27 @@ const HistoryScreen = function() {
       React.createElement(View, { testID: 'View-62', style: { flexDirection: 'row', gap: 8 } },
         React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial' } },
           ['All','Recurring','One-Time','Income'].map(function(t) {
+            var count = t === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.type === t).length;
             return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-23', key: t, onPress: function() { setTypeFilter(t); },
-              style: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: typeFilter === t ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: typeFilter === t ? theme.colors.primary : '#FED7AA' },
+              style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: typeFilter === t ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: typeFilter === t ? theme.colors.primary : '#FED7AA' },
               componentId: 'type-filter-' + t
             },
-              React.createElement(Text, { testID: 'Text-82', style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, t)
+              React.createElement(Text, { testID: 'Text-82', style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, t),
+              count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: typeFilter === t ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
+                React.createElement(Text, { style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
+              ) : null
             );
           }),
           ['All','Pending','Paid','Paid in Advance','Spent','Received'].map(function(s) {
+            var count = s === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.status === s).length;
             return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', key: s, onPress: function() { setStatusFilter(s); },
-              style: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: statusFilter === s ? theme.colors.info : theme.colors.background, borderWidth: 1, borderColor: statusFilter === s ? theme.colors.info : '#FED7AA' },
+              style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: statusFilter === s ? theme.colors.info : theme.colors.background, borderWidth: 1, borderColor: statusFilter === s ? theme.colors.info : '#FED7AA' },
               componentId: 'status-filter-' + s
             },
-              React.createElement(Text, { testID: 'Text-83', style: { color: statusFilter === s ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, s)
+              React.createElement(Text, { testID: 'Text-83', style: { color: statusFilter === s ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, s),
+              count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: statusFilter === s ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
+                React.createElement(Text, { style: { color: statusFilter === s ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
+              ) : null
             );
           })
         )
@@ -131,9 +145,13 @@ const HistoryScreen = function() {
     loading ? React.createElement(View, { testID: 'View-64', style: { flex: 1, alignItems: 'center', justifyContent: 'center' }, componentId: 'history-loading' },
       React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-5', size: 'large', color: theme.colors.primary })
     ) :
-    React.createElement(FlatList, { testID: 'FlatList-1', data: filteredHistory,
+    React.createElement(FlatList, { testID: 'FlatList-1', data: filteredHistory.slice(0, visibleCount),
       keyExtractor: function(item) { return item.id; },
       contentContainerStyle: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: scrollBottomPadding },
+      ListFooterComponent: visibleCount < filteredHistory.length ? React.createElement(TouchableOpacity, {
+        onPress: () => setVisibleCount(visibleCount + 5),
+        style: { alignItems: 'center', paddingVertical: 16 }
+      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold' } }, "See More (" + (filteredHistory.length - visibleCount) + " hidden)")) : null,
       ListEmptyComponent: React.createElement(View, { testID: 'View-65', style: { alignItems: 'center', paddingTop: 60 }, componentId: 'history-empty' },
         React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 } }, 'No history yet'),
         React.createElement(Text, { testID: 'Text-86', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 } }, 'Your transactions will appear here once you start tracking expenses.')

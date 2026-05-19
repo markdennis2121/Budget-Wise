@@ -50,6 +50,9 @@ const StatisticsScreen = function() {
   var oneTimeQuery = useQuery('one_time_expenses');
   var userOneTime = (oneTimeQuery.data || []).filter(function(o) { return o.user_id === userId; });
 
+  var historyQuery = useQuery('expense_history');
+  var userHistory = (historyQuery.data || []).filter(function(h) { return h.user_id === userId; });
+
   var curMonth = getCurrentMonthStr();
 
   var envelopes = useMemo(function() {
@@ -60,14 +63,38 @@ const StatisticsScreen = function() {
     return [];
   }, [userSettings]);
 
-  var totalMonthlyIncome = useMemo(function() {
-    if (!userSettings) return 0;
-    if (userSettings.income_sources) {
-      var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-      return (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+  var accounts = useMemo(function() {
+    if (userSettings && userSettings.accounts) {
+      var raw = typeof userSettings.accounts === 'string' ? JSON.parse(userSettings.accounts) : userSettings.accounts;
+      return Array.isArray(raw) ? raw : [];
     }
-    return parseFloat(userSettings.monthly_salary) || 0;
+    return [];
   }, [userSettings]);
+
+  var totalStartingBalances = useMemo(function() {
+    return accounts.reduce(function(sum, acc) { return sum + (parseFloat(acc.starting_balance) || 0); }, 0);
+  }, [accounts]);
+
+  var totalMonthlyIncome = useMemo(function() {
+    var base = 0;
+    if (userSettings) {
+      if (userSettings.income_sources) {
+        var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+        base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+      } else {
+        base = parseFloat(userSettings.monthly_salary) || 0;
+      }
+    }
+    
+    var extra = 0;
+    userHistory.forEach(function(h) {
+      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
+        extra += (parseFloat(h.amount) || 0);
+      }
+    });
+
+    return base + extra + totalStartingBalances;
+  }, [userSettings, userHistory, curMonth, totalStartingBalances]);
 
   // Current month spending by envelope
   var envelopeSpending = useMemo(function() {
@@ -167,6 +194,7 @@ const StatisticsScreen = function() {
   var monthlyTotals = useMemo(function() {
     return last6Months.map(function(m) {
       var spent = 0;
+      var income = 0;
       userRecurring.forEach(function(r) {
         if ((r.status === 'Paid' || r.status === 'Paid in Advance') && getMonthStr(r.due_date) === m.key) {
           spent += parseFloat(r.amount) || 0;
@@ -177,11 +205,33 @@ const StatisticsScreen = function() {
           spent += parseFloat(o.amount) || 0;
         }
       });
-      return { label: m.label, spent: spent, key: m.key };
-    });
-  }, [userRecurring, userOneTime]);
+      userHistory.forEach(function(h) {
+        if (h.expense_type === 'Income' && getMonthStr(h.date) === m.key) {
+          income += parseFloat(h.amount) || 0;
+        }
+      });
+      
+      // Also add expected base income for each month if needed
+      var base = 0;
+      if (userSettings) {
+        if (userSettings.income_sources) {
+          var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+          base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+        } else {
+          base = parseFloat(userSettings.monthly_salary) || 0;
+        }
+      }
 
-  var maxMonthSpent = Math.max.apply(null, monthlyTotals.map(function(m) { return m.spent; }).concat([1]));
+      if (m.key === curMonth) {
+        income += base;
+        income += totalStartingBalances;
+      }
+
+      return { label: m.label, spent: spent, income: income, key: m.key };
+    });
+  }, [userRecurring, userOneTime, userHistory, userSettings, curMonth, totalStartingBalances]);
+
+  var maxTrendValue = Math.max.apply(null, monthlyTotals.map(function(m) { return Math.max(m.spent, m.income); }).concat([1]));
 
   return React.createElement(View, { style: { flex: 1, backgroundColor: theme.colors.background } },
 
@@ -326,23 +376,58 @@ const StatisticsScreen = function() {
 
       // ── 6-Month Trend ─────────────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
-            React.createElement(MaterialIcons, { name: 'bar-chart', size: 18, color: theme.colors.primary })
+        React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 } },
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+            React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
+              React.createElement(MaterialIcons, { name: 'bar-chart', size: 18, color: theme.colors.primary })
+            ),
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, '6-Month Trend')
           ),
-          React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, '6-Month Trend')
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 12 } },
+            React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+              React.createElement(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 4 } }),
+              React.createElement(Text, { style: { fontSize: 10, color: theme.colors.textSecondary } }, 'In')
+            ),
+            React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+              React.createElement(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 4 } }),
+              React.createElement(Text, { style: { fontSize: 10, color: theme.colors.textSecondary } }, 'Out')
+            )
+          )
         ),
 
         // Chart area
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-end', height: 140 } },
           monthlyTotals.map(function(m, i) {
-            var barPct = maxMonthSpent > 0 ? (m.spent / maxMonthSpent) : 0;
-            var barHeight = Math.max(4, Math.round(barPct * 110));
+            var spentPct = maxTrendValue > 0 ? (m.spent / maxTrendValue) : 0;
+            var incomePct = maxTrendValue > 0 ? (m.income / maxTrendValue) : 0;
+            var spentHeight = Math.max(4, Math.round(spentPct * 110));
+            var incomeHeight = Math.max(4, Math.round(incomePct * 110));
             var isCurrent = m.key === curMonth;
             return React.createElement(View, { key: i, style: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' } },
-              m.spent > 0 ? React.createElement(Text, { style: { fontSize: 9, color: theme.colors.textSecondary, marginBottom: 3, textAlign: 'center' } }, fmt(m.spent)) : null,
-              React.createElement(View, { style: { width: '70%', height: barHeight, backgroundColor: isCurrent ? theme.colors.primary : theme.colors.border, borderRadius: 4, marginBottom: 6 } }),
+              React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: 6 } },
+                React.createElement(View, { style: { width: '30%', height: incomeHeight, backgroundColor: '#10B981', borderTopLeftRadius: 3, borderTopRightRadius: 3, marginRight: 2 } }),
+                React.createElement(View, { style: { width: '30%', height: spentHeight, backgroundColor: '#EF4444', borderTopLeftRadius: 3, borderTopRightRadius: 3 } })
+              ),
               React.createElement(Text, { style: { fontSize: 10, fontWeight: isCurrent ? 'bold' : '400', color: isCurrent ? theme.colors.primary : theme.colors.textSecondary } }, m.label)
+            );
+          })
+        )
+      ),
+
+      // ── Money Inserted History ─────────────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
+          React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
+            React.createElement(MaterialIcons, { name: 'payments', size: 18, color: '#10B981' })
+          ),
+          React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Money Inserted per Month')
+        ),
+        React.createElement(View, null,
+          monthlyTotals.slice().reverse().map(function(m, i) {
+            var isCurrent = m.key === curMonth;
+            return React.createElement(View, { key: i, style: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: i < monthlyTotals.length - 1 ? 1 : 0, borderBottomColor: theme.colors.border } },
+              React.createElement(Text, { style: { fontSize: 14, fontWeight: isCurrent ? 'bold' : '500', color: isCurrent ? theme.colors.primary : theme.colors.textPrimary } }, isCurrent ? 'This Month (' + m.label + ')' : m.label),
+              React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#10B981' } }, '+' + formatCurrency(m.income))
             );
           })
         )

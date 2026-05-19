@@ -21,7 +21,7 @@ const WALLET_STYLES = {
   Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
 };
 
-const AddExpenseModal = function(props) {
+const AddExpenseModal = function (props) {
   var visible = props.visible;
   var onClose = props.onClose;
   var onSaved = props.onSaved;
@@ -29,7 +29,7 @@ const AddExpenseModal = function(props) {
   var theme = props.theme;
   var insetsTop = props.insetsTop;
   var insetsBottom = props.insetsBottom;
-  
+
   var [expType, setExpType] = useState('one_time');
   var [expName, setExpName] = useState('');
   var [expAmount, setExpAmount] = useState('');
@@ -47,19 +47,19 @@ const AddExpenseModal = function(props) {
 
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
-  var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
+  var userSettings = allSettings.find(function (s) { return s.user_id === userId; });
 
   var recurringQuery = useQuery('recurring_expenses');
   var allRecurring = recurringQuery.data || [];
-  var recurringExpenses = allRecurring.filter(function(r) { return r.user_id === userId; });
-  
+  var recurringExpenses = allRecurring.filter(function (r) { return r.user_id === userId; });
+
   var oneTimeQuery = useQuery('one_time_expenses');
   var allOneTime = oneTimeQuery.data || [];
   var curMonth = getCurrentMonthStr();
-  var oneTimeExpenses = allOneTime.filter(function(o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
+  var oneTimeExpenses = allOneTime.filter(function (o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
 
   // Calculate Envelope Balances
-  var envelopes = useMemo(function() {
+  var envelopes = useMemo(function () {
     var envs = [];
     if (userSettings && userSettings.envelopes) {
       envs = typeof userSettings.envelopes === 'string' ? JSON.parse(userSettings.envelopes) : userSettings.envelopes;
@@ -71,9 +71,9 @@ const AddExpenseModal = function(props) {
         { id: 'env-savings', name: 'Savings', assigned: 0 },
       ];
     }
-    
+
     var balances = envs.map(e => ({ ...e, assigned: parseFloat(e.assigned) || 0, spent: 0 }));
-    
+
     recurringExpenses.forEach(r => {
       if (r.status === 'Paid' || r.status === 'Paid in Advance') {
         var env = balances.find(e => e.id === r.category || e.name === r.category);
@@ -84,11 +84,11 @@ const AddExpenseModal = function(props) {
       var env = balances.find(e => e.id === o.category || e.name === o.category);
       if (env) env.spent += (parseFloat(o.amount) || 0);
     });
-    
+
     return balances.map(e => ({ ...e, available: e.assigned - e.spent }));
   }, [userSettings, recurringExpenses, oneTimeExpenses]);
 
-  var incomeSources = useMemo(function() {
+  var incomeSources = useMemo(function () {
     if (userSettings && userSettings.income_sources) {
       return typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
     }
@@ -112,7 +112,7 @@ const AddExpenseModal = function(props) {
     }
   }, [visible]);
 
-  var handleSave = function() {
+  var handleSave = function () {
     if (!expName.trim()) { setErrorMsg('Please enter name.'); return; }
     var amt = parseFloat(expAmount);
     if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
@@ -137,23 +137,23 @@ const AddExpenseModal = function(props) {
     if (expType === 'one_time') {
       var expId = generateId();
       var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: selectedFund, account_id: selectedAccount };
-      mutateOneTime(newOneTime).then(function() {
+      mutateOneTime(newOneTime).then(function () {
         return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName, account_id: selectedAccount });
-      }).then(function() {
+      }).then(function () {
         setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-      }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
+      }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
     } else if (expType === 'recurring') {
       var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: selectedFund, account_id: selectedAccount };
-      mutateRecurring(newRecurring).then(function() {
+      mutateRecurring(newRecurring).then(function () {
         scheduleBillNotification(newRecurring);
         setExpName(''); setExpAmount(''); setDueDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-      }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
+      }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
     } else if (expType === 'income') {
       var expId = generateId();
       mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'Income', date: expDate, status: 'Received', notes: timeStr + ' • Source: ' + fundName + ' • To: ' + accName, category: selectedFund, account_id: selectedAccount })
-      .then(function() {
-        setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-      }).catch(function() { setErrorMsg('Failed to save. Try again.'); });
+        .then(function () {
+          setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
+        }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
     }
   };
 
@@ -177,7 +177,7 @@ const AddExpenseModal = function(props) {
                 <Text style={{ color: expType === 'income' ? '#FFFFFF' : textSecondary, fontWeight: '600', fontSize: 13 }}>Income</Text>
               </TouchableOpacity>
             </View>
-            
+
             {errorMsg ? (
               <View style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 14 }}>
                 <Text style={{ color: dangerColor, fontSize: 13 }}>{errorMsg}</Text>
@@ -186,7 +186,7 @@ const AddExpenseModal = function(props) {
 
             <Text style={{ fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 }}>{expType === 'income' ? 'INCOME NAME' : 'EXPENSE NAME'}</Text>
             <TextInput value={expName} onChangeText={setExpName} placeholder={expType === 'income' ? 'e.g. Freelance, Side Hustle' : 'e.g. Rent, Groceries'} autoCapitalize="words" style={{ backgroundColor: backgroundColor, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: textPrimary, marginBottom: 16 }} />
-            
+
             <Text style={{ fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 }}>AMOUNT</Text>
             <TextInput value={expAmount} onChangeText={(text) => {
               var sanitised = text.replace(/[^0-9.]/g, '');
@@ -194,7 +194,7 @@ const AddExpenseModal = function(props) {
               if (parts.length > 2) sanitised = parts[0] + '.' + parts.slice(1).join('');
               setExpAmount(sanitised);
             }} placeholder="0.00" keyboardType="decimal-pad" style={{ backgroundColor: backgroundColor, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: textPrimary, marginBottom: 16 }} />
-            
+
             {(expType === 'one_time' || expType === 'income') ? (
               <View>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 6 }}>DATE</Text>

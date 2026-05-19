@@ -14,6 +14,7 @@ const WEB_TAB_MENU_PADDING = 90;
 const FAB_SPACING = 16;
 
 const DEFAULT_ACCOUNTS = [
+  { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
   { id: 'acc-gcash', name: 'GCash', starting_balance: 0, type: 'GCash', color: '#1E3A8A' },
   { id: 'acc-maya', name: 'Maya', starting_balance: 0, type: 'Maya', color: '#059669' },
   { id: 'acc-bpi', name: 'BPI Bank', starting_balance: 0, type: 'BPI', color: '#B91C1C' }
@@ -96,7 +97,6 @@ const useDashboardState = function(userId) {
     } else {
       rawList = DEFAULT_ACCOUNTS;
     }
-    rawList = rawList.filter(function(a) { return a.id !== 'acc-cash' && a.name !== 'Cash Wallet'; });
 
     var accs = rawList.map(function(a) {
       return {
@@ -124,6 +124,14 @@ const useDashboardState = function(userId) {
       if (o.account_id) {
         var acc = accs.find(function(a) { return a.id === o.account_id; });
         if (acc) acc.balance -= (parseFloat(o.amount) || 0);
+      }
+    });
+
+    // Add linked income sources
+    incomeSources.forEach(function(src) {
+      if (src.account_id && src.account_id !== 'unlinked') {
+        var acc = accs.find(function(a) { return a.id === src.account_id; });
+        if (acc) acc.balance += (parseFloat(src.amount) || 0);
       }
     });
 
@@ -202,7 +210,8 @@ const useDashboardState = function(userId) {
     return savingsEnv ? savingsEnv.available : 0;
   }, [envelopeBalances]);
 
-  var readyToAssign = totalIncome + totalAvailableMoney - totalSaved;
+  var totalStartingBalances = accounts.reduce(function(sum, acc) { return sum + (parseFloat(acc.starting_balance) || 0); }, 0);
+  var readyToAssign = totalIncome + totalStartingBalances - totalAssigned;
 
   var refetchAll = useCallback(function() {
     settingsQuery.refetch(); recurringQuery.refetch(); oneTimeQuery.refetch(); historyQuery.refetch();
@@ -229,19 +238,16 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
 
   useEffect(() => {
     if (visible) {
-      var initialAmounts = {};
-      envelopes.forEach(e => {
-        initialAmounts[e.id] = String(e.assigned || '');
-      });
-      setAmounts(initialAmounts);
+      setAmounts({});
     }
-  }, [visible, envelopes]);
+  }, [visible]);
 
   var handleAssign = () => {
     var newEnvelopes = envelopes.map(e => {
       var valStr = amounts[e.id];
-      var finalAmt = valStr !== undefined ? (parseFloat(valStr) || 0) : (e.assigned || 0);
-      return { ...e, assigned: finalAmt };
+      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      var finalAmt = (parseFloat(e.assigned) || 0) + addedAmt;
+      return { id: e.id, name: e.name, assigned: finalAmt };
     });
     if (userSettings) {
       mutateUpdateSettings({ id: userSettings.id, data: { envelopes: newEnvelopes } }).then(() => {
@@ -262,7 +268,7 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
 
     var targetEnv = envelopes.find(e => e.id === id);
     var name = targetEnv ? targetEnv.name : 'this envelope';
-    var amt = targetEnv ? (targetEnv.assigned || 0) : 0;
+    var amt = targetEnv ? (targetEnv.available !== undefined ? targetEnv.available : (targetEnv.assigned || 0)) : 0;
     var msg = `This will remove the "${name}" envelope. Any money currently inside it (${formatCurrency(amt)}) will be returned to Ready to Assign.`;
 
     if (Platform.OS === 'web') {
@@ -283,10 +289,10 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
 
   var totalInput = envelopes.reduce((s, env) => {
     var valStr = amounts[env.id];
-    var val = valStr !== undefined ? (parseFloat(valStr) || 0) : (env.assigned || 0);
+    var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
     return s + val;
   }, 0);
-  var remaining = totalIncome - totalInput;
+  var remaining = readyToAssign - totalInput;
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
@@ -305,23 +311,24 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
             {envelopes.map(env => (
               <View key={env.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{env.name}</Text>
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{env.name}</Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Current: {formatCurrency(env.available || 0)}</Text>
+                  </View>
                   <TouchableOpacity onPress={() => handleDeleteEnvelope(env.id)} style={{ marginLeft: 8, padding: 4 }}>
                     <MaterialIcons name="delete-outline" size={16} color={theme.colors.error} />
                   </TouchableOpacity>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>₱</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>+ ₱</Text>
                   <TextInput
                     value={amounts[env.id] || ''}
                     onChangeText={(val) => {
-                      var s = val.replace(/[^0-9.]/g, '');
-                      var parts = s.split('.');
-                      if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
+                      var s = val.replace(/[^0-9.-]/g, '');
                       setAmounts(prev => ({ ...prev, [env.id]: s }));
                     }}
                     placeholder="0.00"
-                    keyboardType="decimal-pad"
+                    keyboardType="numeric"
                     style={{ width: 80, paddingVertical: 10, paddingLeft: 6, fontSize: 15, color: theme.colors.textPrimary, textAlign: 'right' }}
                   />
                 </View>
@@ -610,21 +617,29 @@ const NotificationCenterModal = function({ visible, onClose, state, theme, inset
               <View style={{ alignItems: 'center', padding: 24, backgroundColor: theme.colors.background, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}>
                 <MaterialIcons name="notifications-none" size={32} color={theme.colors.textSecondary} style={{ marginBottom: 8 }} />
                 <Text style={{ fontSize: 13, color: theme.colors.textSecondary, textAlign: 'center' }}>
-                  No upcoming bills scheduled for reminders in the next 5 days.
+                  No upcoming bills due in the next 5 days.
                 </Text>
               </View>
             ) : (
-              state.upcomingBills.map(bill => (
-                <View key={bill.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, backgroundColor: theme.colors.background, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: theme.colors.border }}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }} numberOfLines={1}>{bill.name}</Text>
-                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>
-                      Alert fires on: {new Date(new Date(bill.due_date).getTime() - 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at 9:00 AM
-                    </Text>
+              state.upcomingBills.map(bill => {
+                var overdue = isOverdue(bill.due_date);
+                return (
+                  <View key={bill.id} style={{ backgroundColor: overdue ? (theme.isDark ? '#3F1A1A' : '#FEF2F2') : (theme.isDark ? '#3F351A' : '#FFFBEB'), borderRadius: 12, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: overdue ? theme.colors.error : theme.colors.warning }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }} numberOfLines={1}>{bill.name}</Text>
+                        <Text style={{ fontSize: 12, color: overdue ? theme.colors.error : theme.colors.warning, marginTop: 4 }}>
+                          {overdue ? `⚠ Overdue: ${formatDate(bill.due_date)}` : `⏰ Due: ${formatDate(bill.due_date)}`}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 4 }}>
+                          Alert fires on: {new Date(new Date(bill.due_date).getTime() - 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at 9:00 AM
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: overdue ? theme.colors.error : theme.colors.warning }}>{formatCurrency(bill.amount)}</Text>
+                    </View>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.primary }}>{formatCurrency(bill.amount)}</Text>
-                </View>
-              ))
+                );
+              })
             )}
           </ScrollView>
 
@@ -1223,15 +1238,7 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                             </TouchableOpacity>
                           );
                         })}
-                        {(() => {
-                          var isUnlinked = editAccount === 'unlinked' || editAccount === '';
-                          return (
-                            <TouchableOpacity onPress={() => setEditAccount('unlinked')} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isUnlinked ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isUnlinked ? theme.colors.primary : theme.colors.border }}>
-                              <MaterialIcons name="link-off" size={13} color={isUnlinked ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 4 }} />
-                              <Text style={{ color: isUnlinked ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' }}>None / Unlinked</Text>
-                            </TouchableOpacity>
-                          );
-                        })()}
+
                       </ScrollView>
 
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1288,10 +1295,11 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
               value={newSourceName} 
               onChangeText={setNewSourceName} 
               placeholder="Source name (e.g. Side Gig)"
-              style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }}
+              placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
+              style={{ backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }}
             />
             
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 12 }}>
               <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginRight: 4 }}>₱</Text>
               <TextInput 
                 value={newSourceAmount}
@@ -1302,6 +1310,7 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                   setNewSourceAmount(s);
                 }}
                 placeholder="0.00 (Monthly Amount)" 
+                placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
                 keyboardType="decimal-pad"
                 style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary }}
               />
@@ -1314,21 +1323,13 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                 var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
                 var brandColor = a.color || styleInfo.color;
                 return (
-                  <TouchableOpacity key={a.id} onPress={() => setNewSourceAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isSel ? theme.colors.primary : '#FFFFFF', borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
+                  <TouchableOpacity key={a.id} onPress={() => setNewSourceAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isSel ? theme.colors.primary : theme.colors.inputBg, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
                     <MaterialIcons name={styleInfo.logo} size={13} color={isSel ? '#FFFFFF' : brandColor} style={{ marginRight: 4 }} />
                     <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 12, fontWeight: '600' }}>{a.name}</Text>
                   </TouchableOpacity>
                 );
               })}
-              {(() => {
-                var isUnlinked = newSourceAccount === 'unlinked' || newSourceAccount === '';
-                return (
-                  <TouchableOpacity onPress={() => setNewSourceAccount('unlinked')} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isUnlinked ? theme.colors.primary : '#FFFFFF', borderWidth: 1, borderColor: isUnlinked ? theme.colors.primary : theme.colors.border }}>
-                    <MaterialIcons name="link-off" size={13} color={isUnlinked ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 4 }} />
-                    <Text style={{ color: isUnlinked ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' }}>None / Unlinked</Text>
-                  </TouchableOpacity>
-                );
-              })()}
+
             </ScrollView>
 
             <TouchableOpacity onPress={handleAddSource} style={{ backgroundColor: theme.colors.primary, borderRadius: 8, padding: 12, alignItems: 'center' }}>
@@ -1353,6 +1354,14 @@ const SpentManagerModal = function({ visible, onClose, filter, oneTimeExpenses, 
   var [editingId, setEditingId] = useState(null);
   var [editName, setEditName] = useState('');
   var [editAmount, setEditAmount] = useState('');
+
+  useEffect(() => {
+    if (!visible) {
+      setEditingId(null);
+      setEditName('');
+      setEditAmount('');
+    }
+  }, [visible]);
   
   var deleteOneTime = useMutation('one_time_expenses', 'delete');
   var mutateDeleteOneTime = deleteOneTime.mutate;
@@ -1452,12 +1461,14 @@ const SpentManagerModal = function({ visible, onClose, filter, oneTimeExpenses, 
                   isEditing
                     ? React.createElement(View, null,
                         React.createElement(TextInput, { value: editName, onChangeText: setEditName, placeholder: 'Name',
-                          style: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }
+                          placeholderTextColor: theme.isDark ? '#6B7280' : '#9CA3AF',
+                          style: { backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }
                         }),
                         React.createElement(View, { style: { flexDirection: 'row', gap: 8 } },
-                          React.createElement(View, { style: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 8 } },
+                          React.createElement(View, { style: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 8 } },
                             React.createElement(Text, { style: { fontSize: 14, color: theme.colors.textSecondary } }, '₱'),
                             React.createElement(TextInput, { value: editAmount, onChangeText: setEditAmount, keyboardType: 'decimal-pad', placeholder: '0.00',
+                              placeholderTextColor: theme.isDark ? '#6B7280' : '#9CA3AF',
                               style: { flex: 1, paddingVertical: 6, paddingLeft: 4, fontSize: 14, color: theme.colors.textPrimary }
                             })
                           ),
@@ -1532,11 +1543,18 @@ const DashboardScreen = function(props) {
   var [selectedAccount, setSelectedAccount] = useState(null);
   var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
   var [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  var [hasViewedAlerts, setHasViewedAlerts] = useState(false);
   var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
   var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
   var totalAvailableMoney = state.accounts.reduce(function(sum, acc) { return sum + acc.balance; }, 0);
-  var totalActualMoney = state.totalIncome + totalAvailableMoney;
+  var unlinkedIncome = state.incomeSources.reduce(function(sum, src) {
+    if (!src.account_id || src.account_id === 'unlinked') {
+      return sum + (parseFloat(src.amount) || 0);
+    }
+    return sum;
+  }, 0);
+  var totalActualMoney = totalAvailableMoney + unlinkedIncome;
   var rtaColor = state.readyToAssign === 0 ? '#10B981' : (state.readyToAssign > 0 ? theme.colors.primary : theme.colors.error);
   
   return (
@@ -1548,10 +1566,17 @@ const DashboardScreen = function(props) {
             <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 20 }}>{userName}</Text>
           </View>
           <TouchableOpacity 
-            onPress={function() { setShowNotificationCenter(true); }}
+            onPress={function() { setShowNotificationCenter(true); setHasViewedAlerts(true); }}
             style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
           >
             <MaterialIcons name="notifications-active" size={24} color="#FFFFFF" />
+            {!hasViewedAlerts && state.recurringExpenses && state.recurringExpenses.filter(r => r.status === 'Pending').length > 0 && (
+              <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: theme.colors.error, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
+                  {state.recurringExpenses.filter(r => r.status === 'Pending').length}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
         
@@ -1571,7 +1596,7 @@ const DashboardScreen = function(props) {
           <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
 
           <View>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>TOTAL ACTUAL MONEY</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>TOTAL CURRENT MONEY</Text>
             <Text style={{ color: '#6EE7B7', fontSize: 26, fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
           </View>
         </View>
@@ -1722,34 +1747,14 @@ const DashboardScreen = function(props) {
           ))}
         </View>
 
-        {state.upcomingBills.length > 0 && (
-          <View style={{ marginBottom: 20 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>⚠️ Upcoming Bills</Text>
-            {state.upcomingBills.map(bill => {
-              var overdue = isOverdue(bill.due_date);
-              return (
-                <View key={bill.id} style={{ backgroundColor: overdue ? '#FEF2F2' : '#FFFBEB', borderRadius: 12, padding: 14, marginBottom: 8, borderLeftWidth: 4, borderLeftColor: overdue ? theme.colors.error : theme.colors.warning }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View>
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{bill.name}</Text>
-                      <Text style={{ fontSize: 12, color: overdue ? theme.colors.error : theme.colors.warning, marginTop: 2 }}>
-                        {overdue ? `⚠ Overdue: ${formatDate(bill.due_date)}` : `⏰ Due: ${formatDate(bill.due_date)}`}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: overdue ? theme.colors.error : theme.colors.warning }}>{formatCurrency(bill.amount)}</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+
       </ScrollView>
       <TouchableOpacity onPress={() => state.setShowAddModal(true)} style={{ position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 }}>
         <MaterialIcons name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
       
       <AddExpenseModal visible={state.showAddModal} onClose={() => state.setShowAddModal(false)} onSaved={state.refetchAll} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} envelopes={state.envelopeBalances} accounts={state.accounts} />
-      <AssignMoneyModal visible={state.showAssignModal} onClose={() => { state.setShowAssignModal(false); state.refetchAll(); }} readyToAssign={state.readyToAssign} totalIncome={state.totalAvailableMoney} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
+      <AssignMoneyModal visible={state.showAssignModal} onClose={() => { state.setShowAssignModal(false); state.refetchAll(); }} readyToAssign={state.readyToAssign} totalIncome={state.totalAvailableMoney} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />
       <SpentManagerModal visible={showSpentModal} onClose={function() { setShowSpentModal(false); }} filter={spentFilter} oneTimeExpenses={state.oneTimeExpenses} envelopes={state.envelopeBalances} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} />
       <IncomeManagerModal visible={showIncomeModal} onClose={function() { setShowIncomeModal(false); }} incomeSources={state.incomeSources} accounts={state.accounts} userSettings={state.userSettings} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform, ActivityIndicator, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,10 +44,10 @@ const RecurringScreen = function(props) {
       rawList = typeof userSettings.accounts === 'string' ? JSON.parse(userSettings.accounts) : userSettings.accounts;
     } else {
       rawList = [
-        { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0 },
-        { id: 'acc-gcash', name: 'GCash', starting_balance: 0 },
-        { id: 'acc-maya', name: 'Maya', starting_balance: 0 },
-        { id: 'acc-bpi', name: 'BPI Bank', starting_balance: 0 }
+        { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
+        { id: 'acc-gcash', name: 'GCash', starting_balance: 0, type: 'GCash', color: '#1E3A8A' },
+        { id: 'acc-maya', name: 'Maya', starting_balance: 0, type: 'Maya', color: '#059669' },
+        { id: 'acc-bpi', name: 'BPI Bank', starting_balance: 0, type: 'BPI', color: '#B91C1C' }
       ];
     }
     return rawList;
@@ -61,6 +61,11 @@ const RecurringScreen = function(props) {
   var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
   var filterState = useState('All');
   var filter = filterState[0]; var setFilter = filterState[1];
+  var [visibleCount, setVisibleCount] = useState(5);
+  
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [filter]);
   
   var filters = ['All', 'Pending', 'Paid', 'Paid in Advance'];
   
@@ -119,11 +124,15 @@ const RecurringScreen = function(props) {
     ),
     React.createElement(ScrollView, { testID: 'ScrollView-8', horizontal: true, style: { flexGrow: 'initial', backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, showsHorizontalScrollIndicator: false, contentContainerStyle: { paddingHorizontal: 16, paddingVertical: 12 } },
       filters.map(function(f) {
+        var count = f === 'All' ? recurringExpenses.length : recurringExpenses.filter(r => r.status === f).length;
         return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-18', key: f, onPress: function() { setFilter(f); },
-          style: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: filter === f ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: filter === f ? theme.colors.primary : '#FED7AA' },
+          style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: filter === f ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: filter === f ? theme.colors.primary : '#FED7AA' },
           componentId: 'filter-' + f
         },
-          React.createElement(Text, { testID: 'Text-69', style: { color: filter === f ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 13, fontWeight: '600' } }, f)
+          React.createElement(Text, { testID: 'Text-69', style: { color: filter === f ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 13, fontWeight: '600' } }, f),
+          count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: filter === f ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
+            React.createElement(Text, { style: { color: filter === f ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
+          ) : null
         );
       })
     ),
@@ -137,7 +146,7 @@ const RecurringScreen = function(props) {
         React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 } }, 'No bills yet'),
         React.createElement(Text, { testID: 'Text-70', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 } }, 'Tap the + button to add your recurring monthly bills')
       ) :
-      filtered.map(function(expense, idx) {
+      [...filtered.slice(0, visibleCount).map(function(expense, idx) {
         var overdue = isOverdue(expense.due_date) && expense.status === 'Pending';
         var upcoming = isWithin5Days(expense.due_date) && !overdue && expense.status === 'Pending';
         return React.createElement(View, { testID: 'View-52', key: expense.id,
@@ -178,7 +187,12 @@ const RecurringScreen = function(props) {
             )
           )
         );
-      })
+      }),
+      visibleCount < filtered.length ? React.createElement(TouchableOpacity, {
+        key: 'see-more-btn',
+        onPress: () => setVisibleCount(visibleCount + 5),
+        style: { alignItems: 'center', paddingVertical: 16 }
+      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold' } }, "See More (" + (filtered.length - visibleCount) + " hidden)")) : null]
     ),
     React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-22', onPress: function() { setShowAdd(true); },
       style: { position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },

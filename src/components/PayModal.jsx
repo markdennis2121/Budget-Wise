@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, ActivityIndicator, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useMutation } from 'platform-hooks';
-import { primaryColor, textPrimary, textSecondary, backgroundColor, cardColor, dangerColor, infoColor } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { formatCurrency, isWithin5Days, isOverdue, getTodayStr, generateId } from '../utils/helpers';
 
 const WALLET_STYLES = {
@@ -29,6 +29,17 @@ const PayModal = function(props) {
   var insetsBottom = props.insetsBottom;
   var accounts = props.accounts || [];
 
+  var themeCtx = useTheme();
+  var theme = themeCtx.theme;
+  var colors = theme.colors;
+  var primaryColor = colors.primary;
+  var textPrimary = colors.textPrimary;
+  var textSecondary = colors.textSecondary;
+  var backgroundColor = colors.inputBg;
+  var cardColor = colors.card;
+  var dangerColor = colors.error;
+  var infoColor = colors.info;
+
   var updateRecurring = useMutation('recurring_expenses', 'update');
   var mutateUpdate = updateRecurring.mutate;
   var insertHistory = useMutation('expense_history', 'insert');
@@ -39,9 +50,13 @@ const PayModal = function(props) {
 
   useEffect(() => {
     if (visible) {
-      setSelectedAccount('unlinked');
+      if (accounts && accounts.length > 0) {
+        setSelectedAccount(accounts[0].id);
+      } else {
+        setSelectedAccount('unlinked');
+      }
     }
-  }, [visible]);
+  }, [visible, accounts]);
 
   var handlePay = function() {
     if (!expense) return;
@@ -125,8 +140,8 @@ const PayModal = function(props) {
                     paddingVertical: 8, 
                     borderRadius: 8, 
                     borderWidth: 1, 
-                    borderColor: isSelected ? primaryColor : '#E5E7EB', 
-                    backgroundColor: isSelected ? '#FFEDD5' : '#FFFFFF'
+                    borderColor: isSelected ? primaryColor : theme.colors.border, 
+                    backgroundColor: isSelected ? (theme.isDark ? '#374151' : '#FFEDD5') : theme.colors.inputBg
                   }}
                 >
                   <MaterialIcons name={styleInfo.logo} size={14} color={isSelected ? primaryColor : brandColor} style={{ marginRight: 6 }} />
@@ -136,34 +151,11 @@ const PayModal = function(props) {
                 </TouchableOpacity>
               );
             })}
-            {(() => {
-              var isUnlinked = selectedAccount === 'unlinked' || selectedAccount === '';
-              return (
-                <TouchableOpacity 
-                  onPress={() => setSelectedAccount('unlinked')} 
-                  style={{ 
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginRight: 8,
-                    paddingHorizontal: 12, 
-                    paddingVertical: 8, 
-                    borderRadius: 8, 
-                    borderWidth: 1, 
-                    borderColor: isUnlinked ? primaryColor : '#E5E7EB', 
-                    backgroundColor: isUnlinked ? '#FFEDD5' : '#FFFFFF'
-                  }}
-                >
-                  <MaterialIcons name="link-off" size={14} color={isUnlinked ? primaryColor : textSecondary} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isUnlinked ? primaryColor : textSecondary }}>
-                    None / Unlinked
-                  </Text>
-                </TouchableOpacity>
-              );
-            })()}
+
           </ScrollView>
 
           {isPaidInAdvance && (
-            <View style={{ backgroundColor: '#EFF6FF', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+            <View style={{ backgroundColor: theme.isDark ? '#1E3A8A' : '#EFF6FF', borderRadius: 10, padding: 12, marginBottom: 16 }}>
               <Text style={{ color: infoColor, fontSize: 13, textAlign: 'center' }}>
                 🎉 This bill is due within 5 days — marking as Paid in Advance!
               </Text>
@@ -173,7 +165,7 @@ const PayModal = function(props) {
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity 
               onPress={onClose} 
-              style={{ flex: 1, backgroundColor: backgroundColor, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' }}
+              style={{ flex: 1, backgroundColor: backgroundColor, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border }}
             >
               <Text style={{ color: textSecondary, fontSize: 15, fontWeight: '600' }}>Cancel</Text>
             </TouchableOpacity>
