@@ -12,7 +12,7 @@ import MainNavigator from './navigation/MainNavigator';
 import PinLockScreen from './screens/PinLockScreen';
 import { scheduleDailyReminder } from './utils/notifications';
 
-const EXPIRATION_DATE = '2026-05-25';
+const EXPIRATION_DATE = '2026-06-01';
 
 const TrialExpiredScreen = function() {
   return React.createElement(View, {
@@ -149,7 +149,9 @@ const TermsAndConditionsScreen = function(props) {
 
 const ComponentFunction = function() {
   var isExpired = useMemo(function() {
-    return false;
+    var exp = new Date(EXPIRATION_DATE);
+    var now = new Date();
+    return now.getTime() > exp.getTime();
   }, []);
 
   var [termsAccepted, setTermsAccepted] = useState(function() {
