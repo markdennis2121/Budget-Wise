@@ -6,6 +6,7 @@ import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import AddExpenseModal from '../components/AddExpenseModal';
+import DatePickerInput from '../components/DatePickerInput';
 import { formatCurrency, generateId, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue, formatDate } from '../utils/helpers';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -143,6 +144,17 @@ const useDashboardState = function(userId) {
       }
     });
 
+    // Handle inter-wallet transfers from history
+    userHistory.forEach(function(h) {
+      if (h.expense_type === 'Transfer' && h.account_id && h.dest_account_id) {
+        var amt = parseFloat(h.amount) || 0;
+        var srcAcc = accs.find(function(a) { return a.id === h.account_id; });
+        var destAcc = accs.find(function(a) { return a.id === h.dest_account_id; });
+        if (srcAcc) srcAcc.balance -= amt;
+        if (destAcc) destAcc.balance += amt;
+      }
+    });
+
     return accs;
   }, [userSettings, incomeSources, recurringExpenses, oneTimeExpenses, userHistory, curMonth]);
 
@@ -243,6 +255,31 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
   }, [visible]);
 
   var handleAssign = () => {
+    // 1. Validate no negative final envelope assignments
+    for (var i = 0; i < envelopes.length; i++) {
+      var e = envelopes[i];
+      var valStr = amounts[e.id];
+      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      var finalAmt = (parseFloat(e.assigned) || 0) + addedAmt;
+      if (finalAmt < 0) {
+        var msg = `Cannot reduce "${e.name}" envelope below ₱0.00! Current assigned: ${formatCurrency(e.assigned)}`;
+        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+        return;
+      }
+    }
+
+    // 2. Validate no Ready to Assign overspending
+    var totalInput = envelopes.reduce((s, env) => {
+      var valStr = amounts[env.id];
+      var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      return s + val;
+    }, 0);
+    if (readyToAssign - totalInput < 0) {
+      var overspendMsg = 'You cannot assign more money than you have available in Ready to Assign!';
+      Platform.OS === 'web' ? window.alert(overspendMsg) : Alert.alert('Error', overspendMsg);
+      return;
+    }
+
     var newEnvelopes = envelopes.map(e => {
       var valStr = amounts[e.id];
       var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
@@ -252,6 +289,7 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
     if (userSettings) {
       mutateUpdateSettings({ id: userSettings.id, data: { envelopes: newEnvelopes } }).then(() => {
         onClose();
+        if (onSaved) onSaved();
       });
     }
   };
@@ -347,14 +385,16 @@ const AssignMoneyModal = function({ visible, onClose, readyToAssign, totalIncome
   );
 };
 
-const AddEnvelopeModal = function({ visible, onClose, envelopes, userSettings, mutateUpdateSettings, onSaved }) {
+const AddEnvelopeModal = function({ visible, onClose, envelopes, readyToAssign, userSettings, mutateUpdateSettings, onSaved }) {
   var [name, setName] = useState('');
+  var [assigned, setAssigned] = useState('');
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
 
   useEffect(() => {
     if (visible) {
       setName('');
+      setAssigned('');
     }
   }, [visible]);
 
@@ -364,12 +404,19 @@ const AddEnvelopeModal = function({ visible, onClose, envelopes, userSettings, m
       Platform.OS === 'web' ? window.alert('Envelope already exists!') : Alert.alert('Error', 'Envelope already exists!');
       return;
     }
+    var assignedAmt = parseFloat(assigned) || 0;
+    if (assignedAmt > readyToAssign) {
+      Platform.OS === 'web' ? window.alert('Not enough Ready to Assign money!') : Alert.alert('Error', 'Not enough Ready to Assign money!');
+      return;
+    }
+
     var newId = 'env-' + generateId();
-    var newEnv = { id: newId, name: name.trim(), assigned: 0 };
+    var newEnv = { id: newId, name: name.trim(), assigned: assignedAmt };
     var newList = envelopes.concat(newEnv);
     if (userSettings) {
       mutateUpdateSettings({ id: userSettings.id, data: { envelopes: newList } }).then(() => {
         setName('');
+        setAssigned('');
         onClose();
         onSaved();
       });
@@ -386,13 +433,31 @@ const AddEnvelopeModal = function({ visible, onClose, envelopes, userSettings, m
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Envelope</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ENVELOPE NAME</Text>
+           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ENVELOPE NAME</Text>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="e.g. Travel, Gifts, Health"
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 20 }}
+            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
           />
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ASSIGN INITIAL BUDGET (OPTIONAL)</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 20 }}>
+            <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
+            <TextInput
+              value={assigned}
+              onChangeText={(val) => {
+                var s = val.replace(/[^0-9.]/g, '');
+                var parts = s.split('.');
+                if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
+                setAssigned(s);
+              }}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+              style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 15, color: theme.colors.textPrimary }}
+            />
+          </View>
+
           <TouchableOpacity onPress={handleCreate} style={{ backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Create Envelope</Text>
           </TouchableOpacity>
@@ -741,7 +806,8 @@ const AddAccountModal = function({ visible, onClose, accounts, userSettings, mut
             })}
           </ScrollView>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>STARTING BALANCE</Text>
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>INITIAL SEED BALANCE</Text>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>How much money is currently inside this wallet today?</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 20 }}>
             <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
             <TextInput
@@ -845,7 +911,14 @@ const EditAccountModal = function({ visible, onClose, account, accounts, userSet
             style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
           />
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>STARTING BALANCE</Text>
+          <View style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(15, 118, 110, 0.15)' }}>
+            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: 'bold', marginBottom: 2 }}>CURRENT LIVE BALANCE</Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{formatCurrency(account.balance || 0)}</Text>
+            <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 4 }}>This is the live amount calculated from: Starting Balance + Incomes - Expenses & Transfers.</Text>
+          </View>
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>BASE BALANCE BASELINE</Text>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>Adjust this baseline to match your actual bank or physical cash count if you ever notice a discrepancy.</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 20 }}>
             <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
             <TextInput
@@ -881,11 +954,15 @@ const EditEnvelopeModal = function({ visible, onClose, envelope, readyToAssign, 
   var theme = themeCtx.theme;
   var [name, setName] = useState('');
   var [assigned, setAssigned] = useState('');
+  var [goalAmount, setGoalAmount] = useState('');
+  var [goalDate, setGoalDate] = useState('');
 
   useEffect(() => {
     if (visible && envelope) {
       setName(envelope.name);
       setAssigned(String(envelope.assigned));
+      setGoalAmount(envelope.goal_amount ? String(envelope.goal_amount) : '');
+      setGoalDate(envelope.goal_date || '');
     }
   }, [visible, envelope]);
 
@@ -893,6 +970,10 @@ const EditEnvelopeModal = function({ visible, onClose, envelope, readyToAssign, 
     if (!name.trim()) return;
     var originalAssigned = envelope.assigned || 0;
     var newAssigned = parseFloat(assigned) || 0;
+    if (newAssigned < 0) {
+      Platform.OS === 'web' ? window.alert('Assigned budget cannot be negative!') : Alert.alert('Error', 'Assigned budget cannot be negative!');
+      return;
+    }
     var difference = newAssigned - originalAssigned;
 
     if (difference > readyToAssign) {
@@ -900,9 +981,22 @@ const EditEnvelopeModal = function({ visible, onClose, envelope, readyToAssign, 
       return;
     }
 
+    var newGoalAmt = parseFloat(goalAmount) || 0;
+    if (newGoalAmt < 0) {
+      Platform.OS === 'web' ? window.alert('Goal target amount cannot be negative!') : Alert.alert('Error', 'Goal target amount cannot be negative!');
+      return;
+    }
+    var newGoalDate = goalDate.trim() || '';
+
     var newList = envelopes.map(e => {
       if (e.id === envelope.id) {
-        return { ...e, name: name.trim(), assigned: newAssigned };
+        return { 
+          ...e, 
+          name: name.trim(), 
+          assigned: newAssigned,
+          goal_amount: newGoalAmt > 0 ? newGoalAmt : null,
+          goal_date: newGoalDate || null
+        };
       }
       return e;
     });
@@ -987,6 +1081,31 @@ const EditEnvelopeModal = function({ visible, onClose, envelope, readyToAssign, 
             />
           </View>
 
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>SAVINGS GOAL TARGET AMOUNT (OPTIONAL)</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 16 }}>
+            <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
+            <TextInput
+              value={goalAmount}
+              onChangeText={(val) => {
+                var s = val.replace(/[^0-9.]/g, '');
+                var parts = s.split('.');
+                if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
+                setGoalAmount(s);
+              }}
+              placeholder="e.g. 15000 (Target Amount)"
+              keyboardType="decimal-pad"
+              style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 14, color: theme.colors.textPrimary }}
+            />
+          </View>
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>TARGET DATE (OPTIONAL)</Text>
+          <DatePickerInput
+            value={goalDate}
+            onChange={setGoalDate}
+            placeholder="Select target savings date..."
+            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 }}
+          />
+
           <View style={{ backgroundColor: '#FFEDD5', borderRadius: 12, padding: 12, alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 12, color: '#C2410C', fontWeight: 'bold', marginBottom: 2 }}>Ready to Assign after change</Text>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: remaining < 0 ? theme.colors.error : theme.colors.primary }}>{formatCurrency(remaining)}</Text>
@@ -1000,6 +1119,144 @@ const EditEnvelopeModal = function({ visible, onClose, envelope, readyToAssign, 
               <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Save Changes</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const TransferEnvelopeModal = function({ visible, onClose, envelopes, userSettings, mutateUpdateSettings, onSaved }) {
+  var themeCtx = useTheme();
+  var theme = themeCtx.theme;
+  var [sourceId, setSourceId] = useState('');
+  var [destId, setDestId] = useState('');
+  var [amount, setAmount] = useState('');
+  var [errorMsg, setErrorMsg] = useState('');
+
+  var insertHistory = useMutation('expense_history', 'insert');
+  var mutateHistory = insertHistory.mutate;
+
+  useEffect(() => {
+    if (visible) {
+      setErrorMsg('');
+      setAmount('');
+      if (envelopes && envelopes.length > 0) {
+        setSourceId(envelopes[0].id);
+        setDestId(envelopes[1] ? envelopes[1].id : envelopes[0].id);
+      }
+    }
+  }, [visible, envelopes]);
+
+  var handleTransfer = () => {
+    var amt = parseFloat(amount) || 0;
+    if (amt <= 0) {
+      setErrorMsg('Please enter a valid transfer amount.');
+      return;
+    }
+    if (sourceId === destId) {
+      setErrorMsg('Source and Destination envelopes must be different.');
+      return;
+    }
+    var sourceEnv = envelopes.find(e => e.id === sourceId);
+    var destEnv = envelopes.find(e => e.id === destId);
+    if (!sourceEnv || !destEnv) {
+      setErrorMsg('Invalid envelopes selected.');
+      return;
+    }
+    if ((sourceEnv.assigned || 0) < amt) {
+      setErrorMsg(`Insufficient budget in "${sourceEnv.name}". Available: ${formatCurrency(sourceEnv.assigned)}`);
+      return;
+    }
+
+    var newList = envelopes.map(e => {
+      if (e.id === sourceId) {
+        return { ...e, assigned: (parseFloat(e.assigned) || 0) - amt };
+      }
+      if (e.id === destId) {
+        return { ...e, assigned: (parseFloat(e.assigned) || 0) + amt };
+      }
+      return e;
+    });
+
+    if (userSettings) {
+      mutateUpdateSettings({ id: userSettings.id, data: { envelopes: newList } }).then(() => {
+        return mutateHistory({
+          id: generateId(),
+          user_id: userSettings.user_id,
+          expense_name: `Transfer: ${sourceEnv.name} ➔ ${destEnv.name}`,
+          amount: amt,
+          expense_type: 'Transfer',
+          category: sourceEnv.id,
+          date: getTodayStr(),
+          status: 'Spent',
+          notes: `Transferred budget of ${formatCurrency(amt)} from ${sourceEnv.name} to ${destEnv.name}`
+        });
+      }).then(() => {
+        onSaved();
+        onClose();
+      });
+    }
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelope Budget Transfer</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          </View>
+
+          {errorMsg ? (
+            <Text style={{ color: theme.colors.error, fontSize: 13, marginBottom: 12, fontWeight: '600' }}>{errorMsg}</Text>
+          ) : null}
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>FROM ENVELOPE (SOURCE)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            {envelopes.map(e => {
+              var isSel = sourceId === e.id;
+              return (
+                <TouchableOpacity key={e.id} onPress={() => setSourceId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 6 }}>
+                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>TO ENVELOPE (DESTINATION)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            {envelopes.map(e => {
+              var isSel = destId === e.id;
+              return (
+                <TouchableOpacity key={e.id} onPress={() => setDestId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 6 }}>
+                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT TO TRANSFER</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 20 }}>
+            <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
+            <TextInput
+              value={amount}
+              onChangeText={(val) => {
+                var s = val.replace(/[^0-9.]/g, '');
+                var parts = s.split('.');
+                if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
+                setAmount(s);
+              }}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+              style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 15, color: theme.colors.textPrimary }}
+            />
+          </View>
+
+          <TouchableOpacity onPress={handleTransfer} style={{ backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Complete Transfer</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -1544,6 +1801,8 @@ const DashboardScreen = function(props) {
   var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
   var [showNotificationCenter, setShowNotificationCenter] = useState(false);
   var [hasViewedAlerts, setHasViewedAlerts] = useState(false);
+  var [showTransferEnvModal, setShowTransferEnvModal] = useState(false);
+  var [insightIndex, setInsightIndex] = useState(0);
   var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
   var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
@@ -1556,52 +1815,168 @@ const DashboardScreen = function(props) {
   }, 0);
   var totalActualMoney = totalAvailableMoney + unlinkedIncome;
   var rtaColor = state.readyToAssign === 0 ? '#10B981' : (state.readyToAssign > 0 ? theme.colors.primary : theme.colors.error);
+
+  var smartInsights = useMemo(function() {
+    var insights = [];
+    var today = new Date().toISOString().split('T')[0];
+
+    // 1. Low Envelopes warning
+    state.envelopeBalances.forEach(function(env) {
+      if (env.assigned > 0 && env.spent > 0) {
+        var pct = (env.available / env.assigned) * 100;
+        if (pct < 15 && pct >= 0) {
+          insights.push({
+            type: 'warning',
+            icon: 'warning',
+            color: '#F59E0B',
+            text: `Careful! Your "${env.name}" budget is almost gone (${Math.round(pct)}% remaining).`
+          });
+        }
+      }
+    });
+
+    // 2. Savings Progress nudge
+    var savingsEnv = state.envelopeBalances.find(function(e) {
+      return e.id === 'env-savings' || e.name.toLowerCase().includes('saving');
+    });
+    if (savingsEnv && savingsEnv.available > 0) {
+      insights.push({
+        type: 'success',
+        icon: 'savings',
+        color: '#10B981',
+        text: `Awesome! You have stored ${formatCurrency(savingsEnv.available)} in your Savings envelope. Keep adding to it!`
+      });
+    }
+
+    // 3. Overall spending ratio nudge
+    var baseIncome = state.incomeSources.reduce(function(sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
+    if (baseIncome > 0) {
+      var spendRatio = (state.totalExpenses / baseIncome) * 100;
+      if (spendRatio > 70) {
+        insights.push({
+          type: 'info',
+          icon: 'trending-up',
+          color: '#3B82F6',
+          text: `You have spent ${Math.round(spendRatio)}% of your main salary. Time to consider budget transfers to limit overspending!`
+        });
+      } else {
+        insights.push({
+          type: 'success',
+          icon: 'check-circle-outline',
+          color: '#10B981',
+          text: `Budget is looking healthy! You've only spent ${Math.round(spendRatio)}% of your salary.`
+        });
+      }
+    }
+
+    // 4. Overdue bills
+    var overdueCount = state.recurringExpenses ? state.recurringExpenses.filter(r => r.status === 'Pending' && r.due_date < today).length : 0;
+    if (overdueCount > 0) {
+      insights.push({
+        type: 'danger',
+        icon: 'error-outline',
+        color: '#EF4444',
+        text: `Alert: You have ${overdueCount} overdue recurring bills. Settle them to keep your credit score high!`
+      });
+    }
+
+    // Default if list is empty
+    if (insights.length === 0) {
+      insights.push({
+        type: 'info',
+        icon: 'lightbulb-outline',
+        color: theme.colors.primary,
+        text: "Tip: Give every peso a job. Allocate all remaining Ready to Assign funds to your envelopes!"
+      });
+    }
+
+    return insights;
+  }, [state.envelopeBalances, state.incomeSources, state.totalExpenses, state.recurringExpenses, theme]);
+
+  var activeInsight = smartInsights[insightIndex % smartInsights.length] || smartInsights[0];
   
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Welcome back</Text>
-            <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 20 }}>{userName}</Text>
-          </View>
-          <TouchableOpacity 
-            onPress={function() { setShowNotificationCenter(true); setHasViewedAlerts(true); }}
-            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
-          >
-            <MaterialIcons name="notifications-active" size={24} color="#FFFFFF" />
-            {!hasViewedAlerts && state.recurringExpenses && state.recurringExpenses.filter(r => r.status === 'Pending').length > 0 && (
-              <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: theme.colors.error, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
-                  {state.recurringExpenses.filter(r => r.status === 'Pending').length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding }}>
         
-        <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 20, flexDirection: 'column', gap: 14 }}>
+        {/* Header Block (Moves/Scrolls with everything else!) */}
+        <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View>
-              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>READY TO ASSIGN</Text>
-              <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: 'bold' }}>{formatCurrency(state.readyToAssign)}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>Welcome back</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 'bold', marginBottom: 20 }}>{userName}</Text>
             </View>
-            {state.readyToAssign > 0 && (
-              <TouchableOpacity onPress={() => state.setShowAssignModal(true)} style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}>
-                <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>Assign</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              onPress={function() { setShowNotificationCenter(true); setHasViewedAlerts(true); }}
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}
+            >
+              <MaterialIcons name="notifications-active" size={24} color="#FFFFFF" />
+              {!hasViewedAlerts && state.recurringExpenses && state.recurringExpenses.filter(r => r.status === 'Pending').length > 0 && (
+                <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: theme.colors.error, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1, borderWidth: 1, borderColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' }}>
+                    {state.recurringExpenses.filter(r => r.status === 'Pending').length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
+          
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 20, flexDirection: 'column', gap: 14 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>READY TO ASSIGN</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: 'bold' }}>{formatCurrency(state.readyToAssign)}</Text>
+              </View>
+              {state.readyToAssign > 0 && (
+                <TouchableOpacity onPress={() => state.setShowAssignModal(true)} style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}>
+                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>Assign</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
 
-          <View>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>TOTAL CURRENT MONEY</Text>
-            <Text style={{ color: '#6EE7B7', fontSize: 26, fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
+            <View>
+              <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, marginBottom: 4, fontWeight: '600' }}>TOTAL CURRENT MONEY</Text>
+              <Text style={{ color: '#6EE7B7', fontSize: 26, fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
+            </View>
           </View>
         </View>
-      </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 20, paddingBottom: scrollBottomPadding }}>
+
+        {/* Content Container with standard padding */}
+        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
+
+        {/* Dynamic Insights Banner */}
+        <TouchableOpacity 
+          onPress={function() { setInsightIndex(insightIndex + 1); }} 
+          activeOpacity={0.85}
+          style={{ 
+            backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.025)',
+            borderWidth: 1, 
+            borderColor: activeInsight.color + '33', 
+            borderRadius: 16, 
+            padding: 14, 
+            marginBottom: 20, 
+            flexDirection: 'row', 
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.02,
+            shadowRadius: 4,
+            elevation: 1
+          }}
+        >
+          <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: activeInsight.color + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+            <MaterialIcons name={activeInsight.icon} size={20} color={activeInsight.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, lineHeight: 18 }}>{activeInsight.text}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <MaterialIcons name="touch-app" size={10} color={theme.colors.textSecondary} style={{ marginRight: 2 }} />
+              <Text style={{ fontSize: 10, color: theme.colors.textSecondary, fontWeight: '700', letterSpacing: 0.5 }}>TAP FOR NEXT INSIGHT • {((insightIndex % smartInsights.length) + 1)}/{smartInsights.length}</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Monthly Stats Card */}
         <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 }}>
@@ -1713,41 +2088,69 @@ const DashboardScreen = function(props) {
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelopes</Text>
-          <TouchableOpacity onPress={() => setShowAddEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-            <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add Envelope</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity onPress={() => setShowTransferEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14, marginRight: 8 }}>Transfer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowAddEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-          {state.envelopeBalances.map(env => (
-            <TouchableOpacity key={env.id} onPress={function() { setSpentFilter(env.id); setShowSpentModal(true); }} style={{ width: '48%', backgroundColor: theme.colors.card, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <MaterialIcons name={getEnvelopeIcon(env.name)} size={20} color={theme.colors.primary} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textSecondary }}>
-                    {env.available < 0 ? 'OVERSPENT' : ''}
-                  </Text>
-                  <TouchableOpacity onPress={function(e) {
-                    e.stopPropagation();
-                    var actualEnv = state.envelopes.find(ev => ev.id === env.id);
-                    setSelectedEnvelope(actualEnv);
-                    setShowEditEnvModal(true);
-                  }} style={{ padding: 4 }}>
-                    <MaterialIcons name="edit" size={14} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
+          {state.envelopeBalances.map(env => {
+            var actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
+            var goalAmount = actualEnv.goal_amount || 0;
+            var goalDate = actualEnv.goal_date || '';
+            var goalPct = goalAmount > 0 ? Math.min(100, Math.round((env.available / goalAmount) * 100)) : 0;
+            
+            return (
+              <TouchableOpacity key={env.id} onPress={function() { setSpentFilter(env.id); setShowSpentModal(true); }} style={{ width: '48%', backgroundColor: theme.colors.card, borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <MaterialIcons name={getEnvelopeIcon(env.name)} size={20} color={theme.colors.primary} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textSecondary }}>
+                      {env.available < 0 ? 'OVERSPENT' : ''}
+                    </Text>
+                    <TouchableOpacity onPress={function(e) {
+                      e.stopPropagation();
+                      var actualEvObj = state.envelopes.find(ev => ev.id === env.id);
+                      setSelectedEnvelope(actualEvObj);
+                      setShowEditEnvModal(true);
+                    }} style={{ padding: 4 }}>
+                      <MaterialIcons name="edit" size={14} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>{env.name}</Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(env.available)}</Text>
-              
-              <View style={{ height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, marginTop: 12, overflow: 'hidden' }}>
-                <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
-              </View>
-            </TouchableOpacity>
-          ))}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>{env.name}</Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(env.available)}</Text>
+                
+                <View style={{ height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, marginTop: 12, overflow: 'hidden' }}>
+                  <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
+                </View>
+
+                {goalAmount > 0 ? (
+                  <View style={{ marginTop: 8, backgroundColor: 'rgba(16, 185, 129, 0.08)', borderRadius: 10, padding: 6, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.15)' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                      <Text style={{ fontSize: 9, color: '#059669', fontWeight: 'bold' }}>🎯 GOAL</Text>
+                      <Text style={{ fontSize: 9, color: '#059669', fontWeight: 'bold' }}>{goalPct}%</Text>
+                    </View>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>
+                      {formatCurrency(env.available)} / {formatCurrency(goalAmount)}
+                    </Text>
+                    {goalDate ? (
+                      <Text style={{ fontSize: 8, color: theme.colors.textSecondary, marginTop: 1 }}>By {goalDate}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-
+      </View>
       </ScrollView>
       <TouchableOpacity onPress={() => state.setShowAddModal(true)} style={{ position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 }}>
         <MaterialIcons name="add" size={28} color="#FFFFFF" />
@@ -1758,8 +2161,9 @@ const DashboardScreen = function(props) {
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />
       <SpentManagerModal visible={showSpentModal} onClose={function() { setShowSpentModal(false); }} filter={spentFilter} oneTimeExpenses={state.oneTimeExpenses} envelopes={state.envelopeBalances} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} />
       <IncomeManagerModal visible={showIncomeModal} onClose={function() { setShowIncomeModal(false); }} incomeSources={state.incomeSources} accounts={state.accounts} userSettings={state.userSettings} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} />
-      <AddEnvelopeModal visible={showAddEnvModal} onClose={function() { setShowAddEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
+      <AddEnvelopeModal visible={showAddEnvModal} onClose={function() { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <EditEnvelopeModal visible={showEditEnvModal} onClose={function() { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
+      <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function() { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <SavingsManagerModal visible={showSavingsManagerModal} onClose={function() { setShowSavingsManagerModal(false); }} state={state} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />

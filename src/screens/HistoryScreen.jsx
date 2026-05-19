@@ -79,6 +79,7 @@ const HistoryScreen = function() {
   var totalShown = useMemo(function() {
     return filteredHistory.reduce(function(s, i) {
       if (i.type === 'Income') return s + i.amount;
+      if (i.type === 'Transfer') return s;
       return s - i.amount;
     }, 0);
   }, [filteredHistory]);
@@ -93,6 +94,7 @@ const HistoryScreen = function() {
   
   var getTypeIcon = function(type) {
     if (type === 'Income') return 'trending-up';
+    if (type === 'Transfer') return 'swap-horiz';
     return type === 'Recurring' ? 'repeat' : 'shopping-bag';
   };
   
@@ -163,15 +165,15 @@ const HistoryScreen = function() {
         return React.createElement(View, { testID: 'View-66', style: { backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
           componentId: 'history-item-' + idx
         },
-          React.createElement(View, { testID: 'View-67', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE'), alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { testID: 'MaterialIcons-14', name: getTypeIcon(item.type), size: 20, color: isIncome ? theme.colors.primary : (item.type === 'Recurring' ? theme.colors.warning : '#7C3AED') })
+          React.createElement(View, { testID: 'View-67', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Transfer' ? '#E0F2FE' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE')), alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { testID: 'MaterialIcons-14', name: getTypeIcon(item.type), size: 20, color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : (item.type === 'Recurring' ? theme.colors.warning : '#7C3AED')) })
           ),
           React.createElement(View, { testID: 'View-68', style: { flex: 1 } },
             React.createElement(Text, { testID: 'Text-87', style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, item.name),
             React.createElement(Text, { testID: 'Text-88', style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, formatDate(item.date) + (item.notes ? ' ' + item.notes : '') + ' • ' + item.type)
           ),
           React.createElement(View, { testID: 'View-69', style: { alignItems: 'flex-end' } },
-            React.createElement(Text, { testID: 'Text-89', style: { fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : theme.colors.error } }, (isIncome ? '+' : '-') + formatCurrency(item.amount)),
+            React.createElement(Text, { testID: 'Text-89', style: { fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) } }, (isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)),
             React.createElement(View, { testID: 'View-70', style: { backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 } },
               React.createElement(Text, { testID: 'Text-90', style: { fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' } }, item.status)
             )
