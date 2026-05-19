@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BudgetApp</string>
-    <string name="title_activity_main">BudgetApp</string>
+    <string name="app_name">Penny</string>
+    <string name="title_activity_main">Penny</string>
     <string name="package_name">com.budgetapp</string>
     <string name="custom_url_scheme">com.budgetapp</string>
 </resources>
