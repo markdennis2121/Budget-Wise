@@ -1081,7 +1081,7 @@ const OnboardingModal = function({ visible, onClose, userSettings, mutateUpdateS
           </View>
           <Text style={{ fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12, textAlign: 'center' }}>Welcome to Envelope Budgeting!</Text>
           <Text style={{ fontSize: 15, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 24 }}>
-            Instead of just tracking expenses, you now give every dollar a job. {'\n\n'}
+            Instead of just tracking expenses, you now give every penny a job. {'\n\n'}
             1. Your income goes into <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Ready to Assign</Text>.{'\n'}
             2. You move that money into <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Envelopes</Text> (categories).{'\n'}
             3. You spend money from those Envelopes.{'\n\n'}
