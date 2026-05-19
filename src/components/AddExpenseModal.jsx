@@ -6,6 +6,7 @@ import { primaryColor, textPrimary, textSecondary, backgroundColor, cardColor, d
 import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
 import DatePickerInput from './DatePickerInput';
 import { scheduleBillNotification } from '../utils/notifications';
+import BrandLogo from './BrandLogo';
 
 const WALLET_STYLES = {
   GCash: { color: '#1E3A8A', name: 'GCash', logo: 'account-balance-wallet' },
@@ -281,7 +282,7 @@ const AddExpenseModal = function (props) {
                     var brandColor = acc.color || styleInfo.color;
                     return (
                       <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? primaryColor : theme.colors.border, backgroundColor: isSelected ? '#FFEDD5' : '#FFFFFF' }}>
-                        <MaterialIcons name={styleInfo.logo} size={14} color={isSelected ? primaryColor : brandColor} style={{ marginRight: 6 }} />
+                        <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
                         <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>{acc.name} (₱{acc.balance})</Text>
                       </TouchableOpacity>
                     );
@@ -296,7 +297,7 @@ const AddExpenseModal = function (props) {
                     var brandColor = acc.color || styleInfo.color;
                     return (
                       <TouchableOpacity key={acc.id} onPress={() => setDestAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? primaryColor : theme.colors.border, backgroundColor: isSelected ? '#FFEDD5' : '#FFFFFF' }}>
-                        <MaterialIcons name={styleInfo.logo} size={14} color={isSelected ? primaryColor : brandColor} style={{ marginRight: 6 }} />
+                        <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
                         <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>{acc.name} (₱{acc.balance})</Text>
                       </TouchableOpacity>
                     );
@@ -316,7 +317,7 @@ const AddExpenseModal = function (props) {
                       var brandColor = acc.color || styleInfo.color;
                       return (
                         <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? primaryColor : theme.colors.border, backgroundColor: isSelected ? '#FFEDD5' : '#FFFFFF' }}>
-                          <MaterialIcons name={styleInfo.logo} size={14} color={isSelected ? primaryColor : brandColor} style={{ marginRight: 6 }} />
+                          <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
                           <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>{acc.name}</Text>
                         </TouchableOpacity>
                       );

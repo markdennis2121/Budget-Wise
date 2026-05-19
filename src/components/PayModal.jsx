@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatCurrency, isWithin5Days, isOverdue, getTodayStr, generateId } from '../utils/helpers';
+import BrandLogo from './BrandLogo';
 
 const WALLET_STYLES = {
   GCash: { color: '#1E3A8A', name: 'GCash', logo: 'account-balance-wallet' },
@@ -144,7 +145,7 @@ const PayModal = function(props) {
                     backgroundColor: isSelected ? (theme.isDark ? '#374151' : '#FFEDD5') : theme.colors.inputBg
                   }}
                 >
-                  <MaterialIcons name={styleInfo.logo} size={14} color={isSelected ? primaryColor : brandColor} style={{ marginRight: 6 }} />
+                  <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>
                     {acc.name}
                   </Text>

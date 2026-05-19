@@ -8,6 +8,7 @@ import { useUser } from '../contexts/UserContext';
 import AddExpenseModal from '../components/AddExpenseModal';
 import DatePickerInput from '../components/DatePickerInput';
 import logoImg from '../assets/logo.png';
+import BrandLogo from '../components/BrandLogo';
 import { formatCurrency, generateId, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue, formatDate } from '../utils/helpers';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -1491,7 +1492,7 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                           var brandColor = a.color || styleInfo.color;
                           return (
                             <TouchableOpacity key={a.id} onPress={() => setEditAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                              <MaterialIcons name={styleInfo.logo} size={13} color={isSel ? '#FFFFFF' : brandColor} style={{ marginRight: 4 }} />
+                              <BrandLogo type={a.type} size={14} style={{ marginRight: 6 }} />
                               <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 12, fontWeight: '600' }}>{a.name}</Text>
                             </TouchableOpacity>
                           );
@@ -1522,7 +1523,7 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                               var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                               return (
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                  <MaterialIcons name={styleInfo.logo} size={11} color={acc.color || styleInfo.color} style={{ marginRight: 3 }} />
+                                  <BrandLogo type={acc.type} size={12} style={{ marginRight: 4 }} />
                                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.textPrimary }}>{accName}</Text>
                                 </View>
                               );
@@ -1582,7 +1583,7 @@ const IncomeManagerModal = function({ visible, onClose, incomeSources, accounts 
                 var brandColor = a.color || styleInfo.color;
                 return (
                   <TouchableOpacity key={a.id} onPress={() => setNewSourceAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: isSel ? theme.colors.primary : theme.colors.inputBg, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                    <MaterialIcons name={styleInfo.logo} size={13} color={isSel ? '#FFFFFF' : brandColor} style={{ marginRight: 4 }} />
+                    <BrandLogo type={a.type} size={14} style={{ marginRight: 6 }} />
                     <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 12, fontWeight: '600' }}>{a.name}</Text>
                   </TouchableOpacity>
                 );
@@ -2063,9 +2064,7 @@ const DashboardScreen = function(props) {
                   }}
                 >
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                      <MaterialIcons name={walletStyle.logo} size={16} color="#FFFFFF" />
-                    </View>
+                    <BrandLogo type={acc.type} size={28} />
                     <TouchableOpacity 
                       onPress={() => {
                         setSelectedAccount(acc);
