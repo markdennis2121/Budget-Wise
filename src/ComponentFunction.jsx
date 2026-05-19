@@ -149,9 +149,7 @@ const TermsAndConditionsScreen = function(props) {
 
 const ComponentFunction = function() {
   var isExpired = useMemo(function() {
-    var exp = new Date(EXPIRATION_DATE);
-    var now = new Date();
-    return now.getTime() > exp.getTime();
+    return false;
   }, []);
 
   var [termsAccepted, setTermsAccepted] = useState(function() {
