@@ -24,11 +24,15 @@ Think of Penny as having physical paper envelopes and different physical wallets
 ### 💼 Your Wallets & Accounts
 * These are the actual places you keep your money (like GCash, Bank accounts, or cash in your pocket).
 * To add one, tap **"Add Account"** under the wallet list, type a name (like "My GCash"), and type how much money is currently inside.
+* **🔗 Linked Income:** When adding your monthly income sources, you can link them directly to one of these wallets! This makes sure your income automatically increases the correct account balance every month.
 
 ### ✉️ Labeled Budget Envelopes
 * These are your monthly allowances (like Food, Rent, or Fuel).
 * **Smart Icons:** You don't need to pick pictures! If you name your envelope **"Food"**, Penny automatically draws a little spoon and fork. If you name it **"Rent"**, Penny draws a house!
 * **Ready to Assign:** This is income you haven't assigned to an envelope yet. Tap **"Assign"** to put this money into your envelopes!
+
+### 🎨 Custom Themes
+Want to change the app's look? Go to **Settings** and pick an accent color theme that matches your vibe, from *Rose Gold* and *Lavender Dream* to *Stealth Black* and *Penny Classic*.
 
 ---
 

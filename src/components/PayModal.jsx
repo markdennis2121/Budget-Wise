@@ -48,24 +48,34 @@ const PayModal = function(props) {
   
   var [isLoading, setIsLoading] = useState(false);
   var [selectedAccount, setSelectedAccount] = useState('');
+  var [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (visible) {
-      if (accounts && accounts.length > 0) {
+      setErrorMsg('');
+      if (expense && expense.account_id && expense.account_id !== 'unlinked') {
+        setSelectedAccount(expense.account_id);
+      } else if (accounts && accounts.length > 0) {
         setSelectedAccount(accounts[0].id);
       } else {
         setSelectedAccount('unlinked');
       }
     }
-  }, [visible, accounts]);
+  }, [visible, accounts, expense]);
 
   var handlePay = function() {
     if (!expense) return;
+    var amt = parseFloat(expense.amount) || 0;
+    var acc = accounts.find(a => a.id === selectedAccount);
+    if (acc && acc.balance < amt) {
+      setErrorMsg(`Insufficient funds in ${acc.name}. Balance: ₱${acc.balance.toFixed(2)}`);
+      return;
+    }
+    setErrorMsg('');
     setIsLoading(true);
     var isPaidInAdvance = isWithin5Days(expense.due_date) && !isOverdue(expense.due_date);
     var newStatus = isPaidInAdvance ? 'Paid in Advance' : 'Paid';
     
-    var acc = accounts.find(a => a.id === selectedAccount);
     var accName = acc ? acc.name : 'Wallet';
 
     mutateUpdate({ 
@@ -76,12 +86,13 @@ const PayModal = function(props) {
         id: generateId(), 
         user_id: userId, 
         expense_name: expense.name, 
-        amount: parseFloat(expense.amount) || 0, 
+        amount: amt, 
         expense_type: 'Recurring', 
         date: getTodayStr(), 
         status: newStatus, 
         notes: 'Paid from: ' + accName,
-        account_id: selectedAccount
+        account_id: selectedAccount,
+        category: expense.category
       });
     }).then(function() {
       setIsLoading(false);
@@ -89,6 +100,7 @@ const PayModal = function(props) {
       onClose();
     }).catch(function() { 
       setIsLoading(false); 
+      setErrorMsg('Failed to confirm payment. Try again.');
     });
   };
   
@@ -123,37 +135,62 @@ const PayModal = function(props) {
             </View>
           </View>
 
-          <Text style={{ fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 8 }}>PAY FROM WALLET</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
-            {accounts.map(acc => {
-              var isSelected = selectedAccount === acc.id;
-              var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-              var brandColor = acc.color || styleInfo.color;
-              return (
-                <TouchableOpacity 
-                  key={acc.id} 
-                  onPress={() => setSelectedAccount(acc.id)} 
-                  style={{ 
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginRight: 8,
-                    paddingHorizontal: 12, 
-                    paddingVertical: 8, 
-                    borderRadius: 8, 
-                    borderWidth: 1, 
-                    borderColor: isSelected ? primaryColor : theme.colors.border, 
-                    backgroundColor: isSelected ? (theme.isDark ? '#374151' : '#FFEDD5') : theme.colors.inputBg
-                  }}
-                >
-                  <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>
-                    {acc.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-          </ScrollView>
+          {expense.account_id && expense.account_id !== 'unlinked' ? (
+            <View style={{ 
+              backgroundColor: theme.colors.inputBg, 
+              borderRadius: 12, 
+              borderWidth: 1, 
+              borderColor: theme.colors.border, 
+              padding: 14, 
+              marginBottom: 16, 
+              flexDirection: 'row', 
+              alignItems: 'center' 
+            }}>
+              <MaterialIcons name="account-balance-wallet" size={20} color={primaryColor} style={{ marginRight: 10 }} />
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: textSecondary, textTransform: 'uppercase' }}>Paying From Wallet</Text>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: textPrimary, marginTop: 2 }}>
+                  {(() => {
+                    var acc = accounts.find(a => a.id === expense.account_id);
+                    return acc ? acc.name : 'Linked Wallet';
+                  })()}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: textSecondary, marginBottom: 8 }}>PAY FROM WALLET</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                {accounts.map(acc => {
+                  var isSelected = selectedAccount === acc.id;
+                  var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
+                  var brandColor = acc.color || styleInfo.color;
+                  return (
+                    <TouchableOpacity 
+                      key={acc.id} 
+                      onPress={() => setSelectedAccount(acc.id)} 
+                      style={{ 
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginRight: 8,
+                        paddingHorizontal: 12, 
+                        paddingVertical: 8, 
+                        borderRadius: 8, 
+                        borderWidth: 1, 
+                        borderColor: isSelected ? primaryColor : theme.colors.border, 
+                        backgroundColor: isSelected ? (theme.isDark ? '#374151' : '#FFEDD5') : theme.colors.inputBg
+                      }}
+                    >
+                      <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>
+                        {acc.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
           {isPaidInAdvance && (
             <View style={{ backgroundColor: theme.isDark ? '#1E3A8A' : '#EFF6FF', borderRadius: 10, padding: 12, marginBottom: 16 }}>
@@ -162,6 +199,14 @@ const PayModal = function(props) {
               </Text>
             </View>
           )}
+
+          {errorMsg ? (
+            <View style={{ backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+              <Text style={{ color: dangerColor, fontSize: 13, textAlign: 'center', fontWeight: '600' }}>
+                ⚠️ {errorMsg}
+              </Text>
+            </View>
+          ) : null}
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity 

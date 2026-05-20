@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, Image, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, Image, Platform, ActivityIndicator, Modal } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
@@ -26,6 +27,8 @@ const RegisterScreen = function(props) {
   var errorMsg = errState[0]; var setErrorMsg = errState[1];
   var loadingState = useState(false);
   var isLoading = loadingState[0]; var setIsLoading = loadingState[1];
+  var [agreeTerms, setAgreeTerms] = useState(false);
+  var [showTermsModal, setShowTermsModal] = useState(false);
   var usersQuery = useQuery('budget_users');
   var allUsers = usersQuery.data || [];
   var insertUser = useMutation('budget_users', 'insert');
@@ -37,6 +40,7 @@ const RegisterScreen = function(props) {
     if (!name.trim() || !email.trim() || !password.trim()) { setErrorMsg('Please fill all fields.'); return; }
     if (password !== confirmPassword) { setErrorMsg('Passwords do not match.'); return; }
     if (password.length < 6) { setErrorMsg('Password must be at least 6 characters.'); return; }
+    if (!agreeTerms) { setErrorMsg('You must agree to the Terms & Conditions.'); return; }
     var existing = allUsers.find(function(u) { return u.email === email.trim().toLowerCase(); });
     if (existing) { setErrorMsg('Email already registered.'); return; }
     setIsLoading(true);
@@ -99,6 +103,49 @@ const RegisterScreen = function(props) {
           style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 24 },
           componentId: 'register-confirm-pass-input'
         }),
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setAgreeTerms(!agreeTerms)} style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: agreeTerms ? theme.colors.primary : theme.colors.border, backgroundColor: agreeTerms ? theme.colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+            {agreeTerms && <MaterialIcons name="check" size={14} color="#FFFFFF" />}
+          </TouchableOpacity>
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flex: 1 }}>
+            I agree to the <Text onPress={function(e) { if(e && e.stopPropagation) e.stopPropagation(); setShowTermsModal(true); }} style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Terms & Conditions</Text>
+          </Text>
+        </View>,
+
+        <Modal visible={showTermsModal} animationType="slide" transparent={true} onRequestClose={() => setShowTermsModal(false)}>
+          <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+            <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Terms & Privacy Policy</Text>
+                <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ padding: 4, backgroundColor: theme.colors.background, borderRadius: 12 }}>
+                  <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={{ maxHeight: 300 }}>
+                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>1. 100% Offline App</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+                  Penny is a fully offline application. We do not collect, transmit, or store your financial data on any external servers. All information remains locally on your device.
+                </Text>
+                
+                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>2. Data Responsibility</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+                  Because your data is strictly local, you are solely responsible for it. If you uninstall the app or lose your device without a personal backup, your data will be permanently lost. We cannot recover lost data.
+                </Text>
+                
+                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>3. Not Financial Advice</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+                  This application is a budgeting utility, not professional financial advice. You agree to use it at your own discretion.
+                </Text>
+              </ScrollView>
+              
+              <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ marginTop: 16, backgroundColor: theme.colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>,
+
         React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-9', onPress: handleRegister, disabled: isLoading,
           style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
           componentId: 'register-submit-btn'

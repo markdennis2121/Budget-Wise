@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, Platform, TouchableOpacity, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'platform-hooks';
@@ -93,31 +93,36 @@ const StatisticsScreen = function() {
       }
     });
 
-    return base + extra + totalStartingBalances;
-  }, [userSettings, userHistory, curMonth, totalStartingBalances]);
+    return base + extra;
+  }, [userSettings, userHistory, curMonth]);
 
   // Current month spending by envelope
   var envelopeSpending = useMemo(function() {
     var map = {};
     envelopes.forEach(function(e) { map[e.id] = { name: e.name, spent: 0 }; });
 
-    userRecurring.forEach(function(r) {
-      if ((r.status === 'Paid' || r.status === 'Paid in Advance') && getMonthStr(r.due_date) === curMonth) {
-        var k = r.category;
-        if (!map[k]) map[k] = { name: k || 'Other', spent: 0 };
-        map[k].spent += parseFloat(r.amount) || 0;
+    userHistory.forEach(function (h) {
+      if (h.expense_type === 'Recurring' && getMonthStr(h.date) === curMonth) {
+        var amt = parseFloat(h.amount) || 0;
+        var rec = userRecurring.find(function (r) { return r.name === h.expense_name; });
+        var category = rec ? rec.category : 'Other';
+        var env = envelopes.find(function (e) { return e.id === category || e.name === category; });
+        var key = env ? env.id : (category || 'Other');
+        if (!map[key]) map[key] = { name: env ? env.name : (category || 'Other'), spent: 0 };
+        map[key].spent += amt;
       }
     });
     userOneTime.forEach(function(o) {
       if (getMonthStr(o.date) === curMonth) {
-        var k = o.category;
-        if (!map[k]) map[k] = { name: k || 'Other', spent: 0 };
-        map[k].spent += parseFloat(o.amount) || 0;
+        var env = envelopes.find(function(e) { return e.id === o.category || e.name === o.category; });
+        var key = env ? env.id : (o.category || 'Other');
+        if (!map[key]) map[key] = { name: env ? env.name : (o.category || 'Other'), spent: 0 };
+        map[key].spent += parseFloat(o.amount) || 0;
       }
     });
 
     return Object.values(map).filter(function(e) { return e.spent > 0; }).sort(function(a, b) { return b.spent - a.spent; });
-  }, [userRecurring, userOneTime, envelopes, curMonth]);
+  }, [userHistory, userRecurring, userOneTime, envelopes, curMonth]);
 
   var totalMonthSpent = envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
   var maxEnvSpent = envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1;
@@ -126,6 +131,92 @@ const StatisticsScreen = function() {
   var spendPct = totalMonthlyIncome > 0 ? Math.min(100, Math.round((totalMonthSpent / totalMonthlyIncome) * 100)) : 0;
 
   var [selectedEnvIndex, setSelectedEnvIndex] = useState(null);
+  var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
+
+  var handleIncomeInfo = function() {
+    var base = 0;
+    if (userSettings) {
+      if (userSettings.income_sources) {
+        var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+        base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+      } else {
+        base = parseFloat(userSettings.monthly_salary) || 0;
+      }
+    }
+    var extra = 0;
+    userHistory.forEach(function(h) {
+      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
+        extra += (parseFloat(h.amount) || 0);
+      }
+    });
+
+    setInfoModalConfig({
+      visible: true,
+      title: 'Total Monthly Income',
+      content: (
+        <View>
+          <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
+            This is the total income earned or added this month. 'Expected Income' is your baseline setup, while 'Extra Income' includes manual wallet top-ups and any external income you log. (Note: Initial wallet seed balances are considered starting capital, not income).
+          </Text>
+          <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Expected Income</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(base)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Extra Income</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(extra)}</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 14 }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 16, color: theme.colors.primary, fontWeight: 'bold' }}>Total Income</Text>
+              <Text style={{ fontSize: 16, color: theme.colors.primary, fontWeight: 'bold' }}>{formatCurrency(totalMonthlyIncome)}</Text>
+            </View>
+          </View>
+        </View>
+      )
+    });
+  };
+
+  var handleSpentInfo = function() {
+    setInfoModalConfig({
+      visible: true,
+      title: 'Total Spent',
+      content: (
+        <View>
+          <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
+            This is the sum of all your one-time expenses and paid recurring bills for the current month.
+          </Text>
+          <View style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialIcons name="shopping-cart" size={20} color="#DC2626" style={{ marginRight: 10 }} />
+            <Text style={{ fontSize: 13, color: '#B91C1C', fontWeight: 'bold', flex: 1 }}>
+              Tip: Check the 'Spending by Envelope' chart below for a detailed breakdown.
+            </Text>
+          </View>
+        </View>
+      )
+    });
+  };
+
+  var handleSavedInfo = function() {
+    setInfoModalConfig({
+      visible: true,
+      title: savings >= 0 ? 'Total Saved' : 'Over Budget',
+      content: (
+        <View>
+          <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
+            This is simply your Total Income minus your Total Spent for this month.
+          </Text>
+          <View style={{ backgroundColor: savings >= 0 ? 'rgba(22, 163, 74, 0.1)' : 'rgba(220, 38, 38, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialIcons name={savings >= 0 ? 'savings' : 'warning'} size={20} color={savings >= 0 ? '#16A34A' : '#DC2626'} style={{ marginRight: 10 }} />
+            <Text style={{ fontSize: 13, color: savings >= 0 ? '#15803D' : '#B91C1C', fontWeight: 'bold', flex: 1 }}>
+              {savings >= 0 ? "Great job keeping your expenses below your income!" : "You have spent more than your total monthly income."}
+            </Text>
+          </View>
+        </View>
+      )
+    });
+  };
 
   const SEGMENT_COLORS = [
     '#FF6B6B', // Vibrant Coral Red
@@ -195,41 +286,42 @@ const StatisticsScreen = function() {
     return last6Months.map(function(m) {
       var spent = 0;
       var income = 0;
-      userRecurring.forEach(function(r) {
-        if ((r.status === 'Paid' || r.status === 'Paid in Advance') && getMonthStr(r.due_date) === m.key) {
-          spent += parseFloat(r.amount) || 0;
-        }
-      });
+      
+      // 1. Sum one-time expenses from userOneTime
       userOneTime.forEach(function(o) {
         if (getMonthStr(o.date) === m.key) {
           spent += parseFloat(o.amount) || 0;
         }
       });
+      
+      // 2. Sum paid recurring bills and extra incomes from history
       userHistory.forEach(function(h) {
-        if (h.expense_type === 'Income' && getMonthStr(h.date) === m.key) {
-          income += parseFloat(h.amount) || 0;
+        if (getMonthStr(h.date) === m.key) {
+          if (h.expense_type === 'Recurring') {
+            spent += parseFloat(h.amount) || 0;
+          } else if (h.expense_type === 'Income') {
+            income += parseFloat(h.amount) || 0;
+          }
         }
       });
       
-      // Also add expected base income for each month if needed
-      var base = 0;
-      if (userSettings) {
-        if (userSettings.income_sources) {
-          var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-          base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
-        } else {
-          base = parseFloat(userSettings.monthly_salary) || 0;
-        }
-      }
-
+      // 3. Add expected base recurring income configured in settings (only for current month)
       if (m.key === curMonth) {
+        var base = 0;
+        if (userSettings) {
+          if (userSettings.income_sources) {
+            var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+            base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+          } else {
+            base = parseFloat(userSettings.monthly_salary) || 0;
+          }
+        }
         income += base;
-        income += totalStartingBalances;
       }
 
       return { label: m.label, spent: spent, income: income, key: m.key };
     });
-  }, [userRecurring, userOneTime, userHistory, userSettings, curMonth, totalStartingBalances]);
+  }, [userOneTime, userHistory, userSettings, curMonth]);
 
   var maxTrendValue = Math.max.apply(null, monthlyTotals.map(function(m) { return Math.max(m.spent, m.income); }).concat([1]));
 
@@ -244,37 +336,64 @@ const StatisticsScreen = function() {
     React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: scrollBottomPadding } },
 
       // ── Summary row ──────────────────────────────────────────────────────
-      React.createElement(View, { style: { flexDirection: 'row', marginBottom: 16, gap: 8 } },
-        // Income
-        React.createElement(View, { style: { flex: 1, backgroundColor: '#FFEDD5', borderRadius: 14, padding: 14 } },
-          React.createElement(View, { style: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 } },
-            React.createElement(MaterialIcons, { name: 'account-balance-wallet', size: 18, color: theme.colors.primary })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, formatCurrency(totalMonthlyIncome)),
-          React.createElement(Text, { style: { fontSize: 11, color: '#92400E', marginTop: 2 } }, 'Income')
-        ),
-        // Spent
-        React.createElement(View, { style: { flex: 1, backgroundColor: '#FEE2E2', borderRadius: 14, padding: 14 } },
-          React.createElement(View, { style: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 } },
-            React.createElement(MaterialIcons, { name: 'shopping-cart', size: 18, color: '#DC2626' })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: '#DC2626' } }, formatCurrency(totalMonthSpent)),
-          React.createElement(Text, { style: { fontSize: 11, color: '#991B1B', marginTop: 2 } }, 'Spent')
-        ),
-        // Saved
-        React.createElement(View, { style: { flex: 1, backgroundColor: savings >= 0 ? '#DCFCE7' : '#FEE2E2', borderRadius: 14, padding: 14 } },
-          React.createElement(View, { style: { width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 } },
-            React.createElement(MaterialIcons, { name: 'savings', size: 18, color: savings >= 0 ? '#16A34A' : '#DC2626' })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: savings >= 0 ? '#16A34A' : '#DC2626' } }, formatCurrency(Math.abs(savings))),
-          React.createElement(Text, { style: { fontSize: 11, color: savings >= 0 ? '#14532D' : '#991B1B', marginTop: 2 } }, savings >= 0 ? 'Saved' : 'Over budget')
-        )
-      ),
+      <View style={{ flexDirection: 'row', marginBottom: 16, gap: 8 }}>
+        <TouchableOpacity activeOpacity={0.8} onPress={handleIncomeInfo} style={{ flex: 1, backgroundColor: '#FFEDD5', borderRadius: 14, padding: 14, position: 'relative' }}>
+          <View style={{ position: 'absolute', top: 8, right: 8 }}>
+            <MaterialIcons name="info-outline" size={14} color="rgba(146, 64, 14, 0.5)" />
+          </View>
+          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+            <MaterialIcons name="account-balance-wallet" size={18} color={theme.colors.primary} />
+          </View>
+          <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary }}>{formatCurrency(totalMonthlyIncome)}</Text>
+          <Text style={{ fontSize: 11, color: '#92400E', marginTop: 2 }}>Income</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity activeOpacity={0.8} onPress={handleSpentInfo} style={{ flex: 1, backgroundColor: '#FEE2E2', borderRadius: 14, padding: 14, position: 'relative' }}>
+          <View style={{ position: 'absolute', top: 8, right: 8 }}>
+            <MaterialIcons name="info-outline" size={14} color="rgba(153, 27, 27, 0.5)" />
+          </View>
+          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+            <MaterialIcons name="shopping-cart" size={18} color="#DC2626" />
+          </View>
+          <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#DC2626' }}>{formatCurrency(totalMonthSpent)}</Text>
+          <Text style={{ fontSize: 11, color: '#991B1B', marginTop: 2 }}>Spent</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity activeOpacity={0.8} onPress={handleSavedInfo} style={{ flex: 1, backgroundColor: savings >= 0 ? '#DCFCE7' : '#FEE2E2', borderRadius: 14, padding: 14, position: 'relative' }}>
+          <View style={{ position: 'absolute', top: 8, right: 8 }}>
+            <MaterialIcons name="info-outline" size={14} color={savings >= 0 ? "rgba(20, 83, 45, 0.5)" : "rgba(153, 27, 27, 0.5)"} />
+          </View>
+          <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+            <MaterialIcons name="savings" size={18} color={savings >= 0 ? '#16A34A' : '#DC2626'} />
+          </View>
+          <Text style={{ fontSize: 17, fontWeight: 'bold', color: savings >= 0 ? '#16A34A' : '#DC2626' }}>{formatCurrency(Math.abs(savings))}</Text>
+          <Text style={{ fontSize: 11, color: savings >= 0 ? '#14532D' : '#991B1B', marginTop: 2 }}>{savings >= 0 ? 'Saved' : 'Over budget'}</Text>
+        </TouchableOpacity>
+      </View>,
 
       // ── Savings rate card ─────────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
         React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 } },
-          React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Budget Used'),
+          <TouchableOpacity onPress={() => setInfoModalConfig({
+              visible: true,
+              title: 'Budget Used',
+              content: (
+                <View>
+                  <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 12, lineHeight: 22 }}>
+                    This calculates the percentage of your total monthly income that has already been spent.
+                  </Text>
+                  <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialIcons name="lightbulb" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
+                    <Text style={{ fontSize: 13, color: '#B45309', fontWeight: 'bold', flex: 1 }}>
+                      Aim to keep this under 80% to ensure you have room for savings!
+                    </Text>
+                  </View>
+                </View>
+              )
+            })} style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>Budget Used</Text>
+            <MaterialIcons name="info-outline" size={16} color={theme.colors.textSecondary} />
+          </TouchableOpacity>,
           React.createElement(Text, { style: { fontSize: 20, fontWeight: 'bold', color: spendPct >= 90 ? '#DC2626' : theme.colors.primary } }, spendPct + '%')
         ),
         React.createElement(View, { style: { height: 10, backgroundColor: theme.colors.border, borderRadius: 5, overflow: 'hidden', marginBottom: 8 } },
@@ -381,7 +500,26 @@ const StatisticsScreen = function() {
             React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
               React.createElement(MaterialIcons, { name: 'bar-chart', size: 18, color: theme.colors.primary })
             ),
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, '6-Month Trend')
+            <TouchableOpacity onPress={() => setInfoModalConfig({
+                visible: true,
+                title: '6-Month Trend',
+                content: (
+                  <View>
+                    <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 12, lineHeight: 22 }}>
+                      This chart compares your total income (green) versus your total expenses (red) over the last half-year.
+                    </Text>
+                    <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+                      <MaterialIcons name="trending-up" size={20} color="#10B981" style={{ marginRight: 10 }} />
+                      <Text style={{ fontSize: 13, color: '#047857', fontWeight: 'bold', flex: 1 }}>
+                        A healthy trend shows your green bars consistently taller than your red bars!
+                      </Text>
+                    </View>
+                  </View>
+                )
+              })} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>6-Month Trend</Text>
+              <MaterialIcons name="info-outline" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
           ),
           React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 12 } },
             React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
@@ -432,7 +570,23 @@ const StatisticsScreen = function() {
           })
         )
       )
-    )
+    ),
+    <Modal key="stats-info-modal" visible={infoModalConfig.visible} animationType="fade" transparent={true} onRequestClose={() => setInfoModalConfig({ ...infoModalConfig, visible: false })}>
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{infoModalConfig.title}</Text>
+            <TouchableOpacity onPress={() => setInfoModalConfig({ ...infoModalConfig, visible: false })} style={{ padding: 4, backgroundColor: theme.colors.background, borderRadius: 12 }}>
+              <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          {infoModalConfig.content}
+          <TouchableOpacity onPress={() => setInfoModalConfig({ ...infoModalConfig, visible: false })} style={{ marginTop: 24, backgroundColor: theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Got it!</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 };
 

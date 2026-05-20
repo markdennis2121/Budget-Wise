@@ -40,7 +40,8 @@ const darkTheme = {
 const ThemeContext = createContext({
   theme: lightTheme,
   toggleTheme: function() {},
-  setTheme: function(isDark) {}
+  setTheme: function(isDark) {},
+  setPrimaryColor: function(color) {}
 });
 
 export const primaryColor = lightTheme.colors.primary;
@@ -53,33 +54,59 @@ export const dangerColor = lightTheme.colors.error;
 export const warningColor = lightTheme.colors.warning;
 export const infoColor = lightTheme.colors.info;
 
-export const ThemeProvider = function(props) {
-  var [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    try {
-      var saved = localStorage.getItem('budget_wise_theme');
-      if (saved === 'dark') setIsDark(true);
-    } catch (e) {}
-  }, []);
-
-  var toggleTheme = useCallback(() => {
-    setIsDark(prev => {
-      var next = !prev;
-      try { localStorage.setItem('budget_wise_theme', next ? 'dark' : 'light'); } catch (e) {}
-      return next;
-    });
-  }, []);
-
-  var setTheme = useCallback((dark) => {
-    setIsDark(dark);
-    try { localStorage.setItem('budget_wise_theme', dark ? 'dark' : 'light'); } catch (e) {}
-  }, []);
-
-  var theme = useMemo(() => isDark ? darkTheme : lightTheme, [isDark]);
-  var value = useMemo(() => ({ theme, toggleTheme, setTheme }), [theme, toggleTheme, setTheme]);
-
-  return React.createElement(ThemeContext.Provider, { testID: 'Provider-2', value: value }, props.children);
-};
+  export const ThemeProvider = function(props) {
+    var [isDark, setIsDark] = useState(false);
+    var [customPrimary, setCustomPrimary] = useState('#10B981');
+  
+    useEffect(() => {
+      try {
+        var savedTheme = localStorage.getItem('budget_wise_theme');
+        if (savedTheme === 'dark') setIsDark(true);
+        
+        var savedColor = localStorage.getItem('budget_wise_color');
+        if (savedColor) {
+          if (savedColor.startsWith('[')) setCustomPrimary(JSON.parse(savedColor));
+          else setCustomPrimary(savedColor);
+        }
+      } catch (e) {}
+    }, []);
+  
+    var toggleTheme = useCallback(() => {
+      setIsDark(prev => {
+        var next = !prev;
+        try { localStorage.setItem('budget_wise_theme', next ? 'dark' : 'light'); } catch (e) {}
+        return next;
+      });
+    }, []);
+  
+    var setTheme = useCallback((dark) => {
+      setIsDark(dark);
+      try { localStorage.setItem('budget_wise_theme', dark ? 'dark' : 'light'); } catch (e) {}
+    }, []);
+  
+    var setPrimaryColor = useCallback((color) => {
+      setCustomPrimary(color);
+      try { localStorage.setItem('budget_wise_color', Array.isArray(color) ? JSON.stringify(color) : color); } catch (e) {}
+    }, []);
+  
+    var theme = useMemo(() => {
+      var baseTheme = isDark ? darkTheme : lightTheme;
+      var primaryStr = Array.isArray(customPrimary) ? customPrimary[0] : customPrimary;
+      var gradientArr = Array.isArray(customPrimary) ? customPrimary : [customPrimary, customPrimary];
+      return {
+        ...baseTheme,
+        colors: {
+          ...baseTheme.colors,
+          primary: primaryStr,
+          primaryGradient: gradientArr,
+          info: primaryStr
+        }
+      };
+    }, [isDark, customPrimary]);
+    
+    var value = useMemo(() => ({ theme, toggleTheme, setTheme, setPrimaryColor }), [theme, toggleTheme, setTheme, setPrimaryColor]);
+  
+    return React.createElement(ThemeContext.Provider, { testID: 'Provider-2', value: value }, props.children);
+  };
 
 export const useTheme = function() { return useContext(ThemeContext); };

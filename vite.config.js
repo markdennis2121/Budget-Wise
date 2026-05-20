@@ -18,4 +18,11 @@ export default defineConfig({
       'react-native-safe-area-context': fileURLToPath(new URL('./src/SafeArea.web.js', import.meta.url)),
     },
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      loader: {
+        '.js': 'jsx',
+      },
+    },
+  },
 });

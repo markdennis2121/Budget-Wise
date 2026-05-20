@@ -34,6 +34,11 @@ const RecurringScreen = function(props) {
   var updateRecurring = useMutation('recurring_expenses', 'update');
   var mutateUpdate = updateRecurring.mutate;
 
+  var historyQuery = useQuery('expense_history');
+  var allHistory = historyQuery.data || [];
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
+
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
   var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
@@ -94,13 +99,38 @@ const RecurringScreen = function(props) {
   };
   
   var handleDelete = function(expense) {
-    var msg = 'Delete "' + expense.name + '"?';
+    var isPaid = expense.status === 'Paid' || expense.status === 'Paid in Advance';
+    var msg = isPaid
+      ? 'Delete "' + expense.name + '"? Since it was already paid, the spent amount will be returned to your envelope.'
+      : 'Delete "' + expense.name + '"?';
+
+    var performDelete = function() {
+      mutateDelete({ id: expense.id }).then(function() {
+        // If the bill was paid, also delete its history records so envelope is freed
+        if (isPaid) {
+          var matchingHistory = allHistory.filter(function(h) {
+            return h.user_id === userId
+              && h.expense_type === 'Recurring'
+              && h.expense_name === expense.name;
+          });
+          var deletePromises = matchingHistory.map(function(h) {
+            return mutateDeleteHistory({ id: h.id });
+          });
+          return Promise.all(deletePromises);
+        }
+        return Promise.resolve();
+      }).then(function() {
+        refetch();
+        historyQuery.refetch && historyQuery.refetch();
+      });
+    };
+
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) { mutateDelete({ id: expense.id }).then(function() { refetch(); }); }
+      if (window.confirm(msg)) { performDelete(); }
     } else {
       Alert.alert('Delete Expense', msg, [
         { text: 'Cancel' },
-        { text: 'Delete', style: 'destructive', onPress: function() { mutateDelete({ id: expense.id }).then(function() { refetch(); }); } }
+        { text: 'Delete', style: 'destructive', onPress: performDelete }
       ]);
     }
   };
@@ -142,9 +172,9 @@ const RecurringScreen = function(props) {
     React.createElement(ScrollView, { testID: 'ScrollView-9', style: { flex: 1 },
       contentContainerStyle: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: scrollBottomPadding }
     },
-      filtered.length === 0 ? React.createElement(View, { testID: 'View-51', style: { alignItems: 'center', paddingTop: 60 }, componentId: 'recurring-empty' },
-        React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 } }, 'No bills yet'),
-        React.createElement(Text, { testID: 'Text-70', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 } }, 'Tap the + button to add your recurring monthly bills')
+      filtered.length === 0 ? React.createElement(View, { testID: 'View-51', style: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 30 }, componentId: 'recurring-empty' },
+        React.createElement(Text, { style: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' } }, "You're all caught up! 🎉"),
+        React.createElement(Text, { testID: 'Text-70', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 } }, "No recurring bills to worry about. If you have monthly subscriptions or rent, tap the + button to keep track of them effortlessly.")
       ) :
       [...filtered.slice(0, visibleCount).map(function(expense, idx) {
         var overdue = isOverdue(expense.due_date) && expense.status === 'Pending';

@@ -13,11 +13,27 @@ const WEB_TAB_MENU_PADDING = 90;
 
 const PIN_LENGTH = 6;
 
+const THEME_COLORS = [
+  { name: 'Penny Classic', color: '#10B981' },
+  { name: 'Corporate Blue', color: '#2563EB' },
+  { name: 'Rose Gold', color: '#FB7185' },
+  { name: 'Lavender Dream', color: '#8B5CF6' },
+  { name: 'Stealth Black', color: '#111827' },
+  { name: 'Latte Neutral', color: '#D4A373' },
+  { name: 'Messenger Vibe', color: ['#00C6FF', '#0072FF'] },
+  { name: 'Sunset Blend', color: ['#FF512F', '#F09819'] },
+  { name: 'Cosmic Purple', color: ['#8E2DE2', '#4A00E0'] },
+  { name: 'Mint Glow', color: ['#11998E', '#38EF7D'] }
+];
+
+import { LinearGradient } from 'expo-linear-gradient';
+
 const SettingsScreen = function(props) {
   var navigation = props.navigation;
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var toggleTheme = themeCtx.toggleTheme;
+  var setPrimaryColor = themeCtx.setPrimaryColor;
   var isDark = theme.isDark;
   var userCtx = useUser();
   var currentUser = userCtx.currentUser;
@@ -177,6 +193,30 @@ const SettingsScreen = function(props) {
           React.createElement(TouchableOpacity, { onPress: toggleTheme, style: { width: 50, height: 28, borderRadius: 14, backgroundColor: isDark ? theme.colors.primary : theme.colors.border, justifyContent: 'center', padding: 2 } },
             React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: isDark ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
           )
+        ),
+        React.createElement(View, { style: { marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border } },
+          React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 } }, 'App Accent Color'),
+          React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 12 } }, 'Personalize your budgeting experience'),
+          React.createElement(ScrollView, { horizontal: true, showsHorizontalScrollIndicator: false, style: { flexDirection: 'row' } },
+            THEME_COLORS.map(c => {
+              var isArr = Array.isArray(c.color);
+              var baseStr = isArr ? c.color[0] : c.color;
+              var isSelected = theme.colors.primary === baseStr;
+              var isBlackLightMode = (baseStr === '#111827' && !theme.isDark);
+              var checkColor = isBlackLightMode ? '#FFFFFF' : (baseStr === '#FFFFFF' ? '#000000' : '#FFFFFF');
+              
+              return React.createElement(TouchableOpacity, { 
+                key: baseStr, 
+                onPress: () => setPrimaryColor(c.color),
+                style: { width: 50, height: 50, borderRadius: 25, backgroundColor: isArr ? 'transparent' : baseStr, overflow: 'hidden', marginRight: 12, alignItems: 'center', justifyContent: 'center', shadowColor: baseStr, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }
+              },
+                isArr ? React.createElement(View, {
+                  style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 25, backgroundImage: 'linear-gradient(135deg, ' + c.color[0] + ', ' + c.color[1] + ')' }
+                }) : null,
+                isSelected ? React.createElement(MaterialIcons, { name: 'check', size: 24, color: checkColor, style: { zIndex: 1 } }) : null
+              )
+            })
+          )
         )
       ),
 
@@ -186,7 +226,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-85', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-102', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'App Name'),
-          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Personal Budget Tracker')
+          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Penny Budgeting')
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),

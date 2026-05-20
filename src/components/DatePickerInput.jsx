@@ -34,7 +34,7 @@ const DatePickerInput = function(props) {
   };
   var displayValue = props.value ? (padNum(selMonth) + '/' + padNum(selDay) + '/' + selYear) : (props.placeholder || 'Select date');
   if (Platform.OS === 'web') {
-    return React.createElement('input', { testID: 'input-1', type: 'date', value: props.value || '',
+    return React.createElement('input', { 'data-testid': 'input-1', type: 'date', value: props.value || '',
       onChange: function(e) { if (props.onChange) { props.onChange(e.target.value); } },
       style: Object.assign({}, { padding: 12, border: '1px solid #FED7AA', borderRadius: 8, fontSize: 16, width: '100%', boxSizing: 'border-box', color: textPrimary, backgroundColor: '#FFF7ED', outline: 'none' }, props.style)
     });

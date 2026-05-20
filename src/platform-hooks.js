@@ -50,7 +50,8 @@ const sanitizeDb = (db) => {
         name,
         assigned,
         goal_amount: goalAmt,
-        goal_date: e.goal_date || null
+        goal_date: e.goal_date || null,
+        icon: e.icon || null
       };
     });
 
@@ -74,7 +75,7 @@ const sanitizeDb = (db) => {
       const name = src.name || 'Income Source';
       let amt = parseFloat(src.amount);
       if (isNaN(amt) || amt < 0) amt = 0;
-      return { id, name, amount: amt };
+      return { id, name, amount: amt, account_id: src.account_id || 'unlinked' };
     });
 
     let accounts = setting.accounts;
@@ -274,31 +275,29 @@ export const useMutation = (table, type) => {
   const mutate = (payload) => {
     setLoading(true);
     return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const db = getDb();
-          if (!db[table]) db[table] = [];
+      try {
+        const db = getDb();
+        if (!db[table]) db[table] = [];
 
-          if (type === 'insert') {
-            db[table].push(payload);
-          } else if (type === 'update') {
-            const index = db[table].findIndex(item => item.id === payload.id);
-            if (index !== -1) {
-              db[table][index] = { ...db[table][index], ...payload.data };
-            }
-          } else if (type === 'delete') {
-            db[table] = db[table].filter(item => item.id !== payload.id);
+        if (type === 'insert') {
+          db[table].push(payload);
+        } else if (type === 'update') {
+          const index = db[table].findIndex(item => item.id === payload.id);
+          if (index !== -1) {
+            db[table][index] = { ...db[table][index], ...payload.data };
           }
-
-          saveDb(db);
-          notifyListeners();
-          setLoading(false);
-          resolve(payload);
-        } catch (e) {
-          setLoading(false);
-          reject(e);
+        } else if (type === 'delete') {
+          db[table] = db[table].filter(item => item.id !== payload.id);
         }
-      }, 200); // Simulate network latency
+
+        saveDb(db);
+        notifyListeners();
+        setLoading(false);
+        resolve(payload);
+      } catch (e) {
+        setLoading(false);
+        reject(e);
+      }
     });
   };
 

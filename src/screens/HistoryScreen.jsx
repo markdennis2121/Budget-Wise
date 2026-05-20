@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from 'platform-hooks';
+import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { formatCurrency, formatDate } from '../utils/helpers';
@@ -23,6 +23,8 @@ const HistoryScreen = function() {
   var allHistory = historyQuery.data || [];
   var userHistory = allHistory.filter(function(h) { return h.user_id === userId; });
   var loading = historyQuery.loading;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var deleteOneTime = useMutation('one_time_expenses', 'delete');
   var typeFilterState = useState('All');
   var typeFilter = typeFilterState[0]; var setTypeFilter = typeFilterState[1];
   var statusFilterState = useState('All');
@@ -154,30 +156,57 @@ const HistoryScreen = function() {
         onPress: () => setVisibleCount(visibleCount + 5),
         style: { alignItems: 'center', paddingVertical: 16 }
       }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold' } }, "See More (" + (filteredHistory.length - visibleCount) + " hidden)")) : null,
-      ListEmptyComponent: React.createElement(View, { testID: 'View-65', style: { alignItems: 'center', paddingTop: 60 }, componentId: 'history-empty' },
-        React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 } }, 'No history yet'),
-        React.createElement(Text, { testID: 'Text-86', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', paddingHorizontal: 32 } }, 'Your transactions will appear here once you start tracking expenses.')
+      ListEmptyComponent: React.createElement(View, { testID: 'View-65', style: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 30 }, componentId: 'history-empty' },
+        React.createElement(Text, { style: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' } }, 'Your history is a clean slate! ✨'),
+        React.createElement(Text, { testID: 'Text-86', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 } }, "It looks a bit quiet here right now. Tap the + button on the home screen to log your first transaction and start tracking your financial journey!")
       ),
       renderItem: function(itemData) {
         var item = itemData.item;
         var idx = itemData.index;
         var isIncome = item.type === 'Income';
-        return React.createElement(View, { testID: 'View-66', style: { backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 },
-          componentId: 'history-item-' + idx
-        },
-          React.createElement(View, { testID: 'View-67', style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Transfer' ? '#E0F2FE' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE')), alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { testID: 'MaterialIcons-14', name: getTypeIcon(item.type), size: 20, color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : (item.type === 'Recurring' ? theme.colors.warning : '#7C3AED')) })
-          ),
-          React.createElement(View, { testID: 'View-68', style: { flex: 1 } },
-            React.createElement(Text, { testID: 'Text-87', style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, item.name),
-            React.createElement(Text, { testID: 'Text-88', style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, formatDate(item.date) + (item.notes ? ' ' + item.notes : '') + ' • ' + item.type)
-          ),
-          React.createElement(View, { testID: 'View-69', style: { alignItems: 'flex-end' } },
-            React.createElement(Text, { testID: 'Text-89', style: { fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) } }, (isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)),
-            React.createElement(View, { testID: 'View-70', style: { backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 } },
-              React.createElement(Text, { testID: 'Text-90', style: { fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' } }, item.status)
-            )
-          )
+        return (
+          <View key={item.id} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
+             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Transfer' ? '#E0F2FE' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE')), alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <MaterialIcons name={getTypeIcon(item.type)} size={20} color={isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : (item.type === 'Recurring' ? theme.colors.warning : '#7C3AED'))} />
+             </View>
+             <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{item.name}</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(item.date) + (item.notes ? ' • ' + item.notes : '') + ' • ' + item.type}</Text>
+             </View>
+             <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) }}>{(isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)}</Text>
+                <View style={{ backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
+                   <Text style={{ fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' }}>{item.status}</Text>
+                </View>
+             </View>
+             <TouchableOpacity 
+               onPress={() => {
+                 if (item.type === 'Recurring') {
+                   Platform.OS === 'web' ? window.alert('Cannot delete recurring expenses from history. Cancel them from the Recurring tab.') : Alert.alert('Notice', 'Cannot delete recurring expenses from history. Cancel them from the Recurring tab.');
+                   return;
+                 }
+                 var confirmMsg = 'Are you sure you want to delete this record? Funds will be reverted.';
+                 var doDelete = () => {
+                   deleteHistory.mutate({ id: item.id }).then(() => {
+                     if (item.type === 'One-Time') {
+                       return deleteOneTime.mutate({ id: item.id });
+                     }
+                   }).then(() => {
+                     historyQuery.refetch();
+                     oneTimeQuery.refetch();
+                   });
+                 };
+                 if (Platform.OS === 'web') {
+                   if (window.confirm(confirmMsg)) doDelete();
+                 } else {
+                   Alert.alert('Delete Record', confirmMsg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: doDelete }]);
+                 }
+               }}
+               style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(239, 68, 68, 0.1)', alignItems: 'center', justifyContent: 'center' }}
+             >
+               <MaterialIcons name="delete-outline" size={18} color={theme.colors.error} />
+             </TouchableOpacity>
+          </View>
         );
       }
     })

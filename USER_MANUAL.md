@@ -52,13 +52,24 @@ Track your cash flow across different physical or digital wallets (e.g. Cash, GC
   1. Under the **"Wallets & Accounts"** section on your Home Screen, tap **"Add Account"**.
   2. Enter a custom name and input your current starting balance.
   3. Select your wallet provider type for custom color branding.
-* **Editing an Account:** Tap the small pencil icon on any wallet card to edit its name or adjust the current balance.
+* **Topping Up / Editing an Account:** Tap the small pencil icon on any wallet card to edit its name or **add funds**. Instead of overwriting your balance, you type the exact amount you want to top-up, and Penny will automatically calculate the new live balance and record it as an Income transaction for perfect auditing.
+* **🔗 Linked Income Sources:** 
+  You can link monthly recurring income sources (e.g. Salary, Gigs) to a specific wallet. Once linked, the monthly amount automatically increases that wallet's balance. You can also leave income as "Physical Cash (Unlinked)" if it doesn't belong in a bank or digital account.
 
 ---
 
 ## 4. Using Envelope Allocations
 
 Envelopes are your spending category limits (e.g., Food, Transport, Rent, Savings).
+
+### 💰 Quick Adjust & Assignment History
+* **Assigning Money:** Tap any envelope on the dashboard to open the **Quick Adjust** modal. Here you can easily **Add Funds** (from your Ready to Assign) or **Reduce Funds** (return them to Ready to Assign).
+* **Audit History:** Every envelope maintains a strict **Assignment History** log. Whenever you add or reduce budget, Penny timestamps it (down to the second) and displays a true First-In, Last-Out (newest on top) ledger so you never lose track of where your budget went.
+
+### 🔄 Recurring Expenses & Envelopes
+* When you create a **Recurring Expense**, it acts as a pending bill. It will **not** deduct from your envelope immediately.
+* Once you mark the bill as **Paid** (via the Pay Modal), the money is officially deducted from the respective envelope.
+* If you ever delete a bill that was already marked as Paid, Penny will intelligently **refund** that spent amount back into your envelope automatically.
 
 ### 🏷️ Clean Dynamic Icon Mapping
 Penny automatically scans your envelope names to map clean, minimal vector icons—no messy emojis, keeping your ledger strictly professional:
@@ -69,6 +80,19 @@ Penny automatically scans your envelope names to map clean, minimal vector icons
 * **Savings / Investments:** Dynamic `savings` icon.
 * **Education / School / Books:** Dynamic `school` icon.
 * **Custom/Other:** Dynamically labeled with a clean minimal arrow tag.
+
+---
+
+## 🎨 Theme Customization & Appearance
+Personalize the look and feel of Penny to match your demographic style. Navigate to **Settings** and choose from our curated aesthetic accent palettes:
+* **Penny Classic:** The original elegant teal.
+* **Corporate Blue:** A sleek, secure financial blue.
+* **Rose Gold:** A warm, luxurious premium rose hue.
+* **Lavender Dream:** A calm, modern pastel purple.
+* **Stealth Black:** A bold, high-contrast dark theme style.
+* **Latte Neutral:** A cozy, minimalist warm brown.
+
+All color settings persist instantly across app launches via local storage.
 
 ---
 
