@@ -4,6 +4,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { formatCurrency, isWithin5Days, isOverdue, getTodayStr, generateId } from '../utils/helpers';
+import SaveSuccessOverlay from './SaveSuccessOverlay';
+import { runSaveWithFeedback } from '../utils/saveSuccess';
+import { validateEnvelopeForSpend } from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
 
 const WALLET_STYLES = {
@@ -29,6 +32,7 @@ const PayModal = function(props) {
   var insetsTop = props.insetsTop;
   var insetsBottom = props.insetsBottom;
   var accounts = props.accounts || [];
+  var userSettings = props.userSettings;
 
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
@@ -45,26 +49,39 @@ const PayModal = function(props) {
   var mutateUpdate = updateRecurring.mutate;
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateHistory = insertHistory.mutate;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
   
   var [isLoading, setIsLoading] = useState(false);
   var [selectedAccount, setSelectedAccount] = useState('');
   var [errorMsg, setErrorMsg] = useState('');
+  var [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
-  useEffect(() => {
+  useEffect(function () {
     if (visible) {
       setErrorMsg('');
-      if (expense && expense.account_id && expense.account_id !== 'unlinked') {
-        setSelectedAccount(expense.account_id);
-      } else if (accounts && accounts.length > 0) {
-        setSelectedAccount(accounts[0].id);
-      } else {
-        setSelectedAccount('unlinked');
-      }
+      setShowSaveSuccess(false);
+    }
+  }, [visible]);
+
+  useEffect(function () {
+    if (!visible) return;
+    if (expense && expense.account_id && expense.account_id !== 'unlinked') {
+      setSelectedAccount(expense.account_id);
+    } else if (accounts && accounts.length > 0) {
+      setSelectedAccount(accounts[0].id);
+    } else {
+      setSelectedAccount('unlinked');
     }
   }, [visible, accounts, expense]);
 
   var handlePay = function() {
     if (!expense) return;
+    var spendCheck = validateEnvelopeForSpend(userSettings, expense.category);
+    if (!spendCheck.ok) {
+      setErrorMsg(spendCheck.message);
+      return;
+    }
     var amt = parseFloat(expense.amount) || 0;
     var acc = accounts.find(a => a.id === selectedAccount);
     if (acc && acc.balance < amt) {
@@ -78,38 +95,61 @@ const PayModal = function(props) {
     
     var accName = acc ? acc.name : 'Wallet';
 
-    mutateUpdate({ 
-      id: expense.id, 
-      data: { status: newStatus, account_id: selectedAccount } 
-    }).then(function() {
-      return mutateHistory({ 
-        id: generateId(), 
-        user_id: userId, 
-        expense_name: expense.name, 
-        amount: amt, 
-        expense_type: 'Recurring', 
-        date: getTodayStr(), 
-        status: newStatus, 
+    var historyId = generateId();
+    var previousStatus = expense.status || 'Pending';
+    var previousAccount = expense.account_id;
+
+    var payPromise = mutateUpdate({
+      id: expense.id,
+      data: { status: newStatus, account_id: selectedAccount }
+    }).then(function () {
+      return mutateHistory({
+        id: historyId,
+        user_id: userId,
+        expense_name: expense.name,
+        amount: amt,
+        expense_type: 'Recurring',
+        date: getTodayStr(),
+        status: newStatus,
         notes: 'Paid from: ' + accName,
         account_id: selectedAccount,
         category: expense.category
       });
-    }).then(function() {
+    });
+
+    runSaveWithFeedback(payPromise, {
+      onClose: onClose,
+      onSaved: onPaid,
+      setShowSuccess: setShowSaveSuccess,
+      message: 'Paid!',
+      undoMessage: 'Payment recorded',
+      undo: function () {
+        return mutateUpdate({
+          id: expense.id,
+          data: { status: previousStatus, account_id: previousAccount }
+        }).then(function () {
+          return mutateDeleteHistory({ id: historyId });
+        }).then(function () { onPaid && onPaid(); });
+      },
+      errorMessage: 'Failed to confirm payment. Please try again.',
+      onError: function () {
+        setIsLoading(false);
+        setErrorMsg('Failed to confirm payment. Try again.');
+      }
+    }).then(function () {
       setIsLoading(false);
-      onPaid();
-      onClose();
-    }).catch(function() { 
-      setIsLoading(false); 
-      setErrorMsg('Failed to confirm payment. Try again.');
     });
   };
   
   if (!expense) return null;
   var isPaidInAdvance = isWithin5Days(expense.due_date) && !isOverdue(expense.due_date);
+  var payBlocked = validateEnvelopeForSpend(userSettings, expense.category);
+  var cannotPay = !payBlocked.ok;
   
   return (
     <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop, paddingHorizontal: 20 }}>
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop, paddingHorizontal: 20, position: 'relative' }}>
+        <SaveSuccessOverlay visible={showSaveSuccess} theme={themeCtx.theme} message="Paid!" />
         <View style={{ backgroundColor: cardColor, borderRadius: 20, padding: 24, paddingBottom: insetsBottom + 24 }}>
           <View style={{ alignItems: 'center', marginBottom: 20 }}>
             <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#FED7AA', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
@@ -192,7 +232,15 @@ const PayModal = function(props) {
             </View>
           )}
 
-          {isPaidInAdvance && (
+          {cannotPay ? (
+            <View style={{ backgroundColor: theme.isDark ? '#451a03' : '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#F59E0B' }}>
+              <Text style={{ color: '#B45309', fontSize: 13, textAlign: 'center', lineHeight: 20, fontWeight: '600' }}>
+                {payBlocked.message}
+              </Text>
+            </View>
+          ) : null}
+
+          {isPaidInAdvance && !cannotPay && (
             <View style={{ backgroundColor: theme.isDark ? '#1E3A8A' : '#EFF6FF', borderRadius: 10, padding: 12, marginBottom: 16 }}>
               <Text style={{ color: infoColor, fontSize: 13, textAlign: 'center' }}>
                 🎉 This bill is due within 5 days — marking as Paid in Advance!
@@ -218,8 +266,8 @@ const PayModal = function(props) {
             
             <TouchableOpacity 
               onPress={handlePay} 
-              disabled={isLoading || !selectedAccount} 
-              style={{ flex: 1, backgroundColor: primaryColor, borderRadius: 12, padding: 14, alignItems: 'center' }}
+              disabled={isLoading || !selectedAccount || cannotPay} 
+              style={{ flex: 1, backgroundColor: primaryColor, borderRadius: 12, padding: 14, alignItems: 'center', opacity: cannotPay ? 0.5 : 1 }}
             >
               {isLoading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />

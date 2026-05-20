@@ -1,11 +1,26 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { formatCurrency, generateId } from '../utils/helpers';
+import { formatDate, generateId } from '../utils/helpers';
+import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
+import TrialCountdownBanner from '../components/TrialCountdownBanner';
+import OnboardingModal from '../components/OnboardingModal';
+import { BETA_EXPIRATION_DATE } from '../utils/trial';
+import { runSaveWithFeedback } from '../utils/saveSuccess';
+import {
+  buildUserBackup,
+  restoreUserBackup,
+  downloadBackupFile,
+  copyBackupToClipboard,
+  pickBackupFile,
+  parseBackupJson,
+  formatBackupDate,
+  summarizeBackup
+} from '../utils/dataBackup';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const SCROLL_EXTRA_PADDING = 16;
@@ -45,6 +60,9 @@ const SettingsScreen = function(props) {
   var [pinMode, setPinMode] = useState(false);
   var [newPin, setNewPin] = useState('');
   var [showPinSaved, setShowPinSaved] = useState(false);
+  var [backupBusy, setBackupBusy] = useState(false);
+  var [backupNote, setBackupNote] = useState('');
+  var [showAppTour, setShowAppTour] = useState(false);
 
   var updateSettings = useMutation('user_settings', 'update');
   var mutateUpdate = updateSettings.mutate;
@@ -69,12 +87,16 @@ const SettingsScreen = function(props) {
       return;
     }
     if (userSettings) {
-      mutateUpdate({ id: userSettings.id, data: { pin_code: newPin } }).then(() => {
+      runSaveWithFeedback(
+        mutateUpdate({ id: userSettings.id, data: { pin_code: newPin } }),
+        {
+          setShowSuccess: setShowPinSaved,
+          onSaved: refetch,
+          errorMessage: 'Could not save PIN. Please try again.'
+        }
+      ).then(function () {
         setPinMode(false);
         setNewPin('');
-        refetch();
-        setShowPinSaved(true);
-        setTimeout(() => setShowPinSaved(false), 2000);
       });
     }
   };
@@ -93,6 +115,88 @@ const SettingsScreen = function(props) {
     }
   };
   
+  var showAlert = function (title, message) {
+    if (Platform.OS === 'web') {
+      window.alert(title + (message ? '\n\n' + message : ''));
+    } else {
+      Alert.alert(title, message || '');
+    }
+  };
+
+  var handleExportBackup = function () {
+    if (!userId) {
+      showAlert('Error', 'Sign in to export your data.');
+      return;
+    }
+    setBackupBusy(true);
+    setBackupNote('');
+    var backup = buildUserBackup(userId, currentUser);
+    downloadBackupFile(backup)
+      .then(function (result) {
+        setBackupNote('Saved ' + (result.filename || 'backup file') + ' to your device.');
+      })
+      .catch(function () {
+        return copyBackupToClipboard(backup).then(function () {
+          setBackupNote('Backup copied to clipboard. Paste it into Notes or email to save.');
+        });
+      })
+      .catch(function (err) {
+        showAlert('Export failed', err && err.message ? err.message : 'Could not export backup.');
+      })
+      .then(function () {
+        setBackupBusy(false);
+      });
+  };
+
+  var handleImportBackup = function () {
+    if (!userId) {
+      showAlert('Error', 'Sign in to restore a backup.');
+      return;
+    }
+    setBackupBusy(true);
+    pickBackupFile()
+      .then(function (text) {
+        var payload = parseBackupJson(text);
+        var summary = summarizeBackup(payload);
+        var exportedLabel = formatBackupDate(payload.exportedAt);
+        var fromUser = payload.user && payload.user.email ? payload.user.email : 'another account';
+        var msg =
+          'Restore backup from ' + exportedLabel + ' (' + fromUser + ')?\n\n' +
+          'This replaces your current envelopes, wallets, bills, and history (' +
+          summary.total + ' records) for this account. This cannot be undone.';
+
+        var runRestore = function () {
+          restoreUserBackup(userId, payload)
+            .then(function () {
+              setBackupNote('Backup restored successfully.');
+              refetch();
+              showAlert('Restored', 'Your budget data was restored from the backup file.');
+            })
+            .catch(function (err) {
+              showAlert('Restore failed', err && err.message ? err.message : 'Could not restore backup.');
+            })
+            .then(function () {
+              setBackupBusy(false);
+            });
+        };
+
+        setBackupBusy(false);
+        if (Platform.OS === 'web') {
+          if (window.confirm(msg)) runRestore();
+        } else {
+          Alert.alert('Restore backup?', msg, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Restore', style: 'destructive', onPress: runRestore }
+          ]);
+        }
+      })
+      .catch(function (err) {
+        setBackupBusy(false);
+        if (err && err.message === 'No file selected.') return;
+        showAlert('Import failed', err && err.message ? err.message : 'Could not read backup file.');
+      });
+  };
+
   var handleLogout = function() {
     var msg = 'Are you sure you want to sign out?';
     if (Platform.OS === 'web') {
@@ -105,7 +209,14 @@ const SettingsScreen = function(props) {
     }
   };
   
-  return React.createElement(View, { testID: 'View-71', style: { flex: 1, backgroundColor: theme.colors.background }, componentId: 'settings-screen' },
+  return React.createElement(View, { testID: 'View-71', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'settings-screen' },
+    React.createElement(OnboardingModal, {
+      visible: showAppTour,
+      onClose: function () { setShowAppTour(false); refetch(); },
+      userSettings: userSettings,
+      mutateUpdateSettings: mutateUpdate
+    }),
+    React.createElement(SaveSuccessOverlay, { visible: showPinSaved, theme: theme, message: 'PIN saved!' }),
     React.createElement(View, { testID: 'View-72', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }, componentId: 'settings-header' },
       React.createElement(Text, { testID: 'Text-91', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Settings'),
       React.createElement(Text, { testID: 'Text-92', style: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 } }, currentUser ? currentUser.email : '')
@@ -125,6 +236,7 @@ const SettingsScreen = function(props) {
         )
       ) : null,
 
+      React.createElement(TrialCountdownBanner, { theme: theme }),
 
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
@@ -169,10 +281,6 @@ const SettingsScreen = function(props) {
           },
             React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: userSettings?.biometrics_enabled ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
           )
-        ) : null,
-        showPinSaved ? React.createElement(View, { style: { backgroundColor: '#FFEDD5', borderRadius: 8, padding: 10, marginTop: 12, flexDirection: 'row', alignItems: 'center' } },
-          React.createElement(MaterialIcons, { name: 'check-circle', size: 18, color: theme.colors.info }),
-          React.createElement(Text, { style: { color: theme.colors.info, fontSize: 13, marginLeft: 8, fontWeight: '600' } }, 'PIN lock enabled!')
         ) : null
       ),
 
@@ -218,6 +326,68 @@ const SettingsScreen = function(props) {
         )
       ),
 
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
+        React.createElement(View, { style: { padding: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border } },
+          React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 } }, 'HELP')
+        ),
+        React.createElement(TouchableOpacity, {
+          onPress: function () { setShowAppTour(true); },
+          style: { padding: 16, flexDirection: 'row', alignItems: 'center' }
+        },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
+            React.createElement(MaterialIcons, { name: 'school', size: 22, color: theme.colors.primary })
+          ),
+          React.createElement(View, { style: { flex: 1 } },
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Replay welcome tour'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, 'Envelope budgeting, taps, privacy & quick start')
+          ),
+          React.createElement(MaterialIcons, { name: 'chevron-right', size: 22, color: theme.colors.textSecondary })
+        )
+      ),
+
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'data-backup-card' },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 } },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.12)', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { name: 'cloud-off', size: 22, color: '#3B82F6' })
+          ),
+          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Your data on this device')
+        ),
+        React.createElement(View, { style: { backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' } },
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-start' } },
+            React.createElement(MaterialIcons, { name: 'info-outline', size: 18, color: '#3B82F6', style: { marginRight: 10, marginTop: 1 } }),
+            React.createElement(Text, { style: { flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 } },
+              'Budget-Wise stores your budgets, bills, and transactions locally on this phone or browser. We do not upload them to a cloud server. Export a backup regularly — uninstalling the app or clearing browser data will permanently delete your records.'
+            )
+          )
+        ),
+        backupNote ? React.createElement(Text, { style: { fontSize: 12, color: theme.colors.primary, marginBottom: 12, lineHeight: 18 } }, backupNote) : null,
+        React.createElement(TouchableOpacity, {
+          onPress: handleExportBackup,
+          disabled: backupBusy,
+          style: { backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+        },
+          backupBusy
+            ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
+            : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+                React.createElement(MaterialIcons, { name: 'file-download', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
+                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export backup (JSON)')
+              )
+        ),
+        React.createElement(TouchableOpacity, {
+          onPress: handleImportBackup,
+          disabled: backupBusy,
+          style: { backgroundColor: theme.colors.background, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+        },
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+            React.createElement(MaterialIcons, { name: 'file-upload', size: 20, color: theme.colors.textPrimary, style: { marginRight: 8 } }),
+            React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15, fontWeight: '600' } }, 'Restore from backup')
+          )
+        ),
+        React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
+          'Keep backup files private. Restore only replaces data for your signed-in account.'
+        )
+      ),
+
       React.createElement(View, { testID: 'View-83', style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'app-info-card' },
         React.createElement(View, { testID: 'View-84', style: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-101', style: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 } }, 'APP INFO')
@@ -226,9 +396,13 @@ const SettingsScreen = function(props) {
           React.createElement(Text, { testID: 'Text-102', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'App Name'),
           React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Penny Budgeting')
         ),
-        React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
+        React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
           React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '1.0.0')
+        ),
+        React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
+          React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),
+          React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 15 } }, formatDate(BETA_EXPIRATION_DATE))
         )
       ),
       React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-26', onPress: handleLogout,

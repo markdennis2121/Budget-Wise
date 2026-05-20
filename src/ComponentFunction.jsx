@@ -11,8 +11,8 @@ import { useQuery } from 'platform-hooks';
 import MainNavigator from './navigation/MainNavigator';
 import PinLockScreen from './screens/PinLockScreen';
 import { scheduleDailyReminder } from './utils/notifications';
-
-const EXPIRATION_DATE = '2026-06-01';
+import { BETA_EXPIRATION_DATE, isTrialExpired } from './utils/trial';
+import UndoToastProvider from './components/UndoToastProvider';
 
 const TrialExpiredScreen = function() {
   return React.createElement(View, {
@@ -31,7 +31,7 @@ const TrialExpiredScreen = function() {
       }, 'Beta Trial Expired'),
       React.createElement(Text, {
         style: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 22 }
-      }, 'Thank you for testing the Personal Budget Tracker app! This beta testing build expired on ' + formatDate(EXPIRATION_DATE) + '. Please contact the developer for a newer version or standard update.')
+      }, 'Thank you for testing the Personal Budget Tracker app! This beta testing build expired on ' + formatDate(BETA_EXPIRATION_DATE) + '. Please contact the developer for a newer version or standard update.')
     )
   );
 };
@@ -64,7 +64,9 @@ const AppContent = function() {
     return React.createElement(PinLockScreen, { onUnlock: () => setIsLocked(false) });
   }
 
-  return React.createElement(NavigationContainer, {}, React.createElement(MainNavigator));
+  return React.createElement(UndoToastProvider, {},
+    React.createElement(NavigationContainer, {}, React.createElement(MainNavigator))
+  );
 };
 
 const TermsAndConditionsScreen = function(props) {
@@ -149,9 +151,7 @@ const TermsAndConditionsScreen = function(props) {
 
 const ComponentFunction = function() {
   var isExpired = useMemo(function() {
-    var exp = new Date(EXPIRATION_DATE);
-    var now = new Date();
-    return now.getTime() > exp.getTime();
+    return isTrialExpired();
   }, []);
 
   var [termsAccepted, setTermsAccepted] = useState(function() {

@@ -4,7 +4,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useQuery, useMutation } from 'platform-hooks';
 import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
 import DatePickerInput from './DatePickerInput';
+import SaveSuccessOverlay from './SaveSuccessOverlay';
 import { scheduleBillNotification } from '../utils/notifications';
+import { runSaveWithFeedback } from '../utils/saveSuccess';
+import {
+  parseUserEnvelopes,
+  expenseTypeRequiresEnvelope,
+  validateEnvelopeForSpend
+} from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
 
 const WALLET_STYLES = {
@@ -27,6 +34,49 @@ const WALLET_STYLES = {
   Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
 };
 
+var EXPENSE_TYPE_HELP = {
+  one_time: {
+    modalTitle: 'Quick spend',
+    tabLabel: 'Spend',
+    icon: 'shopping-cart',
+    hint: 'Record something you bought today. Pick an envelope (your budget category) and the wallet you paid with.',
+    nameLabel: 'What did you buy?',
+    namePlaceholder: 'e.g. Groceries, Coffee, Grab ride',
+    saveLabel: 'Save spend'
+  },
+  recurring: {
+    modalTitle: 'Monthly bill',
+    tabLabel: 'Bill',
+    icon: 'event-repeat',
+    hint: 'Bills that repeat each month (rent, Netflix, utilities). You pay them later from the Bills tab.',
+    nameLabel: 'Bill name',
+    namePlaceholder: 'e.g. Rent, Spotify, Internet',
+    saveLabel: 'Save bill'
+  },
+  transfer: {
+    modalTitle: 'Wallet transfer',
+    tabLabel: 'Wallets',
+    icon: 'swap-horiz',
+    hint: 'Move cash between your wallets only — not spending. Example: salary bank → GCash. Envelopes and Ready to Assign do not change.',
+    nameLabel: 'Note (optional)',
+    namePlaceholder: 'e.g. Bank to GCash, Cash withdrawal',
+    saveLabel: 'Move money'
+  },
+  income: {
+    modalTitle: 'Add income',
+    tabLabel: 'Income',
+    icon: 'payments',
+    hint: 'Log extra income this month.',
+    nameLabel: 'Income source',
+    namePlaceholder: 'e.g. Freelance, Bonus',
+    saveLabel: 'Save income'
+  }
+};
+
+function getExpenseHelp(expType) {
+  return EXPENSE_TYPE_HELP[expType] || EXPENSE_TYPE_HELP.one_time;
+}
+
 const AddExpenseModal = function (props) {
   var visible = props.visible;
   var onClose = props.onClose;
@@ -35,8 +85,9 @@ const AddExpenseModal = function (props) {
   var theme = props.theme;
   var insetsTop = props.insetsTop;
   var insetsBottom = props.insetsBottom;
+  var initialExpType = props.initialExpType || 'one_time';
 
-  var [expType, setExpType] = useState('one_time');
+  var [expType, setExpType] = useState(initialExpType);
   var [expName, setExpName] = useState('');
   var [expAmount, setExpAmount] = useState('');
   var [expDate, setExpDate] = useState(getTodayStr());
@@ -44,6 +95,7 @@ const AddExpenseModal = function (props) {
   var [errorMsg, setErrorMsg] = useState('');
   var [selectedFund, setSelectedFund] = useState('');
   var [destAccount, setDestAccount] = useState('');
+  var [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   var insertRecurring = useMutation('recurring_expenses', 'insert');
   var mutateRecurring = insertRecurring.mutate;
@@ -51,6 +103,12 @@ const AddExpenseModal = function (props) {
   var mutateOneTime = insertOneTime.mutate;
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateHistory = insertHistory.mutate;
+  var deleteOneTime = useMutation('one_time_expenses', 'delete');
+  var mutateDeleteOneTime = deleteOneTime.mutate;
+  var deleteRecurring = useMutation('recurring_expenses', 'delete');
+  var mutateDeleteRecurring = deleteRecurring.mutate;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
 
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
@@ -65,35 +123,37 @@ const AddExpenseModal = function (props) {
   var curMonth = getCurrentMonthStr();
   var oneTimeExpenses = allOneTime.filter(function (o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
 
-  // Calculate Envelope Balances
+  var accounts = props.accounts || [];
+
+  var rawEnvelopes = useMemo(function () {
+    return parseUserEnvelopes(userSettings);
+  }, [userSettings]);
+
+  var spendBlocked = expenseTypeRequiresEnvelope(expType) && rawEnvelopes.length === 0;
+  var typeHelp = getExpenseHelp(expType);
+  var transferNeedsWallets = expType === 'transfer' && accounts.length < 2;
+
+  // Calculate Envelope Balances (only real user envelopes)
   var envelopes = useMemo(function () {
-    var envs = [];
-    if (userSettings && userSettings.envelopes) {
-      envs = typeof userSettings.envelopes === 'string' ? JSON.parse(userSettings.envelopes) : userSettings.envelopes;
-    } else {
-      envs = [
-        { id: 'env-housing', name: 'Housing', assigned: 0 },
-        { id: 'env-food', name: 'Food', assigned: 0 },
-        { id: 'env-transport', name: 'Transport', assigned: 0 },
-        { id: 'env-savings', name: 'Savings', assigned: 0 },
-      ];
-    }
+    var envs = rawEnvelopes;
+    var balances = envs.map(e => ({ ...e, assigned: parseFloat(e.assigned) || 0, spent: 0, reserved: 0 }));
 
-    var balances = envs.map(e => ({ ...e, assigned: parseFloat(e.assigned) || 0, spent: 0 }));
-
-    recurringExpenses.forEach(r => {
+    recurringExpenses.forEach(function (r) {
       if (r.status === 'Paid' || r.status === 'Paid in Advance') {
-        var env = balances.find(e => e.id === r.category || e.name === r.category);
-        if (env) env.spent += (parseFloat(r.amount) || 0);
+        var envPaid = balances.find(function (e) { return e.id === r.category || e.name === r.category; });
+        if (envPaid) envPaid.spent += (parseFloat(r.amount) || 0);
+      } else if (r.status === 'Pending') {
+        var envPending = balances.find(function (e) { return e.id === r.category || e.name === r.category; });
+        if (envPending) envPending.reserved += (parseFloat(r.amount) || 0);
       }
     });
-    oneTimeExpenses.forEach(o => {
-      var env = balances.find(e => e.id === o.category || e.name === o.category);
+    oneTimeExpenses.forEach(function (o) {
+      var env = balances.find(function (e) { return e.id === o.category || e.name === o.category; });
       if (env) env.spent += (parseFloat(o.amount) || 0);
     });
 
-    return balances.map(e => ({ ...e, available: e.assigned - e.spent }));
-  }, [userSettings, recurringExpenses, oneTimeExpenses]);
+    return balances.map(function (e) { return { ...e, available: e.assigned - e.spent - e.reserved }; });
+  }, [rawEnvelopes, recurringExpenses, oneTimeExpenses]);
 
   var incomeSources = useMemo(function () {
     if (userSettings && userSettings.income_sources) {
@@ -104,7 +164,6 @@ const AddExpenseModal = function (props) {
   }, [userSettings]);
 
   var optionsList = expType === 'income' ? incomeSources : envelopes;
-  var accounts = props.accounts || [];
   var [selectedAccount, setSelectedAccount] = useState('');
 
   useEffect(() => {
@@ -116,22 +175,73 @@ const AddExpenseModal = function (props) {
     }
   }, [visible, optionsList, expType]);
 
-  useEffect(() => {
+  useEffect(function () {
     if (visible) {
-      if (accounts && accounts.length > 0) {
-        setSelectedAccount(accounts[0].id);
-      } else {
-        setSelectedAccount('unlinked');
+      setShowSaveSuccess(false);
+      var startType = initialExpType;
+      if (expenseTypeRequiresEnvelope(initialExpType) && rawEnvelopes.length === 0) {
+        startType = 'transfer';
       }
-      setDestAccount('');
+      setExpType(startType);
+      setErrorMsg('');
+      setExpName('');
+      setExpAmount('');
+      setExpDate(getTodayStr());
+      setDueDate(getTodayStr());
     }
+  }, [visible, initialExpType, rawEnvelopes.length]);
+
+  useEffect(function () {
+    if (!visible) return;
+    if (accounts && accounts.length > 0) {
+      setSelectedAccount(accounts[0].id);
+    } else {
+      setSelectedAccount('unlinked');
+    }
+    setDestAccount('');
   }, [visible, accounts]);
 
+  var finishSave = function (savePromise, feedbackOpts) {
+    feedbackOpts = feedbackOpts || {};
+    runSaveWithFeedback(savePromise, {
+      onClose: onClose,
+      onSaved: onSaved,
+      setShowSuccess: setShowSaveSuccess,
+      message: feedbackOpts.message,
+      undoMessage: feedbackOpts.undoMessage,
+      undo: feedbackOpts.undo,
+      errorMessage: 'Failed to save. Please try again.',
+      onError: function () { setErrorMsg('Failed to save. Try again.'); }
+    }).then(function () {
+      setExpName('');
+      setExpAmount('');
+      setExpDate(getTodayStr());
+      setDueDate(getTodayStr());
+      setSelectedAccount('');
+      setDestAccount('');
+    });
+  };
+
   var handleSave = function () {
-    if (!expName.trim()) { setErrorMsg('Please enter name.'); return; }
+    if (expType !== 'transfer' && !expName.trim()) {
+      setErrorMsg(expType === 'recurring' ? 'Please enter a bill name.' : 'Please enter what you spent on.');
+      return;
+    }
     var amt = parseFloat(expAmount);
     if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
     setErrorMsg('');
+
+    if (expenseTypeRequiresEnvelope(expType)) {
+      if (!selectedFund || envelopes.length === 0) {
+        setErrorMsg('Select an envelope. Create one on the Dashboard if you have none.');
+        return;
+      }
+      var envCheck = validateEnvelopeForSpend(userSettings, selectedFund);
+      if (!envCheck.ok) {
+        setErrorMsg(envCheck.message);
+        return;
+      }
+    }
 
     if (expType === 'transfer') {
       if (!selectedAccount || selectedAccount === 'unlinked') {
@@ -155,20 +265,27 @@ const AddExpenseModal = function (props) {
 
       var expId = generateId();
       var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var transferLabel = expName.trim() || (srcAcc.name + ' to ' + destAcc.name);
       mutateHistory({
         id: expId,
         user_id: userId,
-        expense_name: expName.trim(),
+        expense_name: transferLabel,
         amount: amt,
         expense_type: 'Transfer',
         date: expDate,
         status: 'Spent',
-        notes: timeStr + ' • Wallet Transfer: ' + srcAcc.name + ' ➔ ' + destAcc.name,
+        notes: timeStr + ' • Wallet transfer: ' + srcAcc.name + ' → ' + destAcc.name,
         account_id: selectedAccount,
         dest_account_id: destAccount
       }).then(function () {
-        setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); setDestAccount(''); onSaved(); onClose();
-      }).catch(function () { setErrorMsg('Failed to save transfer. Try again.'); });
+        finishSave(Promise.resolve(), {
+          message: 'Money moved!',
+          undoMessage: 'Wallet transfer saved',
+          undo: function () {
+            return mutateDeleteHistory({ id: expId }).then(function () { onSaved && onSaved(); });
+          }
+        });
+      });
       return;
     }
 
@@ -205,46 +322,132 @@ const AddExpenseModal = function (props) {
     if (expType === 'one_time') {
       var expId = generateId();
       var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: selectedFund, account_id: selectedAccount };
-      mutateOneTime(newOneTime).then(function () {
+      var savePromise = mutateOneTime(newOneTime).then(function () {
         return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName, account_id: selectedAccount });
-      }).then(function () {
-        setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-      }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
+      });
+      finishSave(savePromise, {
+        message: 'Expense saved!',
+        undoMessage: 'Expense saved',
+        undo: function () {
+          return mutateDeleteOneTime({ id: expId }).then(function () {
+            return mutateDeleteHistory({ id: expId });
+          }).then(function () { onSaved && onSaved(); });
+        }
+      });
     } else if (expType === 'recurring') {
       var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: selectedFund, account_id: selectedAccount };
-      mutateRecurring(newRecurring).then(function () {
-        scheduleBillNotification(newRecurring);
-        setExpName(''); setExpAmount(''); setDueDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-      }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
+      var recurringId = newRecurring.id;
+      var recurringPromise = mutateRecurring(newRecurring).then(function () {
+        return scheduleBillNotification(newRecurring);
+      });
+      finishSave(recurringPromise, {
+        message: 'Bill saved!',
+        undoMessage: 'Bill saved',
+        undo: function () {
+          return mutateDeleteRecurring({ id: recurringId }).then(function () { onSaved && onSaved(); });
+        }
+      });
     } else if (expType === 'income') {
       var expId = generateId();
-      mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'Income', date: expDate, status: 'Received', notes: timeStr + ' • Source: ' + fundName + ' • To: ' + accName, category: selectedFund, account_id: selectedAccount })
-        .then(function () {
-          setExpName(''); setExpAmount(''); setExpDate(getTodayStr()); setSelectedAccount(''); onSaved(); onClose();
-        }).catch(function () { setErrorMsg('Failed to save. Try again.'); });
+      finishSave(
+        mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'Income', date: expDate, status: 'Received', notes: timeStr + ' • Source: ' + fundName + ' • To: ' + accName, category: selectedFund, account_id: selectedAccount }),
+        {
+          message: 'Income saved!',
+          undoMessage: 'Income logged',
+          undo: function () {
+            return mutateDeleteHistory({ id: expId }).then(function () { onSaved && onSaved(); });
+          }
+        }
+      );
     }
   };
 
+  var saveMessage = expType === 'recurring' ? 'Bill saved!' : (expType === 'one_time' ? 'Spend saved!' : (expType === 'transfer' ? 'Money moved!' : 'Saved!'));
+
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop, position: 'relative' }}>
+        <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={saveMessage} />
         <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insetsBottom + 24, maxHeight: '90%' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>{expType === 'income' ? 'Add Income' : 'Add Expense'}</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>{typeHelp.modalTitle}</Text>
+              <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 3 }}>Tap a tab below to switch type</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 20 }}>
-              <TouchableOpacity onPress={() => setExpType('one_time')} style={{ flex: 1, padding: 8, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent' }}>
-                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>One-Time</Text>
+            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 12 }}>
+              <TouchableOpacity
+                onPress={() => { if (rawEnvelopes.length > 0) setExpType('one_time'); }}
+                disabled={rawEnvelopes.length === 0}
+                style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
+              >
+                <MaterialIcons name="shopping-cart" size={16} color={expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
+                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setExpType('recurring')} style={{ flex: 1, padding: 8, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent' }}>
-                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>Recurring</Text>
+              <TouchableOpacity
+                onPress={() => { if (rawEnvelopes.length > 0) setExpType('recurring'); }}
+                disabled={rawEnvelopes.length === 0}
+                style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
+              >
+                <MaterialIcons name="event-repeat" size={16} color={expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
+                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setExpType('transfer')} style={{ flex: 1, padding: 8, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'transfer' ? theme.colors.primary : 'transparent' }}>
-                <Text style={{ color: expType === 'transfer' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>Transfer</Text>
+              <TouchableOpacity
+                onPress={() => setExpType('transfer')}
+                style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'transfer' ? theme.colors.primary : 'transparent' }}
+              >
+                <MaterialIcons name="swap-horiz" size={16} color={expType === 'transfer' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
+                <Text style={{ color: expType === 'transfer' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.transfer.tabLabel}</Text>
               </TouchableOpacity>
             </View>
+
+            {rawEnvelopes.length === 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.25)' }}>
+                <MaterialIcons name="info-outline" size={18} color="#3B82F6" style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={{ flex: 1, fontSize: 12, color: theme.colors.textSecondary, lineHeight: 18 }}>
+                  Create an envelope on the Dashboard to use Spend or Bill. You can still use <Text style={{ fontWeight: '700', color: theme.colors.textPrimary }}>Wallets</Text> to move money between accounts.
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <MaterialIcons name={typeHelp.icon} size={20} color={theme.colors.primary} />
+              </View>
+              <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 }}>{typeHelp.hint}</Text>
+            </View>
+
+            {spendBlocked ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 8, marginBottom: 8 }}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                  <MaterialIcons name="folder-special" size={28} color={theme.colors.primary} />
+                </View>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
+                  Create an envelope first
+                </Text>
+                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 16 }}>
+                  Spending and bills need a budget envelope. Close this, tap + on an envelope row, or switch to the <Text style={{ fontWeight: '700' }}>Wallets</Text> tab to move money only.
+                </Text>
+                <TouchableOpacity onPress={() => setExpType('transfer')} style={{ backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20, marginBottom: 10 }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>Use wallet transfer instead</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onClose}>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: '600' }}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+            <>
+            {transferNeedsWallets ? (
+              <View style={{ backgroundColor: '#FEF3C7', borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#FCD34D' }}>
+                <Text style={{ fontSize: 13, color: '#92400E', lineHeight: 20 }}>
+                  Add at least two wallets on the Dashboard (e.g. Bank and GCash) before moving money between them.
+                </Text>
+              </View>
+            ) : null}
 
             {errorMsg ? (
               <View style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 14 }}>
@@ -253,9 +456,9 @@ const AddExpenseModal = function (props) {
             ) : null}
 
             <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 }}>
-              {expType === 'income' ? 'INCOME NAME' : (expType === 'transfer' ? 'TRANSFER REMARK' : 'EXPENSE NAME')}
+              {typeHelp.nameLabel.toUpperCase()}
             </Text>
-            <TextInput value={expName} onChangeText={setExpName} placeholder={expType === 'income' ? 'e.g. Freelance, Side Hustle' : (expType === 'transfer' ? 'e.g. BPI to GCash Transfer, GCash Cashout' : 'e.g. Rent, Groceries')} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: expType === 'one_time' ? 12 : 16 }} />
+            <TextInput value={expName} onChangeText={setExpName} placeholder={typeHelp.namePlaceholder} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: expType === 'one_time' ? 12 : 16 }} />
 
             {expType === 'one_time' && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
@@ -313,7 +516,10 @@ const AddExpenseModal = function (props) {
 
             {expType !== 'transfer' && (
               <View style={{ marginTop: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>{expType === 'income' ? 'CREDIT TO SOURCE' : 'DEDUCT FROM ENVELOPE'}</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>{expType === 'income' ? 'Income source' : 'Which envelope pays for this?'}</Text>
+                {expType !== 'income' ? (
+                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8, lineHeight: 16 }}>This is your budget category — not your bank wallet.</Text>
+                ) : null}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                   {optionsList.map(opt => {
                     var isSelected = selectedFund === opt.id;
@@ -331,7 +537,8 @@ const AddExpenseModal = function (props) {
 
             {expType === 'transfer' ? (
               <View style={{ marginTop: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>SOURCE WALLET (FROM)</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Move from</Text>
+                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>Wallet you are taking money out of</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                   {accounts.map(acc => {
                     var isSelected = selectedAccount === acc.id;
@@ -346,7 +553,8 @@ const AddExpenseModal = function (props) {
                   })}
                 </View>
 
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>DESTINATION WALLET (TO)</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Move to</Text>
+                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>Wallet receiving the money</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                   {accounts.map(acc => {
                     var isSelected = destAccount === acc.id;
@@ -364,9 +572,12 @@ const AddExpenseModal = function (props) {
             ) : (
               accounts.length > 0 && (
                 <View style={{ marginTop: 16 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>
-                    {expType === 'income' ? 'DEPOSIT TO WALLET' : 'PAY FROM WALLET'}
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>
+                    {expType === 'income' ? 'Deposit to wallet' : 'Paid with (wallet)'}
                   </Text>
+                  {expType !== 'income' ? (
+                    <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8, lineHeight: 16 }}>The actual account you used — GCash, bank, cash, etc.</Text>
+                  ) : null}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                     {accounts.map(acc => {
                       var isSelected = selectedAccount === acc.id;
@@ -384,11 +595,17 @@ const AddExpenseModal = function (props) {
               )
             )}
 
-            <TouchableOpacity onPress={handleSave} style={{ backgroundColor: theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24 }}>
+            <TouchableOpacity
+              onPress={handleSave}
+              disabled={transferNeedsWallets}
+              style={{ backgroundColor: theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24, opacity: transferNeedsWallets ? 0.5 : 1 }}
+            >
               <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>
-                {expType === 'income' ? 'Save Income' : (expType === 'transfer' ? 'Save Transfer' : 'Save Expense')}
+                {typeHelp.saveLabel}
               </Text>
             </TouchableOpacity>
+            </>
+            )}
           </ScrollView>
         </View>
       </View>

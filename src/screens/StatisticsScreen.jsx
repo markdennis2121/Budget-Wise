@@ -6,26 +6,12 @@ import { useQuery } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { formatCurrency, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
+import { buildMonthlyInsight, getLast6Months, MONTH_LABELS } from '../utils/monthlyInsights';
+import { buildEnvelopeSpendingForMonth } from '../utils/envelopeBudget';
+import TrialCountdownBanner from '../components/TrialCountdownBanner';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const WEB_TAB_MENU_PADDING = 90;
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function getLast6Months() {
-  var result = [];
-  var now = new Date();
-  for (var i = 5; i >= 0; i--) {
-    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    result.push({
-      year: d.getFullYear(),
-      month: d.getMonth(),
-      label: MONTH_LABELS[d.getMonth()],
-      key: d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1)
-    });
-  }
-  return result;
-}
-
 function fmt(amount) {
   var num = Math.max(0, parseFloat(amount) || 0);
   if (num >= 1000) return '₱' + (num / 1000).toFixed(1) + 'k';
@@ -96,33 +82,23 @@ const StatisticsScreen = function() {
     return base + extra;
   }, [userSettings, userHistory, curMonth]);
 
-  // Current month spending by envelope
-  var envelopeSpending = useMemo(function() {
-    var map = {};
-    envelopes.forEach(function(e) { map[e.id] = { name: e.name, spent: 0 }; });
-
-    userHistory.forEach(function (h) {
-      if (h.expense_type === 'Recurring' && getMonthStr(h.date) === curMonth) {
-        var amt = parseFloat(h.amount) || 0;
-        var rec = userRecurring.find(function (r) { return r.name === h.expense_name; });
-        var category = rec ? rec.category : 'Other';
-        var env = envelopes.find(function (e) { return e.id === category || e.name === category; });
-        var key = env ? env.id : (category || 'Other');
-        if (!map[key]) map[key] = { name: env ? env.name : (category || 'Other'), spent: 0 };
-        map[key].spent += amt;
-      }
+  var recurringByName = useMemo(function () {
+    var lookup = {};
+    userRecurring.forEach(function (r) {
+      if (r && r.name) lookup[r.name] = r;
     });
-    userOneTime.forEach(function(o) {
-      if (getMonthStr(o.date) === curMonth) {
-        var env = envelopes.find(function(e) { return e.id === o.category || e.name === o.category; });
-        var key = env ? env.id : (o.category || 'Other');
-        if (!map[key]) map[key] = { name: env ? env.name : (o.category || 'Other'), spent: 0 };
-        map[key].spent += parseFloat(o.amount) || 0;
-      }
-    });
+    return lookup;
+  }, [userRecurring]);
 
-    return Object.values(map).filter(function(e) { return e.spent > 0; }).sort(function(a, b) { return b.spent - a.spent; });
-  }, [userHistory, userRecurring, userOneTime, envelopes, curMonth]);
+  var envelopeSpending = useMemo(function () {
+    return buildEnvelopeSpendingForMonth({
+      envelopes: envelopes,
+      curMonth: curMonth,
+      oneTimeExpenses: userOneTime,
+      historyEntries: userHistory,
+      recurringByName: recurringByName
+    });
+  }, [userHistory, userOneTime, envelopes, curMonth, recurringByName]);
 
   var totalMonthSpent = envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
   var maxEnvSpent = envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1;
@@ -233,7 +209,7 @@ const StatisticsScreen = function() {
     return envelopeSpending.map(function(env, idx) {
       return {
         ...env,
-        color: SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+        color: env.isOrphan ? '#9CA3AF' : SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
       };
     });
   }, [envelopeSpending]);
@@ -325,15 +301,37 @@ const StatisticsScreen = function() {
 
   var maxTrendValue = Math.max.apply(null, monthlyTotals.map(function(m) { return Math.max(m.spent, m.income); }).concat([1]));
 
+  var monthlyInsight = useMemo(function() {
+    return buildMonthlyInsight({
+      monthlyTotals: monthlyTotals,
+      curMonthKey: curMonth,
+      envelopeSpending: envelopeSpending
+    });
+  }, [monthlyTotals, curMonth, envelopeSpending]);
+
   return React.createElement(View, { style: { flex: 1, backgroundColor: theme.colors.background } },
 
     // Header
     React.createElement(View, { style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 28, paddingHorizontal: 20 } },
       React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Statistics'),
-      React.createElement(Text, { style: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 } }, 'Your money overview for this month')
+      React.createElement(Text, { style: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 } }, 'Insights for ' + (MONTH_LABELS[new Date().getMonth()] || '') + ' ' + new Date().getFullYear())
     ),
 
     React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: scrollBottomPadding } },
+
+      React.createElement(TrialCountdownBanner, { theme: theme, compact: true }),
+
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: monthlyInsight.color + '33', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-start' } },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 20, backgroundColor: monthlyInsight.color + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { name: monthlyInsight.icon, size: 22, color: monthlyInsight.color })
+          ),
+          React.createElement(View, { style: { flex: 1 } },
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 } }, monthlyInsight.title),
+            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 } }, monthlyInsight.text)
+          )
+        )
+      ),
 
       // ── Summary row ──────────────────────────────────────────────────────
       <View style={{ flexDirection: 'row', marginBottom: 16, gap: 8 }}>

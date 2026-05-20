@@ -18,7 +18,14 @@ const DB_STORAGE_KEYS = [
   'budget_app_db'
 ];
 const DB_SCHEMA_VERSION_KEY = 'budget_tracker_schema_version';
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
+
+const STARTER_ACCOUNTS = [
+  { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
+  { id: 'acc-gcash', name: 'GCash', starting_balance: 0, type: 'GCash', color: '#1E3A8A' },
+  { id: 'acc-maya', name: 'Maya', starting_balance: 0, type: 'Maya', color: '#059669' },
+  { id: 'acc-bpi', name: 'BPI Bank', starting_balance: 0, type: 'BPI', color: '#B91C1C' }
+];
 
 const normalizeLegacyDbTables = (rawDb) => {
   if (!rawDb || typeof rawDb !== 'object') return null;
@@ -75,6 +82,25 @@ const runVersionedMigrations = (db, fromVersion) => {
       expense_name: item.expense_name || item.name || 'Transaction'
     }));
     version = 3;
+  }
+
+  if (version < 4) {
+    db.user_settings = (db.user_settings || []).map(function (setting) {
+      var accounts = setting.accounts;
+      if (typeof accounts === 'string') {
+        try {
+          accounts = JSON.parse(accounts);
+        } catch (e) {
+          accounts = [];
+        }
+      }
+      if (!Array.isArray(accounts)) accounts = [];
+      if (accounts.length === 0 && !setting.accounts_customized) {
+        accounts = STARTER_ACCOUNTS.map(function (a) { return { ...a }; });
+      }
+      return { ...setting, accounts: accounts };
+    });
+    version = 4;
   }
 
   return db;
@@ -411,3 +437,16 @@ export const useMutation = (table, type) => {
     loading
   };
 };
+
+/** Read full local database (for backup/export). */
+export const getDatabase = function () {
+  return getDb();
+};
+
+/** Write full database and refresh all query subscribers. */
+export const persistDatabase = function (db) {
+  saveDb(db);
+  notifyListeners();
+};
+
+export const DB_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
