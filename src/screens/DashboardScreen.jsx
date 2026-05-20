@@ -15,6 +15,12 @@ const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 const FAB_SPACING = 16;
+const FAB_SIZE = 56;
+const FAB_RIGHT_OFFSET = 20;
+// Extra scroll padding so list content can clear the floating expense FAB above the tab bar.
+const FAB_SCROLL_BOTTOM_EXTRA = FAB_SIZE + FAB_SPACING + 12;
+// Reserve right margin so header actions (e.g. Envelopes Add) are not under the FAB hit area.
+const FAB_HEADER_RIGHT_INSET = FAB_SIZE + FAB_RIGHT_OFFSET + FAB_SPACING;
 
 const DEFAULT_ACCOUNTS = [
   { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
@@ -504,8 +510,8 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
           />
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ASSIGN INITIAL BUDGET (OPTIONAL)</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, marginBottom: 20 }}>
-            <Text style={{ fontSize: 15, color: theme.colors.textSecondary }}>₱</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 22, borderBottomWidth: 1.5, borderBottomColor: theme.colors.border, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.textSecondary, marginRight: 6, paddingBottom: 2 }}>₱</Text>
             <TextInput
               value={assigned}
               onChangeText={(val) => {
@@ -515,8 +521,20 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
                 setAssigned(s);
               }}
               placeholder="0.00"
+              placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
               keyboardType="decimal-pad"
-              style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 15, color: theme.colors.textPrimary }}
+              style={{
+                flex: 1,
+                paddingVertical: 4,
+                paddingHorizontal: 0,
+                fontSize: 22,
+                lineHeight: 26,
+                color: theme.colors.textPrimary,
+                fontWeight: '700',
+                backgroundColor: 'transparent',
+                borderWidth: 0,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {})
+              }}
             />
           </View>
 
@@ -2081,8 +2099,8 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
           <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>
             Amount to {mode === 'add' ? 'Add' : 'Reduce'}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 12, marginBottom: 14 }}>
-            <Text style={{ fontSize: 16, color: theme.colors.textSecondary, marginRight: 4 }}>₱</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 18, borderBottomWidth: 1.5, borderBottomColor: theme.colors.border, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.textSecondary, marginRight: 6, paddingBottom: 2 }}>₱</Text>
             <TextInput
               value={amount}
               onChangeText={(val) => {
@@ -2094,7 +2112,18 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
               keyboardType="decimal-pad"
               placeholder="0.00"
               placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-              style={{ flex: 1, paddingVertical: 10, fontSize: 16, color: theme.colors.textPrimary, fontWeight: 'bold' }}
+              style={{
+                flex: 1,
+                paddingVertical: 4,
+                paddingHorizontal: 0,
+                fontSize: 24,
+                lineHeight: 28,
+                color: theme.colors.textPrimary,
+                fontWeight: '700',
+                backgroundColor: 'transparent',
+                borderWidth: 0,
+                ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {})
+              }}
               autoFocus
             />
           </View>
@@ -2359,7 +2388,7 @@ const DashboardScreen = function (props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding + FAB_SCROLL_BOTTOM_EXTRA }}>
 
         {/* Header Block (Floating Card Style) */}
         <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 10 }}>
@@ -2571,7 +2600,7 @@ const DashboardScreen = function (props) {
             </ScrollView>
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingRight: FAB_HEADER_RIGHT_INSET }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelopes</Text>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <TouchableOpacity onPress={() => setShowTransferEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
