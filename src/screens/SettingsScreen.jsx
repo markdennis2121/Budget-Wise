@@ -26,8 +26,6 @@ const THEME_COLORS = [
   { name: 'Mint Glow', color: ['#11998E', '#38EF7D'] }
 ];
 
-import { LinearGradient } from 'expo-linear-gradient';
-
 const SettingsScreen = function(props) {
   var navigation = props.navigation;
   var themeCtx = useTheme();
