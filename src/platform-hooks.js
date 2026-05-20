@@ -9,6 +9,77 @@ const initialDb = {
   expense_history: [],
 };
 
+const DB_STORAGE_KEYS = [
+  'budget_tracker_db',
+  // Legacy keys from older app names/builds
+  'penny_db',
+  'budget_wise_db',
+  'budgetwise_db',
+  'budget_app_db'
+];
+const DB_SCHEMA_VERSION_KEY = 'budget_tracker_schema_version';
+const CURRENT_SCHEMA_VERSION = 3;
+
+const normalizeLegacyDbTables = (rawDb) => {
+  if (!rawDb || typeof rawDb !== 'object') return null;
+  const legacy = { ...rawDb };
+
+  // Map old table names to current schema names.
+  if (!legacy.budget_users && Array.isArray(legacy.users)) legacy.budget_users = legacy.users;
+  if (!legacy.user_settings && Array.isArray(legacy.settings)) legacy.user_settings = legacy.settings;
+  if (!legacy.recurring_expenses && Array.isArray(legacy.recurring)) legacy.recurring_expenses = legacy.recurring;
+  if (!legacy.one_time_expenses && Array.isArray(legacy.one_time)) legacy.one_time_expenses = legacy.one_time;
+  if (!legacy.one_time_expenses && Array.isArray(legacy.expenses)) legacy.one_time_expenses = legacy.expenses;
+  if (!legacy.expense_history && Array.isArray(legacy.history)) legacy.expense_history = legacy.history;
+
+  return legacy;
+};
+
+const runVersionedMigrations = (db, fromVersion) => {
+  var version = parseInt(fromVersion, 10);
+  if (isNaN(version) || version < 0) version = 0;
+
+  if (version < 1) {
+    // Ensure user settings have baseline keys expected by newer screens.
+    db.user_settings = (db.user_settings || []).map(setting => ({
+      ...setting,
+      monthly_salary: parseFloat(setting.monthly_salary) || 0,
+      envelopes: setting.envelopes || [],
+      income_sources: setting.income_sources || [],
+      accounts: setting.accounts || []
+    }));
+    version = 1;
+  }
+
+  if (version < 2) {
+    // Newer account-aware features rely on account_id existing.
+    db.one_time_expenses = (db.one_time_expenses || []).map(exp => ({
+      ...exp,
+      account_id: exp.account_id || 'unlinked'
+    }));
+    db.recurring_expenses = (db.recurring_expenses || []).map(rec => ({
+      ...rec,
+      account_id: rec.account_id || 'unlinked'
+    }));
+    db.expense_history = (db.expense_history || []).map(item => ({
+      ...item,
+      account_id: item.account_id || 'unlinked'
+    }));
+    version = 2;
+  }
+
+  if (version < 3) {
+    // Newer UIs assume explicit expense_name in history rows.
+    db.expense_history = (db.expense_history || []).map(item => ({
+      ...item,
+      expense_name: item.expense_name || item.name || 'Transaction'
+    }));
+    version = 3;
+  }
+
+  return db;
+};
+
 const sanitizeDb = (db) => {
   if (!db) return initialDb;
   
@@ -115,6 +186,25 @@ const sanitizeDb = (db) => {
     };
   });
 
+  // Sanitize budget_users
+  db.budget_users = db.budget_users
+    .filter(user => user && typeof user === 'object')
+    .map((user, idx) => {
+      const id = user.id || ('usr-' + idx);
+      const email = (user.email || '').toString().trim().toLowerCase();
+      const name = (user.name || '').toString().trim() || 'User';
+      const password = (user.password || '').toString();
+      return {
+        ...user,
+        id,
+        email,
+        name,
+        password,
+        created_at: user.created_at || new Date().toISOString().split('T')[0]
+      };
+    })
+    .filter(user => !!user.email);
+
   // --- Legacy Income Migration Phase ---
   // Identify and extract transactions that represent incomes but were incorrectly logged in one_time_expenses or recurring_expenses
   const legacyIncomes = [];
@@ -217,12 +307,27 @@ const sanitizeDb = (db) => {
 
 const getDb = () => {
   try {
-    const data = localStorage.getItem('budget_tracker_db');
-    if (!data) return initialDb;
-    const parsed = JSON.parse(data);
-    const sanitized = sanitizeDb(parsed);
-    saveDb(sanitized); // Auto-persist repaired schema instantly!
-    return sanitized;
+    var schemaVersionRaw = localStorage.getItem(DB_SCHEMA_VERSION_KEY);
+    var schemaVersion = parseInt(schemaVersionRaw, 10);
+    if (isNaN(schemaVersion)) schemaVersion = 0;
+
+    for (var i = 0; i < DB_STORAGE_KEYS.length; i++) {
+      const key = DB_STORAGE_KEYS[i];
+      const data = localStorage.getItem(key);
+      if (!data) continue;
+      try {
+        const parsed = JSON.parse(data);
+        const normalized = normalizeLegacyDbTables(parsed);
+        const migrated = runVersionedMigrations(normalized, schemaVersion);
+        const sanitized = sanitizeDb(migrated);
+        saveDb(sanitized); // Auto-persist repaired schema instantly!
+        localStorage.setItem(DB_SCHEMA_VERSION_KEY, String(CURRENT_SCHEMA_VERSION));
+        return sanitized;
+      } catch (parseErr) {
+        // Skip corrupted legacy keys and continue scanning fallbacks.
+      }
+    }
+    return initialDb;
   } catch (e) {
     return initialDb;
   }

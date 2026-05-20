@@ -72,7 +72,6 @@ const useDashboardState = function (userId) {
   var mutateUpdateSettings = updateSettings.mutate;
 
   var [showAddModal, setShowAddModal] = useState(false);
-  var [showAssignModal, setShowAssignModal] = useState(false);
   var [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
@@ -274,7 +273,7 @@ const useDashboardState = function (userId) {
   return {
     userSettings, incomeSources, envelopes, envelopeBalances,
     totalIncome, totalAssigned, readyToAssign, totalExpenses, upcomingBills,
-    showAddModal, setShowAddModal, showAssignModal, setShowAssignModal,
+    showAddModal, setShowAddModal,
     showOnboarding, setShowOnboarding,
     mutateUpdateSettings, refetchAll,
     oneTimeExpenses,
@@ -2412,11 +2411,6 @@ const DashboardScreen = function (props) {
                 </TouchableOpacity>
                 <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: -1 }}>{formatCurrency(state.readyToAssign)}</Text>
               </View>
-              {state.readyToAssign > 0 && (
-                <TouchableOpacity onPress={() => state.setShowAssignModal(true)} style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 }}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Assign</Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 2 }} />
@@ -2668,7 +2662,6 @@ const DashboardScreen = function (props) {
       </TouchableOpacity>
 
       <AddExpenseModal visible={state.showAddModal} onClose={() => state.setShowAddModal(false)} onSaved={state.refetchAll} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} envelopes={state.envelopeBalances} accounts={state.accounts} />
-      <AssignMoneyModal visible={state.showAssignModal} onClose={() => { state.setShowAssignModal(false); state.refetchAll(); }} readyToAssign={state.readyToAssign} totalIncome={state.totalAvailableMoney} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />
       <SpentManagerModal visible={showSpentModal} onClose={function () { setShowSpentModal(false); }} filter={spentFilter} oneTimeExpenses={state.oneTimeExpenses} envelopes={state.envelopeBalances} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} userHistory={state.userHistory} recurringExpenses={state.recurringExpenses} />
       <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
