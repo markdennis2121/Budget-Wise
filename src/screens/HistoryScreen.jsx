@@ -5,7 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import { formatCurrency, formatDate, parseAmount } from '../utils/helpers';
+import { formatAmountForEdit } from '../utils/amountFormat';
+import { isManualWalletTopUp } from '../utils/walletIncomeHistory';
+import AmountInput from '../components/AmountInput';
 import emptyHistoryImg from '../assets/empty_history.png';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -25,6 +28,7 @@ const HistoryScreen = function() {
   var loading = historyQuery.loading;
   var deleteHistory = useMutation('expense_history', 'delete');
   var deleteOneTime = useMutation('one_time_expenses', 'delete');
+  var updateHistory = useMutation('expense_history', 'update');
   var typeFilterState = useState('All');
   var typeFilter = typeFilterState[0]; var setTypeFilter = typeFilterState[1];
   var statusFilterState = useState('All');
@@ -32,9 +36,16 @@ const HistoryScreen = function() {
   var searchState = useState('');
   var search = searchState[0]; var setSearch = searchState[1];
   var [visibleCount, setVisibleCount] = useState(5);
-  
+  var [editingId, setEditingId] = useState(null);
+  var [editAmount, setEditAmount] = useState('');
+
   useEffect(() => {
     setVisibleCount(5);
+  }, [typeFilter, statusFilter, search]);
+
+  useEffect(() => {
+    setEditingId(null);
+    setEditAmount('');
   }, [typeFilter, statusFilter, search]);
 
   var oneTimeQuery = useQuery('one_time_expenses');
@@ -162,8 +173,44 @@ const HistoryScreen = function() {
       ),
       renderItem: function(itemData) {
         var item = itemData.item;
-        var idx = itemData.index;
         var isIncome = item.type === 'Income';
+        var isEditing = editingId === item.id;
+        var histRow = userHistory.find(function(h) { return h.id === item.id; });
+        var canEditIncome = isIncome && histRow;
+
+        var saveIncomeEdit = function() {
+          var amt = parseAmount(editAmount);
+          if (amt <= 0) {
+            Platform.OS === 'web' ? window.alert('Enter a valid amount greater than zero.') : Alert.alert('Invalid amount', 'Enter a valid amount greater than zero.');
+            return;
+          }
+          updateHistory.mutate({ id: item.id, data: { amount: amt } }).then(function() {
+            setEditingId(null);
+            setEditAmount('');
+            historyQuery.refetch();
+          });
+        };
+
+        if (isEditing && canEditIncome) {
+          return (
+            <View key={item.id} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.primary }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 }}>{item.name}</Text>
+              <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 10 }}>
+                {isManualWalletTopUp(histRow) ? 'Wallet top-up — fix the amount below' : 'Edit income amount'}
+              </Text>
+              <AmountInput value={editAmount} onChangeText={setEditAmount} theme={theme} containerStyle={{ marginBottom: 10 }} />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity onPress={saveIncomeEdit} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={function() { setEditingId(null); }} style={{ paddingHorizontal: 16, justifyContent: 'center', backgroundColor: theme.colors.border, borderRadius: 8 }}>
+                  <Text style={{ color: theme.colors.textSecondary }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }
+
         return (
           <View key={item.id} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Transfer' ? '#E0F2FE' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE')), alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
@@ -173,19 +220,31 @@ const HistoryScreen = function() {
                 <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{item.name}</Text>
                 <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(item.date) + (item.notes ? ' • ' + item.notes : '') + ' • ' + item.type}</Text>
              </View>
-             <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+             <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) }}>{(isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)}</Text>
+                {item.status ? (
                 <View style={{ backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
                    <Text style={{ fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' }}>{item.status}</Text>
                 </View>
+                ) : null}
              </View>
+             {canEditIncome ? (
+               <TouchableOpacity
+                 onPress={function() { setEditingId(item.id); setEditAmount(formatAmountForEdit(item.amount)); }}
+                 style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(15, 118, 110, 0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 6 }}
+               >
+                 <MaterialIcons name="edit" size={18} color={theme.colors.primary} />
+               </TouchableOpacity>
+             ) : null}
              <TouchableOpacity 
                onPress={() => {
                  if (item.type === 'Recurring') {
                    Platform.OS === 'web' ? window.alert('Cannot delete recurring expenses from history. Cancel them from the Recurring tab.') : Alert.alert('Notice', 'Cannot delete recurring expenses from history. Cancel them from the Recurring tab.');
                    return;
                  }
-                 var confirmMsg = 'Are you sure you want to delete this record? Funds will be reverted.';
+                 var confirmMsg = isIncome && histRow && histRow.account_id
+                   ? 'Delete this record? Your wallet balance will be adjusted.'
+                   : 'Are you sure you want to delete this record? Funds will be reverted.';
                  var doDelete = () => {
                    deleteHistory.mutate({ id: item.id }).then(() => {
                      if (item.type === 'One-Time') {

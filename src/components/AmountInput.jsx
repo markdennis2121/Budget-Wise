@@ -1,9 +1,14 @@
 import React from 'react';
 import { View, Text, TextInput, Platform } from 'react-native';
-import { sanitizeDecimalInput } from '../utils/saveSuccess';
+import {
+  sanitizeAmountDigits,
+  formatAmountWithCommas,
+  normalizeAmountInputValue
+} from '../utils/amountFormat';
 
 /**
- * Mobile-first peso amount field: large tap target, decimal-pad, underline style.
+ * Peso amount field with thousand separators (e.g. 1,234.56).
+ * Parent state: raw digits string (no commas). Use parseFormattedAmount() before save.
  */
 const AmountInput = function ({
   value,
@@ -14,55 +19,92 @@ const AmountInput = function ({
   containerStyle,
   inputStyle,
   prefixSize = 22,
-  fontSize = 24
+  fontSize = 24,
+  allowNegative = false,
+  allowExpression = false,
+  formatOnBlur = true,
+  variant = 'underline'
 }) {
   var colors = theme && theme.colors ? theme.colors : {};
   var isDark = theme && theme.isDark;
 
+  var rawValue = value == null ? '' : String(value);
+  var displayValue = allowExpression
+    ? rawValue
+    : formatAmountWithCommas(rawValue);
+
   var handleChange = function (val) {
-    if (typeof onChangeText === 'function') {
-      onChangeText(sanitizeDecimalInput(val));
+    if (typeof onChangeText !== 'function') return;
+    if (allowExpression) {
+      onChangeText(sanitizeAmountDigits(val, { allowExpression: true }));
+      return;
+    }
+    onChangeText(sanitizeAmountDigits(val, { allowNegative: allowNegative }));
+  };
+
+  var handleBlur = function () {
+    if (!formatOnBlur || typeof onChangeText !== 'function') return;
+    var normalized = normalizeAmountInputValue(rawValue, { allowExpression: allowExpression });
+    if (normalized !== rawValue) {
+      onChangeText(normalized);
     }
   };
 
-  return (
-    <View
-      style={[{
+  var isBoxed = variant === 'boxed' || variant === 'compact';
+
+  var shellStyle = isBoxed
+    ? {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.inputBg || colors.background || '#F9FAFB',
+        borderWidth: 1,
+        borderColor: colors.border || '#E5E7EB',
+        borderRadius: variant === 'compact' ? 8 : 10,
+        paddingHorizontal: variant === 'compact' ? 8 : 12,
+        minHeight: variant === 'compact' ? 40 : 44
+      }
+    : {
         flexDirection: 'row',
         alignItems: 'flex-end',
         borderBottomWidth: 1.5,
         borderBottomColor: colors.border || '#E5E7EB',
         paddingBottom: 8,
         minHeight: 52
-      }, containerStyle]}
-    >
+      };
+
+  return (
+    <View style={[shellStyle, containerStyle]}>
       <Text style={{
-        fontSize: prefixSize,
+        fontSize: isBoxed ? (variant === 'compact' ? 14 : 16) : prefixSize,
         fontWeight: '700',
         color: colors.textSecondary || '#6B7280',
-        marginRight: 6,
-        paddingBottom: 2
+        marginRight: isBoxed ? 4 : 6,
+        paddingBottom: isBoxed ? 0 : 2
       }}>₱</Text>
       <TextInput
-        value={value}
+        value={displayValue}
         onChangeText={handleChange}
+        onBlur={handleBlur}
         placeholder={placeholder}
         placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
-        keyboardType="decimal-pad"
+        keyboardType={allowExpression
+          ? (Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default')
+          : 'decimal-pad'}
         returnKeyType="done"
         autoFocus={autoFocus}
         selectTextOnFocus={Platform.OS !== 'web'}
         style={[{
           flex: 1,
-          paddingVertical: Platform.OS === 'ios' ? 6 : 4,
+          paddingVertical: isBoxed ? (variant === 'compact' ? 8 : 10) : (Platform.OS === 'ios' ? 6 : 4),
           paddingHorizontal: 0,
           fontSize: fontSize,
-          lineHeight: fontSize + 4,
+          lineHeight: isBoxed ? fontSize + 2 : fontSize + 4,
           color: colors.textPrimary || '#111827',
-          fontWeight: '700',
+          fontWeight: isBoxed ? '600' : '700',
           backgroundColor: 'transparent',
           borderWidth: 0,
-          minHeight: 44,
+          minHeight: isBoxed ? 36 : 44,
+          textAlign: variant === 'compact' ? 'right' : 'left',
           ...(Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {})
         }, inputStyle]}
       />

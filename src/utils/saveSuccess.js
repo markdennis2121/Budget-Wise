@@ -64,9 +64,4 @@ export function runSaveWithFeedback(promise, opts) {
   });
 }
 
-export function sanitizeDecimalInput(val) {
-  var s = String(val || '').replace(/[^0-9.]/g, '');
-  var parts = s.split('.');
-  if (parts.length > 2) s = parts[0] + '.' + parts.slice(1).join('');
-  return s;
-}
+export { sanitizeDecimalInput } from './amountFormat';

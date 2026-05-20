@@ -13,9 +13,21 @@ export const getTodayStr = function() {
   return d.getFullYear() + '-' + padNum(d.getMonth() + 1) + '-' + padNum(d.getDate());
 };
 
+import { parseFormattedAmount } from './amountFormat';
+
 export const formatCurrency = function(amount) {
-  var num = parseFloat(amount) || 0;
+  var num = typeof amount === 'string' && amount.indexOf(',') !== -1
+    ? (parseFormattedAmount(amount) || 0)
+    : (parseFloat(amount) || 0);
   return '₱' + num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+/** Parse amount from user input (handles commas) or stored numbers */
+export const parseAmount = function(val) {
+  if (val === '' || val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  var n = parseFormattedAmount(val);
+  return isNaN(n) ? 0 : n;
 };
 
 export const formatDate = function(dateStr) {

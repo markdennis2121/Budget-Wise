@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Modal, ScrollView, Alert, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useQuery, useMutation } from 'platform-hooks';
-import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
+import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr, parseAmount } from '../utils/helpers';
+import { evaluateAmountExpression } from '../utils/amountFormat';
 import DatePickerInput from './DatePickerInput';
+import AmountInput from './AmountInput';
 import SaveSuccessOverlay from './SaveSuccessOverlay';
 import { scheduleBillNotification } from '../utils/notifications';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
@@ -227,7 +229,11 @@ const AddExpenseModal = function (props) {
       setErrorMsg(expType === 'recurring' ? 'Please enter a bill name.' : 'Please enter what you spent on.');
       return;
     }
-    var amt = parseFloat(expAmount);
+    var amt = parseAmount(expAmount);
+    if (expAmount && /[+\-*/]/.test(expAmount)) {
+      var evaluated = evaluateAmountExpression(expAmount);
+      if (!isNaN(evaluated)) amt = evaluated;
+    }
     if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
     setErrorMsg('');
 
@@ -481,25 +487,15 @@ const AddExpenseModal = function (props) {
               <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary }}>AMOUNT</Text>
               <Text style={{ fontSize: 11, color: theme.colors.primary }}>You can do math (e.g. 150+45)</Text>
             </View>
-            <TextInput
+            <AmountInput
               value={expAmount}
-              onChangeText={(text) => {
-                var sanitised = text.replace(/[^0-9.+\-*/() ]/g, '');
-                setExpAmount(sanitised);
-              }}
-              onBlur={() => {
-                try {
-                  if (expAmount && /^[\d\s()+\-*/.]+$/.test(expAmount)) {
-                    var result = Function('"use strict";return (' + expAmount + ')')();
-                    if (!isNaN(result) && isFinite(result)) {
-                      setExpAmount(String(Number(result).toFixed(2)).replace(/\.00$/, ''));
-                    }
-                  }
-                } catch (e) { }
-              }}
+              onChangeText={setExpAmount}
+              theme={theme}
+              variant="boxed"
+              allowExpression={true}
+              fontSize={18}
+              containerStyle={{ marginBottom: 16 }}
               placeholder="0.00"
-              keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-              style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 }}
             />
 
             {(expType === 'one_time' || expType === 'income' || expType === 'transfer') ? (
@@ -524,7 +520,12 @@ const AddExpenseModal = function (props) {
                   {optionsList.map(opt => {
                     var isSelected = selectedFund === opt.id;
                     var availStr = expType !== 'income' ? ` (Avail: ${opt.available})` : '';
-                    var isExceeded = expType !== 'income' && opt.available < (parseFloat(expAmount) || 0);
+                    var previewAmt = parseAmount(expAmount);
+                    if (expAmount && /[+\-*/]/.test(expAmount)) {
+                      var ev = evaluateAmountExpression(expAmount);
+                      if (!isNaN(ev)) previewAmt = ev;
+                    }
+                    var isExceeded = expType !== 'income' && opt.available < previewAmt;
                     return (
                       <TouchableOpacity key={opt.id} onPress={() => setSelectedFund(opt.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border), backgroundColor: isSelected ? '#FFEDD5' : (isExceeded ? '#FEF2F2' : theme.colors.inputBg), alignItems: 'center' }}>
                         <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.textPrimary) }}>{opt.name}{availStr}</Text>

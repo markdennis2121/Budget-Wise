@@ -13,14 +13,17 @@ const PIN_LENGTH = 6;
 
 const LoginScreen = function (props) {
   var navigation = props.navigation;
+  var route = props.route;
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var userCtx = useUser();
   var insets = useSafeAreaInsets();
 
-  var [email, setEmail] = useState('');
+  var routeParams = route && route.params ? route.params : {};
+  var [email, setEmail] = useState(routeParams.email || '');
   var [password, setPassword] = useState('');
   var [errorMsg, setErrorMsg] = useState('');
+  var [successMsg, setSuccessMsg] = useState(routeParams.resetMessage || '');
   var [isLoading, setIsLoading] = useState(false);
 
   // PIN modal state
@@ -93,9 +96,17 @@ const LoginScreen = function (props) {
   var handleBackspace = function () { setPin(function (p) { return p.slice(0, -1); }); setPinError(false); };
   var handleClosePinModal = function () { setShowPinModal(false); setPin(''); setPinError(false); };
 
+  useEffect(function () {
+    if (routeParams.resetMessage) {
+      setSuccessMsg(routeParams.resetMessage);
+      if (routeParams.email) setEmail(routeParams.email);
+      navigation.setParams({ resetMessage: undefined, email: undefined });
+    }
+  }, [routeParams.resetMessage, routeParams.email]);
+
   var handleLogin = function () {
     if (!email.trim() || !password.trim()) { setErrorMsg('Please enter email and password.'); return; }
-    setIsLoading(true); setErrorMsg('');
+    setIsLoading(true); setErrorMsg(''); setSuccessMsg('');
     setTimeout(function () {
       var found = allUsers.find(function (u) { return u.email === email.trim().toLowerCase() && u.password === password; });
       if (found) {
@@ -131,6 +142,9 @@ const LoginScreen = function (props) {
       // Login card
       React.createElement(View, { testID: 'View-7', style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'login-card' },
         React.createElement(Text, { testID: 'Text-10', style: { fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 24 } }, 'Sign In'),
+        successMsg ? React.createElement(View, { style: { backgroundColor: '#E6F4EA', borderRadius: 8, padding: 12, marginBottom: 16 } },
+          React.createElement(Text, { style: { color: '#065F46', fontSize: 14 } }, successMsg)
+        ) : null,
         errorMsg ? React.createElement(View, { testID: 'View-8', style: { backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12, marginBottom: 16 } },
           React.createElement(Text, { testID: 'Text-11', style: { color: theme.colors.error, fontSize: 14 } }, errorMsg)
         ) : null,
@@ -145,9 +159,16 @@ const LoginScreen = function (props) {
         React.createElement(TextInput, {
           testID: 'TextInput-2', value: password, onChangeText: setPassword, placeholder: '••••••••',
           secureTextEntry: true, autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 24 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 12 },
           componentId: 'login-password-input'
         }),
+        React.createElement(TouchableOpacity, {
+          onPress: function () { navigation.navigate('ForgotPassword'); },
+          style: { alignSelf: 'flex-end', marginBottom: 20 },
+          componentId: 'forgot-password-btn'
+        },
+          React.createElement(Text, { style: { color: theme.colors.primary, fontSize: 13, fontWeight: '600' } }, 'Forgot password?')
+        ),
         React.createElement(TouchableOpacity, {
           testID: 'TouchableOpacity-7', onPress: handleLogin, disabled: isLoading,
           style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center' },

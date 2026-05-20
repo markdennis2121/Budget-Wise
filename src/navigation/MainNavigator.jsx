@@ -12,6 +12,7 @@ import HistoryScreen from '../screens/HistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import PinLockScreen from '../screens/PinLockScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import { useUser } from '../contexts/UserContext';
@@ -136,6 +137,7 @@ const MainNavigator = function() {
   },
     React.createElement(Stack.Screen, { testID: 'Screen-5', name: 'Login', component: LoginScreen }),
     React.createElement(Stack.Screen, { testID: 'Screen-6', name: 'Register', component: RegisterScreen }),
+    React.createElement(Stack.Screen, { name: 'ForgotPassword', component: ForgotPasswordScreen }),
     React.createElement(Stack.Screen, { testID: 'Screen-7', name: 'MainApp', component: TabNavigator })
   );
 };

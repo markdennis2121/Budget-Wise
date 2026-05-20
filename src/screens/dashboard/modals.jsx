@@ -11,9 +11,11 @@ import BrandLogo from '../../components/BrandLogo';
 import { runSaveWithFeedback } from '../../utils/saveSuccess';
 import { deleteEnvelopeAndCleanup } from '../../utils/envelopeBudget';
 import { promptDeleteEnvelope } from './envelopeUtils';
-import { formatCurrency, formatDate, generateId, getTodayStr, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue } from '../../utils/helpers';
+import { formatCurrency, formatDate, generateId, getTodayStr, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue, parseAmount } from '../../utils/helpers';
+import { formatAmountForEdit } from '../../utils/amountFormat';
 import { WALLET_STYLES } from './constants';
 import { getStoredAccountsList, serializeAccountsForStorage } from '../../utils/accountBalances';
+import { getWalletIncomeHistoryForAccount, isManualWalletTopUp } from '../../utils/walletIncomeHistory';
 
 const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncome, envelopes, userSettings, mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, recurringExpenses, onSaved }) {
   var themeCtx = useTheme();
@@ -34,7 +36,7 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
     for (var i = 0; i < envelopes.length; i++) {
       var e = envelopes[i];
       var valStr = amounts[e.id];
-      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? parseAmount(valStr) : 0;
       var finalAmt = (parseFloat(e.assigned) || 0) + addedAmt;
       if (finalAmt < 0) {
         var msg = `Cannot reduce "${e.name}" envelope below ₱0.00! Current assigned: ${formatCurrency(e.assigned)}`;
@@ -46,7 +48,7 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
     // 2. Validate no Ready to Assign overspending
     var totalInput = envelopes.reduce((s, env) => {
       var valStr = amounts[env.id];
-      var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? parseAmount(valStr) : 0;
       return s + val;
     }, 0);
     if (readyToAssign - totalInput < 0) {
@@ -57,7 +59,7 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
 
     var newEnvelopes = envelopes.map(e => {
       var valStr = amounts[e.id];
-      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+      var addedAmt = valStr !== undefined && valStr !== '' && valStr !== '-' ? parseAmount(valStr) : 0;
       var finalAmt = (parseFloat(e.assigned) || 0) + addedAmt;
       return { id: e.id, name: e.name, assigned: finalAmt };
     });
@@ -105,7 +107,7 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
 
   var totalInput = envelopes.reduce((s, env) => {
     var valStr = amounts[env.id];
-    var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? (parseFloat(valStr) || 0) : 0;
+    var val = valStr !== undefined && valStr !== '' && valStr !== '-' ? parseAmount(valStr) : 0;
     return s + val;
   }, 0);
   var remaining = readyToAssign - totalInput;
@@ -135,19 +137,16 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
                     <MaterialIcons name="delete-outline" size={16} color={theme.colors.error} />
                   </TouchableOpacity>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12 }}>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14 }}>+ ₱</Text>
-                  <TextInput
-                    value={amounts[env.id] || ''}
-                    onChangeText={(val) => {
-                      var s = val.replace(/[^0-9.-]/g, '');
-                      setAmounts(prev => ({ ...prev, [env.id]: s }));
-                    }}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    style={{ width: 80, paddingVertical: 10, paddingLeft: 6, fontSize: 15, color: theme.colors.textPrimary, textAlign: 'right' }}
-                  />
-                </View>
+                <AmountInput
+                  value={amounts[env.id] || ''}
+                  onChangeText={(val) => setAmounts(function (prev) { return { ...prev, [env.id]: val }; })}
+                  theme={theme}
+                  variant="compact"
+                  allowNegative={true}
+                  fontSize={15}
+                  placeholder="0"
+                  containerStyle={{ width: 120 }}
+                />
               </View>
             ))}
           </ScrollView>
@@ -187,7 +186,7 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
       Platform.OS === 'web' ? window.alert('Envelope already exists!') : Alert.alert('Error', 'Envelope already exists!');
       return;
     }
-    var assignedAmt = parseFloat(assigned) || 0;
+    var assignedAmt = parseAmount(assigned);
     if (assignedAmt > readyToAssign) {
       Platform.OS === 'web' ? window.alert('Not enough Ready to Assign money!') : Alert.alert('Error', 'Not enough Ready to Assign money!');
       return;
@@ -280,7 +279,7 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   var readyToAssign = state.readyToAssign;
 
   var handleAdd = function () {
-    var val = parseFloat(amount) || 0;
+    var val = parseAmount(amount);
     if (val <= 0) return;
     if (val > readyToAssign) {
       Platform.OS === 'web'
@@ -319,7 +318,7 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   };
 
   var handleWithdraw = function () {
-    var val = parseFloat(amount) || 0;
+    var val = parseAmount(amount);
     if (val <= 0) return;
     if (!savingsEnv || val > currentSavings) {
       Platform.OS === 'web'
@@ -545,7 +544,7 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
       id: newId,
       name: finalName,
       type: type,
-      starting_balance: parseFloat(startingBalance) || 0,
+      starting_balance: parseAmount(startingBalance),
       color: walletStyle.color
     };
     var newList = getStoredAccountsList(userSettings).concat([newAcc]);
@@ -617,21 +616,35 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   );
 };
 
-const EditAccountModal = function ({ visible, onClose, account, accounts, userSettings, mutateUpdateSettings, onSaved, userId }) {
+const EditAccountModal = function ({ visible, onClose, account, accounts, userSettings, mutateUpdateSettings, onSaved, userId, userHistory }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var [name, setName] = useState('');
   var [addAmount, setAddAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
+  var [editingTopUpId, setEditingTopUpId] = useState(null);
+  var [editTopUpAmount, setEditTopUpAmount] = useState('');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
+  var updateHistory = useMutation('expense_history', 'update');
+  var mutateUpdateHistory = updateHistory.mutate;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
+
+  var curMonth = getCurrentMonthStr();
+  var walletIncomeRows = useMemo(function () {
+    if (!account) return [];
+    return getWalletIncomeHistoryForAccount(userHistory, account.id, { curMonth: curMonth });
+  }, [userHistory, account, curMonth]);
 
   useEffect(() => {
     if (visible && account) {
       setName(account.name);
       setAddAmount('');
+      setEditingTopUpId(null);
+      setEditTopUpAmount('');
       setShowSaveSuccess(false);
       setSuccessMessage('Saved!');
     }
@@ -639,7 +652,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
 
   var handleSave = () => {
     if (!name.trim()) return;
-    var topUp = parseFloat(addAmount) || 0;
+    var topUp = parseAmount(addAmount);
 
     var newList = getStoredAccountsList(userSettings).map(function (a) {
       if (a.id === account.id) {
@@ -719,6 +732,55 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     }
   };
 
+  var handleStartEditTopUp = function (row) {
+    setEditingTopUpId(row.id);
+    setEditTopUpAmount(formatAmountForEdit(row.amount));
+  };
+
+  var handleSaveTopUpEdit = function (row) {
+    var amt = parseAmount(editTopUpAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Platform.OS === 'web' ? window.alert('Enter a valid amount greater than zero.') : Alert.alert('Invalid amount', 'Enter a valid amount greater than zero.');
+      return;
+    }
+    var label = isManualWalletTopUp(row) ? ('Manual Top-up: ' + name.trim()) : row.expense_name;
+    runSaveWithFeedback(
+      mutateUpdateHistory({ id: row.id, data: { amount: amt, expense_name: label } }),
+      {
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        setSuccessMessage: setSuccessMessage,
+        message: 'Top-up updated!',
+        errorMessage: 'Could not update top-up. Please try again.'
+      }
+    ).then(function () {
+      setEditingTopUpId(null);
+      setEditTopUpAmount('');
+    });
+  };
+
+  var handleDeleteTopUp = function (row) {
+    var amt = formatCurrency(parseFloat(row.amount) || 0);
+    var msg = 'Remove this ' + amt + ' addition? Your wallet balance will go down by that amount.';
+    var doDelete = function () {
+      runSaveWithFeedback(mutateDeleteHistory({ id: row.id }), {
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        setSuccessMessage: setSuccessMessage,
+        message: 'Top-up removed!',
+        errorMessage: 'Could not remove top-up. Please try again.'
+      });
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) doDelete();
+    } else {
+      Alert.alert('Remove top-up?', msg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: doDelete }
+      ]);
+    }
+  };
+
   if (!visible || !account) return null;
 
   var topUp = parseFloat(addAmount) || 0;
@@ -729,12 +791,13 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   return (
     <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, maxHeight: '90%', position: 'relative', overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet / Account</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ACCOUNT NAME</Text>
           <TextInput
             value={name}
@@ -743,27 +806,68 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
             style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
           />
 
-          {/* Current Balance Display */}
           <View style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(15, 118, 110, 0.15)' }}>
             <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: 'bold', marginBottom: 2 }}>CURRENT LIVE BALANCE</Text>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{formatCurrency(account.balance || 0)}</Text>
             <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 4 }}>Live total from this month's income, spending, and transfers.</Text>
           </View>
 
-          {/* Top-up input */}
+          {walletIncomeRows.length > 0 ? (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>This month's additions</Text>
+              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 10 }}>Tap edit to fix a wrong top-up or income amount. Balance updates automatically.</Text>
+              {walletIncomeRows.map(function (row) {
+                var isEditing = editingTopUpId === row.id;
+                var rowLabel = isManualWalletTopUp(row) ? 'Direct top-up' : (row.expense_name || 'Income');
+                return (
+                  <View key={row.id} style={{ backgroundColor: theme.colors.background, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: theme.colors.border }}>
+                    {isEditing ? (
+                      <View>
+                        <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6 }}>{rowLabel} • {formatDate(row.date)}</Text>
+                        <AmountInput value={editTopUpAmount} onChangeText={setEditTopUpAmount} theme={theme} containerStyle={{ marginBottom: 8 }} />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity onPress={function () { handleSaveTopUpEdit(row); }} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}>
+                            <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Save</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={function () { setEditingTopUpId(null); }} style={{ paddingHorizontal: 14, justifyContent: 'center', backgroundColor: theme.colors.border, borderRadius: 8 }}>
+                            <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>{rowLabel}</Text>
+                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(row.date)}</Text>
+                        </View>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.primary, marginRight: 10 }}>+{formatCurrency(parseFloat(row.amount) || 0)}</Text>
+                        <TouchableOpacity onPress={function () { handleStartEditTopUp(row); }} style={{ padding: 6, backgroundColor: '#FFEDD5', borderRadius: 6, marginRight: 6 }}>
+                          <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={function () { handleDeleteTopUp(row); }} style={{ padding: 6, backgroundColor: '#FEF2F2', borderRadius: 6 }}>
+                          <MaterialIcons name="delete-outline" size={16} color={theme.colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+
           <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>Add Funds to This Wallet</Text>
           <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>Enter the amount you want to add on top of the current balance. Leave blank if you're only renaming.</Text>
           <AmountInput value={addAmount} onChangeText={setAddAmount} theme={theme} containerStyle={{ marginBottom: topUp > 0 ? 10 : 20 }} />
 
-          {/* Preview of new balance */}
           {topUp > 0 ? (
             <View style={{ backgroundColor: '#D1FAE5', borderRadius: 8, padding: 10, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 13, color: '#065F46', fontWeight: '600' }}>Balance after top-up:</Text>
               <Text style={{ fontSize: 13, color: '#065F46', fontWeight: 'bold' }}>{formatCurrency(previewBal)}</Text>
             </View>
           ) : null}
+          </ScrollView>
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
             <TouchableOpacity onPress={handleDelete} style={{ flex: 1, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
               <Text style={{ color: theme.colors.error, fontSize: 15, fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
@@ -799,7 +903,7 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
 
   var handleSave = () => {
     if (!name.trim()) return;
-    var newGoalAmt = parseFloat(goalAmount) || 0;
+    var newGoalAmt = parseAmount(goalAmount);
     if (newGoalAmt < 0) {
       Platform.OS === 'web' ? window.alert('Goal target amount cannot be negative!') : Alert.alert('Error', 'Goal target amount cannot be negative!');
       return;
@@ -938,7 +1042,7 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
   }, [visible, envelopes]);
 
   var handleTransfer = () => {
-    var amt = parseFloat(amount) || 0;
+    var amt = parseAmount(amount);
     if (amt <= 0) {
       setErrorMsg('Please enter a valid transfer amount.');
       return;
@@ -1054,7 +1158,7 @@ const EditSalaryModal = function ({ visible, onClose, incomeSources, userSetting
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   var handleSave = () => {
-    var newAmt = parseFloat(salary) || 0;
+    var newAmt = parseAmount(salary);
     var newSources = incomeSources.map(s => s.id === 'main-salary' ? { ...s, amount: newAmt } : s);
     if (!incomeSources.find(s => s.id === 'main-salary')) {
       newSources.unshift({ id: 'main-salary', name: 'Main Salary', amount: newAmt });
@@ -1119,7 +1223,7 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
       Platform.OS === 'web' ? window.alert('Please enter source name.') : Alert.alert('Error', 'Please enter source name.');
       return;
     }
-    var amt = parseFloat(newSourceAmount);
+    var amt = parseAmount(newSourceAmount);
     if (isNaN(amt) || amt < 0) {
       Platform.OS === 'web' ? window.alert('Please enter a valid monthly amount.') : Alert.alert('Error', 'Please enter a valid monthly amount.');
       return;
@@ -1177,17 +1281,17 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   var handleStartEdit = function (src) {
     setEditingSourceId(src.id);
     setEditName(src.name);
-    setEditAmount(String(src.amount || ''));
+    setEditAmount(formatAmountForEdit(src.amount));
     setEditAccount(src.account_id || (accounts[0] ? accounts[0].id : ''));
   };
 
   var handleSaveEdit = function (id) {
-    var amt = parseFloat(editAmount);
+    var amt = parseAmount(editAmount);
     if (!editName.trim()) {
       Platform.OS === 'web' ? window.alert('Please enter a name.') : Alert.alert('Error', 'Please enter a name.');
       return;
     }
-    if (isNaN(amt) || amt < 0) {
+    if (amt < 0) {
       Platform.OS === 'web' ? window.alert('Please enter a valid amount.') : Alert.alert('Error', 'Please enter a valid amount.');
       return;
     }
@@ -1243,18 +1347,15 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
                         style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 10 }}
                       />
 
-                      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 12 }}>
-                          <Text style={{ fontSize: 16, color: theme.colors.textSecondary }}>₱</Text>
-                          <TextInput
-                            value={editAmount}
-                            onChangeText={setEditAmount}
-                            keyboardType="decimal-pad"
-                            placeholder="0.00"
-                            style={{ flex: 1, paddingVertical: 10, paddingLeft: 6, fontSize: 16, color: theme.colors.textPrimary }}
-                          />
-                        </View>
-                      </View>
+                      <AmountInput
+                        value={editAmount}
+                        onChangeText={setEditAmount}
+                        theme={theme}
+                        variant="boxed"
+                        fontSize={16}
+                        containerStyle={{ marginBottom: 10 }}
+                        placeholder="0.00"
+                      />
 
                       <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>LINKED WALLET</Text>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -1330,22 +1431,15 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
                 style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 12 }}
               />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, color: theme.colors.textSecondary, marginRight: 6 }}>₱</Text>
-                <TextInput
-                  value={newSourceAmount}
-                  onChangeText={function (text) {
-                    var s = text.replace(/[^0-9.]/g, '');
-                    var parts = s.split('.');
-                    if (parts.length > 2) { s = parts[0] + '.' + parts.slice(1).join(''); }
-                    setNewSourceAmount(s);
-                  }}
-                  placeholder="0.00 (Monthly Amount)"
-                  placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-                  keyboardType="decimal-pad"
-                  style={{ flex: 1, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary }}
-                />
-              </View>
+              <AmountInput
+                value={newSourceAmount}
+                onChangeText={setNewSourceAmount}
+                theme={theme}
+                variant="boxed"
+                fontSize={15}
+                containerStyle={{ marginBottom: 16 }}
+                placeholder="0.00 (Monthly Amount)"
+              />
 
               <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>LINK TO WALLET (OPTIONAL)</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
@@ -1439,16 +1533,16 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
   var handleStartEdit = function (exp) {
     setEditingId(exp.id);
     setEditName(exp.name);
-    setEditAmount(String(exp.amount));
+    setEditAmount(formatAmountForEdit(exp.amount));
   };
 
   var handleSaveEdit = function (exp) {
-    var amt = parseFloat(editAmount);
+    var amt = parseAmount(editAmount);
     if (!editName.trim()) {
       Platform.OS === 'web' ? window.alert('Please enter a name.') : Alert.alert('Error', 'Please enter a name.');
       return;
     }
-    if (isNaN(amt) || amt <= 0) {
+    if (amt <= 0) {
       Platform.OS === 'web' ? window.alert('Please enter a valid amount.') : Alert.alert('Error', 'Please enter a valid amount.');
       return;
     }
@@ -1551,15 +1645,16 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
                         placeholderTextColor: theme.isDark ? '#6B7280' : '#9CA3AF',
                         style: { backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }
                       }),
-                      React.createElement(View, { style: { flexDirection: 'row', gap: 8 } },
-                        React.createElement(View, { style: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 8 } },
-                          React.createElement(Text, { style: { fontSize: 14, color: theme.colors.textSecondary } }, '₱'),
-                          React.createElement(TextInput, {
-                            value: editAmount, onChangeText: setEditAmount, keyboardType: 'decimal-pad', placeholder: '0.00',
-                            placeholderTextColor: theme.isDark ? '#6B7280' : '#9CA3AF',
-                            style: { flex: 1, paddingVertical: 6, paddingLeft: 4, fontSize: 14, color: theme.colors.textPrimary }
-                          })
-                        ),
+                      React.createElement(AmountInput, {
+                        value: editAmount,
+                        onChangeText: setEditAmount,
+                        theme: theme,
+                        variant: 'boxed',
+                        fontSize: 14,
+                        containerStyle: { flex: 1, marginBottom: 0 },
+                        placeholder: '0.00'
+                      }),
+                      React.createElement(View, { style: { flexDirection: 'row', gap: 8, marginTop: 8 } },
                         React.createElement(TouchableOpacity, {
                           onPress: function () { handleSaveEdit(exp); },
                           style: { backgroundColor: theme.colors.primary, borderRadius: 8, paddingHorizontal: 12, justifyContent: 'center' }
@@ -1634,7 +1729,7 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
 
   var currentAssigned = parseFloat(envelope.assigned) || 0;
   var currentAvailable = parseFloat(envelope.available) !== undefined ? parseFloat(envelope.available) : currentAssigned;
-  var amtVal = parseFloat(amount) || 0;
+  var amtVal = parseAmount(amount);
   
   var newAssigned = mode === 'add' ? (currentAssigned + amtVal) : (currentAssigned - amtVal);
   var remainingRta = mode === 'add' ? (readyToAssign - amtVal) : (readyToAssign + amtVal);
