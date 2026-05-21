@@ -1,2 +1,14 @@
 /build/*
 !/build/.npmkeep
+# Node
+node_modules/
+
+# Android build
+android/app/build/
+android/build/
+
+# APK files
+*.apk
+
+# Capacitor
+android/.gradle/
