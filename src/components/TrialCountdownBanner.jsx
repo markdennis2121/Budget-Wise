@@ -12,7 +12,9 @@ const TrialCountdownBanner = function ({ theme, compact }) {
   var label = getTrialCountdownLabel();
   var colors = theme && theme.colors ? theme.colors : {};
   var urgent = days <= 7;
-  var accent = urgent ? (colors.warning || '#F59E0B') : (colors.primary || '#0F766E');
+  var isStealthDark = theme.isDark && colors.primary === '#111827';
+  var safePrimary = isStealthDark ? '#E5E7EB' : (colors.primary || '#0F766E');
+  var accent = urgent ? (colors.warning || '#F59E0B') : safePrimary;
   var bg = urgent ? 'rgba(245, 158, 11, 0.12)' : 'rgba(15, 118, 110, 0.1)';
 
   if (days <= 0) return null;

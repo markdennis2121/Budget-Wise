@@ -152,11 +152,11 @@ export function useDashboardState(userId) {
   }, [recurringExpenses]);
 
   var totalSaved = useMemo(function () {
-    var savingsEnv = envelopeBalances.find(function (e) {
-      return e.id === 'env-savings' || e.name.toLowerCase().includes('saving');
-    });
-    return savingsEnv ? savingsEnv.available : 0;
-  }, [envelopeBalances]);
+    var raw = userSettings && userSettings.savings ? userSettings.savings : [];
+    try { if (typeof raw === 'string') raw = JSON.parse(raw); } catch (e) { raw = userSettings && userSettings.savings ? userSettings.savings : []; }
+    var arr = Array.isArray(raw) ? raw : [];
+    return arr.reduce(function (s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
+  }, [userSettings]);
 
   var totalEnvelopeAvailable = envelopeBalances.reduce(function (sum, env) { return sum + (parseFloat(env.available) || 0); }, 0);
   var readyToAssign = totalAvailableMoney - totalEnvelopeAvailable - orphanPendingTotal;

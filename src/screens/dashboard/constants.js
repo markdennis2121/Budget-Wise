@@ -38,6 +38,5 @@ export const WALLET_STYLES = {
 export const DEFAULT_ENVELOPES = [
   { id: 'env-housing', name: 'Housing', assigned: 0 },
   { id: 'env-food', name: 'Food', assigned: 0 },
-  { id: 'env-transport', name: 'Transport', assigned: 0 },
-  { id: 'env-savings', name: 'Savings', assigned: 0 }
+  { id: 'env-transport', name: 'Transport', assigned: 0 }
 ];

@@ -13,6 +13,9 @@ const RtaNudgeBanner = function ({ theme, readyToAssign, orphanPendingTotal, onP
 
   var config = null;
 
+  var isStealthDark = theme.isDark && colors.primary === '#111827';
+  var safePrimary = isStealthDark ? '#E5E7EB' : (colors.primary || '#0F766E');
+
   if (rta < -0.01) {
     config = {
       icon: 'warning',
@@ -35,7 +38,7 @@ const RtaNudgeBanner = function ({ theme, readyToAssign, orphanPendingTotal, onP
     config = {
       icon: 'savings',
       bg: 'rgba(15, 118, 110, 0.1)',
-      border: colors.primary || '#0F766E',
+      border: safePrimary,
       title: 'Unassigned cash',
       message: 'You still have ' + formatCurrency(rta) + ' ready to assign. Give every peso a job in your envelopes.',
       cta: 'Assign now'

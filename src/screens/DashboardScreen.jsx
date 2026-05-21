@@ -107,7 +107,7 @@ const DashboardScreen = function (props) {
       content: (
         <View>
           <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
-            This is the exact sum of all the money in your linked wallets and banks right now.
+            This is the exact sum of all the money in your linked wallets and banks right now, plus any expected base income not yet assigned to a wallet.
           </Text>
           <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border }}>
             {accountsList.map((acc, idx) => (
@@ -141,7 +141,7 @@ const DashboardScreen = function (props) {
       content: (
         <View>
           <Text style={{ fontSize: 15, color: theme.colors.textPrimary, marginBottom: 12, lineHeight: 22 }}>
-            Cash in your wallets minus money already assigned to envelopes and pending bills. Pending bills reduce the envelope they belong to until paid.
+            Total Current Money minus money already assigned to envelopes and pending bills. Pending bills reduce the envelope they belong to until paid.
           </Text>
           {orphanNote}
           <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
@@ -182,6 +182,9 @@ const DashboardScreen = function (props) {
     var insights = [];
     var today = new Date().toISOString().split('T')[0];
 
+    var isStealthDark = theme.isDark && theme.colors.primary === '#111827';
+    var safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
+
     // 1. Low Envelopes warning
     state.envelopeBalances.forEach(function (env) {
       if (env.assigned > 0 && env.spent > 0) {
@@ -198,15 +201,12 @@ const DashboardScreen = function (props) {
     });
 
     // 2. Savings Progress nudge
-    var savingsEnv = state.envelopeBalances.find(function (e) {
-      return e.id === 'env-savings' || e.name.toLowerCase().includes('saving');
-    });
-    if (savingsEnv && savingsEnv.available > 0) {
+    if (state.totalSaved && state.totalSaved > 0) {
       insights.push({
         type: 'success',
         icon: 'savings',
         color: '#10B981',
-        text: `Awesome! You have stored ${formatCurrency(savingsEnv.available)} in your Savings envelope. Keep adding to it!`
+        text: `Awesome! You have stored ${formatCurrency(state.totalSaved)} in Savings. Keep adding to it!`
       });
     }
 
@@ -215,7 +215,7 @@ const DashboardScreen = function (props) {
       insights.push({
         type: 'info',
         icon: 'account-balance-wallet',
-        color: theme.colors.primary,
+        color: safePrimary,
         text: 'You still have ' + formatCurrency(state.readyToAssign) + ' ready to assign. Tap an envelope below to fund it.'
       });
     } else if (state.readyToAssign < 0) {
@@ -264,7 +264,7 @@ const DashboardScreen = function (props) {
       insights.push({
         type: 'info',
         icon: 'lightbulb-outline',
-        color: theme.colors.primary,
+        color: safePrimary,
         text: "Tip: Give every peso a job. Allocate all remaining Ready to Assign funds to your envelopes!"
       });
     }

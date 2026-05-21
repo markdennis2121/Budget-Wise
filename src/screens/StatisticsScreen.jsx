@@ -61,26 +61,95 @@ const StatisticsScreen = function() {
     return accounts.reduce(function(sum, acc) { return sum + (parseFloat(acc.starting_balance) || 0); }, 0);
   }, [accounts]);
 
-  var totalMonthlyIncome = useMemo(function() {
-    var base = 0;
-    if (userSettings) {
-      if (userSettings.income_sources) {
-        var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-        base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
-      } else {
-        base = parseFloat(userSettings.monthly_salary) || 0;
-      }
+  var incomeSources = useMemo(function() {
+    if (!userSettings) return [];
+    if (userSettings.income_sources) {
+      var raw = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
+      return Array.isArray(raw) ? raw : [];
     }
-    
-    var extra = 0;
-    userHistory.forEach(function(h) {
-      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
-        extra += (parseFloat(h.amount) || 0);
-      }
+    return [{ id: 'main-salary', name: 'Main Salary', amount: parseFloat(userSettings.monthly_salary) || 0 }];
+  }, [userSettings]);
+
+  var incomeHistory = useMemo(function() {
+    return userHistory.filter(function(h) { return h.expense_type === 'Income' && getMonthStr(h.date) === curMonth; });
+  }, [userHistory, curMonth]);
+
+  var incomeReceivedBySource = useMemo(function() {
+    var received = {};
+    incomeSources.forEach(function(src) {
+      var key = src.id || 'unlinked';
+      received[key] = (received[key] || 0) + (parseFloat(src.amount) || 0);
+    });
+    incomeHistory.forEach(function(h) {
+      var key = h.category || 'unlinked';
+      received[key] = (received[key] || 0) + (parseFloat(h.amount) || 0);
     });
 
+    return Object.keys(received).map(function(key) {
+      var src = incomeSources.find(function(s) { return s.id === key; });
+      var name = 'Unknown Source';
+      if (src) name = src.name;
+      else if (key === 'unlinked') name = 'Unlinked Source';
+      else if (key === 'Income') name = 'Wallet Top-up';
+      
+      return {
+        id: key,
+        name: name,
+        amount: received[key],
+        percent: 0
+      };
+    }).sort(function(a, b) { return b.amount - a.amount; });
+  }, [incomeHistory, incomeSources]);
+
+  var incomeReceivedByAccount = useMemo(function() {
+    var received = {};
+    incomeSources.forEach(function(src) {
+      var accountId = src.account_id || 'unlinked';
+      received[accountId] = (received[accountId] || 0) + (parseFloat(src.amount) || 0);
+    });
+    incomeHistory.forEach(function(h) {
+      var accountId = h.account_id || 'unlinked';
+      received[accountId] = (received[accountId] || 0) + (parseFloat(h.amount) || 0);
+    });
+    return Object.keys(received).map(function(accountId) {
+      var acc = accounts.find(function(a) { return a.id === accountId; });
+      return {
+        id: accountId,
+        name: acc ? acc.name : (accountId === 'unlinked' ? 'Unlinked Cash' : 'Unknown Account'),
+        amount: received[accountId]
+      };
+    }).sort(function(a, b) { return b.amount - a.amount; });
+  }, [accounts, incomeHistory, incomeSources]);
+
+  var totalMonthlyIncome = useMemo(function() {
+    var base = incomeSources.reduce(function(sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
+    var extra = incomeHistory.reduce(function(sum, h) {
+      return sum + (parseFloat(h.amount) || 0);
+    }, 0);
     return base + extra;
-  }, [userSettings, userHistory, curMonth]);
+  }, [incomeHistory, incomeSources]);
+
+  var totalIncomeThisMonth = totalMonthlyIncome;
+  var incomeSourceTotal = useMemo(function() {
+    return incomeReceivedBySource.reduce(function(sum, src) { return sum + src.amount; }, 0);
+  }, [incomeReceivedBySource]);
+
+  var incomeBySourceWithPercent = useMemo(function() {
+    return incomeReceivedBySource.map(function(src) {
+      return {
+        id: src.id,
+        name: src.name,
+        amount: src.amount,
+        percent: totalIncomeThisMonth > 0 ? Math.round((src.amount / totalIncomeThisMonth) * 100) : 0
+      };
+    });
+  }, [incomeReceivedBySource, totalIncomeThisMonth]);
+
+  var recentIncomeActivity = useMemo(function() {
+    return incomeHistory.slice().sort(function(a, b) {
+      return new Date(b.date) - new Date(a.date);
+    }).slice(0, 6);
+  }, [incomeHistory]);
 
   var recurringByName = useMemo(function () {
     var lookup = {};
@@ -368,6 +437,73 @@ const StatisticsScreen = function() {
           <Text style={{ fontSize: 11, color: savings >= 0 ? '#14532D' : '#991B1B', marginTop: 2 }}>{savings >= 0 ? 'Saved' : 'Over budget'}</Text>
         </TouchableOpacity>
       </View>,
+
+      // ── Income This Month summary ───────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 } },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { name: 'trending-up', size: 22, color: '#2563EB' })
+          ),
+          React.createElement(View, null,
+            React.createElement(Text, { style: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Income This Month'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 } }, 'Actual income recorded in the current month.')
+          )
+        ),
+        React.createElement(Text, { style: { fontSize: 28, fontWeight: 'bold', color: theme.colors.primary, marginTop: 4 } }, formatCurrency(totalMonthlyIncome))
+      ),
+
+      // ── Income by Source ─────────────────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Income by Source'),
+        incomeBySourceWithPercent.length === 0
+          ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No income transactions recorded this month.')
+          : incomeBySourceWithPercent.map(function(src) {
+              return React.createElement(View, { key: src.id, style: { marginBottom: 16 } },
+                React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 } },
+                  React.createElement(Text, { style: { fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary } }, src.name),
+                  React.createElement(Text, { style: { fontSize: 14, fontWeight: '700', color: theme.colors.primary } }, formatCurrency(src.amount))
+                ),
+                React.createElement(View, { style: { height: 8, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden' } },
+                  React.createElement(View, { style: { width: src.percent + '%', height: '100%', backgroundColor: '#2563EB' } })
+                ),
+                React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 6 } }, src.percent + '% of income')
+              );
+            })
+      ),
+
+      // ── Deposits by Account ───────────────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Deposits by Account'),
+        incomeReceivedByAccount.length === 0
+          ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No account deposits recorded this month.')
+          : incomeReceivedByAccount.map(function(acc, idx) {
+              return React.createElement(View, { key: acc.id, style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: idx < incomeReceivedByAccount.length - 1 ? 1 : 0, borderBottomColor: theme.colors.border } },
+                React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textPrimary } }, acc.name),
+                React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.primary } }, formatCurrency(acc.amount))
+              );
+            })
+      ),
+
+      // ── Recent Income Activity ───────────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Recent Income Activity'),
+        recentIncomeActivity.length === 0
+          ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No income transactions yet.')
+          : recentIncomeActivity.map(function(item) {
+              var source = incomeSources.find(function(src) { return src.id === item.category; });
+              var account = accounts.find(function(acc) { return acc.id === item.account_id; });
+              return React.createElement(View, { key: item.id, style: { marginBottom: 14 } },
+                React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 } },
+                  React.createElement(Text, { style: { fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary } }, formatCurrency(item.amount)),
+                  React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, getMonthStr(item.date))
+                ),
+                React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 } },
+                  React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Source: ' + (source ? source.name : (item.category || 'Unknown'))),
+                  React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Account: ' + (account ? account.name : (item.account_id === 'unlinked' ? 'Unlinked Cash' : 'Unknown Account')))
+                )
+              );
+            })
+      ),
 
       // ── Savings rate card ─────────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },

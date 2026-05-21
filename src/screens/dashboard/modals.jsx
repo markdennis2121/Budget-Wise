@@ -16,6 +16,7 @@ import { formatAmountForEdit } from '../../utils/amountFormat';
 import { WALLET_STYLES } from './constants';
 import { getStoredAccountsList, serializeAccountsForStorage } from '../../utils/accountBalances';
 import { getWalletIncomeHistoryForAccount, isManualWalletTopUp } from '../../utils/walletIncomeHistory';
+import { parseUserEnvelopes } from '../../utils/envelopeGuards';
 
 const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncome, envelopes, userSettings, mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, recurringExpenses, onSaved }) {
   var themeCtx = useTheme();
@@ -262,56 +263,73 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   var [amount, setAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
+  var [selectedSource, setSelectedSource] = useState('');
+
+  var insertHistory = useMutation('expense_history', 'insert');
+  var mutateInsertHistory = insertHistory.mutate;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
 
   useEffect(() => {
     if (visible) {
       setAmount('');
       setShowSaveSuccess(false);
+      if (!selectedSource && (state.accounts || []).length > 0) setSelectedSource((state.accounts || [])[0].id);
     }
   }, [visible]);
-
-  // Find the savings envelope
-  var savingsEnv = state.envelopes.find(function (e) {
-    return e.id === 'env-savings' || e.name.toLowerCase().includes('saving');
-  });
-
-  var currentSavings = savingsEnv ? (parseFloat(savingsEnv.assigned) || 0) : 0;
-  var readyToAssign = state.readyToAssign;
+  var storedSavingsRaw = userSettings && userSettings.savings ? userSettings.savings : [];
+  try { if (typeof storedSavingsRaw === 'string') storedSavingsRaw = JSON.parse(storedSavingsRaw); } catch (e) { storedSavingsRaw = userSettings && userSettings.savings ? userSettings.savings : []; }
+  var storedSavings = Array.isArray(storedSavingsRaw) ? storedSavingsRaw : [];
+  var currentSavings = storedSavings.reduce(function(s, r){ return s + (parseFloat(r.amount) || 0); }, 0);
+  var accountsList = state.accounts || getStoredAccountsList(userSettings);
+  var selectedAccountObj = accountsList.find(function(a){ return a.id === selectedSource; });
+  var selectedSourceBalance = selectedAccountObj ? parseFloat(selectedAccountObj.balance || 0) : 0;
+  var parsedAmount = parseAmount(amount) || 0;
+  var addExceedsSource = parsedAmount > selectedSourceBalance;
 
   var handleAdd = function () {
     var val = parseAmount(amount);
     if (val <= 0) return;
-    if (val > readyToAssign) {
-      Platform.OS === 'web'
-        ? window.alert('You cannot save more than your Ready to Assign balance!')
-        : Alert.alert('Invalid Amount', 'You cannot save more than your Ready to Assign balance!');
-      return;
-    }
-
-    var updatedEnvelopes = [];
-    if (!savingsEnv) {
-      // Auto-create "Savings" envelope
-      var newSavings = { id: 'env-savings', name: 'Savings', assigned: val };
-      updatedEnvelopes = state.envelopes.concat(newSavings);
-    } else {
-      updatedEnvelopes = state.envelopes.map(function (e) {
-        if (e.id === savingsEnv.id) {
-          return { ...e, assigned: currentSavings + val };
-        }
-        return e;
-      });
-    }
-
     if (userSettings) {
+      var historyId = generateId();
+      var historyPromise = Promise.resolve();
+      if (selectedSource) {
+        var srcAcc = accountsList.find(function(a){ return a.id === selectedSource; });
+        var historyEntry = {
+          id: historyId,
+          user_id: userSettings.user_id || userSettings.id,
+          expense_name: 'Saved to Savings',
+          amount: val,
+          expense_type: 'Transfer',
+          date: getTodayStr(),
+          status: 'Saved',
+          notes: 'Saved to Savings • From: ' + (srcAcc ? srcAcc.name : selectedSource),
+          account_id: selectedSource,
+          dest_account_id: 'savings'
+        };
+        historyPromise = mutateInsertHistory(historyEntry);
+      }
+
+      var newSavingsEntry = { id: generateId(), amount: val, source: selectedSource || null, date: getTodayStr() };
+      var updatedSavings = storedSavings.concat(newSavingsEntry);
+      var settingsPromise = mutateUpdateSettings({ id: userSettings.id, data: { savings: updatedSavings } });
+
       runSaveWithFeedback(
-        mutateUpdateSettings({ id: userSettings.id, data: { envelopes: updatedEnvelopes } }),
+        Promise.all([settingsPromise, historyPromise]),
         {
           onClose: onClose,
           onSaved: onSaved,
           setShowSuccess: setShowSaveSuccess,
           setSuccessMessage: setSuccessMessage,
           message: 'Saved to Savings!',
-          errorMessage: 'Could not add to savings. Please try again.'
+          errorMessage: 'Could not add to savings. Please try again.',
+          undo: function () {
+            return Promise.resolve().then(function () {
+              var p = Promise.resolve();
+              if (selectedSource) p = mutateDeleteHistory({ id: historyId });
+              return p;
+            }).then(function () { if (onSaved) onSaved(); });
+          }
         }
       ).then(function () { setAmount(''); });
     }
@@ -320,23 +338,56 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   var handleWithdraw = function () {
     var val = parseAmount(amount);
     if (val <= 0) return;
-    if (!savingsEnv || val > currentSavings) {
+    if (val > currentSavings) {
       Platform.OS === 'web'
         ? window.alert('You cannot withdraw more than your current Savings!')
         : Alert.alert('Invalid Amount', 'You cannot withdraw more than your current Savings!');
       return;
     }
 
-    var updatedEnvelopes = state.envelopes.map(function (e) {
-      if (e.id === savingsEnv.id) {
-        return { ...e, assigned: currentSavings - val };
+    // Consume savings entries FIFO
+    var remaining = val;
+    var updatedSavings = [];
+    for (var i = 0; i < storedSavings.length; i++) {
+      var s = storedSavings[i];
+      var amt = parseFloat(s.amount) || 0;
+      if (remaining <= 0) {
+        updatedSavings.push(s);
+        continue;
       }
-      return e;
-    });
+      if (amt <= remaining) {
+        remaining -= amt;
+        // consumed entirely, skip adding back
+        continue;
+      }
+      // partially consume
+      updatedSavings.push({ ...s, amount: (amt - remaining) });
+      remaining = 0;
+    }
 
     if (userSettings) {
+      var historyId = generateId();
+      var historyPromise = Promise.resolve();
+      if (selectedSource) {
+        var historyEntry = {
+          id: historyId,
+          user_id: userSettings.user_id || userSettings.id,
+          expense_name: 'Withdrawn from Savings',
+          amount: val,
+          expense_type: 'Transfer',
+          date: getTodayStr(),
+          status: 'Received',
+          notes: 'Withdrawn from Savings • To: ' + (selectedAccountObj ? selectedAccountObj.name : selectedSource),
+          account_id: 'savings',
+          dest_account_id: selectedSource
+        };
+        historyPromise = mutateInsertHistory(historyEntry);
+      }
+
+      var settingsPromise = mutateUpdateSettings({ id: userSettings.id, data: { savings: updatedSavings } });
+
       runSaveWithFeedback(
-        mutateUpdateSettings({ id: userSettings.id, data: { envelopes: updatedEnvelopes } }),
+        Promise.all([settingsPromise, historyPromise]),
         {
           onClose: onClose,
           onSaved: onSaved,
@@ -365,17 +416,30 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
             <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#16A34A' }}>{formatCurrency(currentSavings)}</Text>
           </View>
 
-          <View style={{ backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '700' }}>
-              Ready to Assign: {formatCurrency(readyToAssign)}
-            </Text>
-          </View>
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>SOURCE</Text>
+          <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            { (accountsList || []).map(function(a){
+              return (
+                React.createElement(TouchableOpacity, { key: a.id, onPress: function() { setSelectedSource(a.id); }, style: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginRight: 8, borderWidth: 1, borderColor: selectedSource === a.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedSource === a.id ? (theme.colors.primary + '22') : theme.colors.background } },
+                  React.createElement(Text, { style: { color: selectedSource === a.id ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '700' } }, a.name)
+                )
+              );
+            }) }
+          </ScrollView>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
-          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: 20 }} />
+          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: 8 }} />
+
+          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6 }}>Saved from: { ((accountsList.find(a => a.id === selectedSource) || {}).name || selectedSource || '—') }</Text>
+          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12 }}>Source balance: {formatCurrency(selectedSourceBalance)}</Text>
+
+          { addExceedsSource ? (
+            React.createElement(Text, { style: { color: theme.colors.error, marginBottom: 8 } }, 'Amount exceeds selected source balance.')
+          ) : null }
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity onPress={handleAdd} style={{ flex: 1, backgroundColor: '#16A34A', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+            <TouchableOpacity disabled={parsedAmount <= 0 || addExceedsSource} onPress={parsedAmount > 0 && !addExceedsSource ? handleAdd : undefined} style={{ flex: 1, backgroundColor: parsedAmount > 0 && !addExceedsSource ? '#16A34A' : '#94A3B8', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: parsedAmount > 0 && !addExceedsSource ? 1 : 0.6 }}>
               <MaterialIcons name="add" size={18} color="#FFFFFF" />
               <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>Add to Savings</Text>
             </TouchableOpacity>
@@ -650,6 +714,11 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     }
   }, [visible, account]);
 
+  var envelopeAssignments = useMemo(function () {
+    var envelopes = parseUserEnvelopes(userSettings);
+    return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
+  }, [userSettings]);
+
   var handleSave = () => {
     if (!name.trim()) return;
     var topUp = parseAmount(addAmount);
@@ -697,7 +766,17 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   };
 
   var handleDelete = () => {
-    var performDelete = () => {
+    if (envelopeAssignments > 0) {
+      var blockMsg = 'This wallet cannot be deleted while you have active envelope allocations. Move assigned money back from your envelopes before deleting this account.';
+      if (Platform.OS === 'web') {
+        window.alert(blockMsg);
+      } else {
+        Alert.alert('Cannot delete wallet', blockMsg);
+      }
+      return;
+    }
+
+    var performDelete = function () {
       var newList = getStoredAccountsList(userSettings).filter(function (a) { return a.id !== account.id; });
       if (userSettings) {
         runSaveWithFeedback(
@@ -1208,6 +1287,9 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
 
   var updateSettings = useMutation('user_settings', 'update');
   var mutateUpdate = updateSettings.mutate;
+  var historyQuery = useQuery('expense_history');
+  var allHistory = historyQuery.data || [];
+  var userHistory = userSettings ? allHistory.filter(function (h) { return h.user_id === (userSettings.user_id || userSettings.id); }) : [];
 
   useEffect(() => {
     if (visible) {
@@ -1259,14 +1341,40 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   };
 
   var handleDeleteSource = function (id) {
-    if (incomeSources.length <= 1) {
-      Platform.OS === 'web' ? window.alert('You must have at least one income source.') : Alert.alert('Error', 'You must have at least one income source.');
+    var source = incomeSources.find(function (src) { return src.id === id; });
+    if (!source) return;
+
+    var hasIncomeTransactions = userHistory.some(function (h) {
+      return h.expense_type === 'Income' && h.category === id;
+    });
+
+    if (hasIncomeTransactions) {
+      var blockMsg = 'Cannot delete this income source because it is already used or would make the account balance invalid. Please remove or adjust related income entries first.';
+      Platform.OS === 'web' ? window.alert(blockMsg) : Alert.alert('Cannot delete income source', blockMsg);
       return;
     }
+
+    var linkedAccountId = source.account_id;
+    if (linkedAccountId && linkedAccountId !== 'unlinked') {
+      var linkedAccount = accounts.find(function (a) { return a.id === linkedAccountId; });
+      if (linkedAccount) {
+        var projectedBalance = (parseFloat(linkedAccount.balance) || 0) - (parseFloat(source.amount) || 0);
+        if (projectedBalance < 0) {
+          var balanceMsg = 'Cannot delete this income source because it is already used or would make the account balance invalid. Please remove or adjust related income entries first.';
+          Platform.OS === 'web' ? window.alert(balanceMsg) : Alert.alert('Cannot delete income source', balanceMsg);
+          return;
+        }
+      }
+    }
+
     var newList = incomeSources.filter(function (src) { return src.id !== id; });
+    var newMonthlySalary = userSettings ? (userSettings.monthly_salary || 0) : 0;
+    if (source.id === 'main-salary') {
+      newMonthlySalary = 0;
+    }
     if (userSettings) {
       runSaveWithFeedback(
-        mutateUpdate({ id: userSettings.id, data: { income_sources: newList, monthly_salary: newList[0] ? newList[0].amount : 0 } }),
+        mutateUpdate({ id: userSettings.id, data: { income_sources: newList, monthly_salary: newMonthlySalary } }),
         {
           onSaved: onSaved,
           setShowSuccess: setShowSaveSuccess,
@@ -1295,6 +1403,35 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
       Platform.OS === 'web' ? window.alert('Please enter a valid amount.') : Alert.alert('Error', 'Please enter a valid amount.');
       return;
     }
+
+    var source = incomeSources.find(function (src) { return src.id === id; });
+    if (!source) return;
+
+    var totalUsedAmount = userHistory.reduce(function (sum, h) {
+      if (h.expense_type === 'Income' && h.category === id) {
+        return sum + (parseFloat(h.amount) || 0);
+      }
+      return sum;
+    }, 0);
+
+    if (totalUsedAmount > 0 && amt < totalUsedAmount) {
+      var blockMsg = 'Cannot update this income source because the new amount is smaller than the amount already received from it. Please remove or adjust related income entries first.';
+      Platform.OS === 'web' ? window.alert(blockMsg) : Alert.alert('Cannot save income source', blockMsg);
+      return;
+    }
+
+    if (source.account_id && source.account_id !== 'unlinked') {
+      var linkedAccount = accounts.find(function (a) { return a.id === source.account_id; });
+      if (linkedAccount) {
+        var projectedBalance = (parseFloat(linkedAccount.balance) || 0) - (parseFloat(source.amount) || 0) + amt;
+        if (projectedBalance < 0) {
+          var balanceMsg = 'Cannot update this income source because it would make the account balance invalid. Please remove or adjust related income entries first.';
+          Platform.OS === 'web' ? window.alert(balanceMsg) : Alert.alert('Cannot save income source', balanceMsg);
+          return;
+        }
+      }
+    }
+
     var newList = incomeSources.map(function (src) {
       return src.id === id ? { ...src, name: editName.trim(), amount: amt, account_id: editAccount } : src;
     });

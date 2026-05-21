@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image, Alert, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
@@ -33,6 +33,7 @@ const HistoryScreen = function() {
   var typeFilter = typeFilterState[0]; var setTypeFilter = typeFilterState[1];
   var statusFilterState = useState('All');
   var statusFilter = statusFilterState[0]; var setStatusFilter = statusFilterState[1];
+  var [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
   var searchState = useState('');
   var search = searchState[0]; var setSearch = searchState[1];
   var [visibleCount, setVisibleCount] = useState(5);
@@ -124,30 +125,42 @@ const HistoryScreen = function() {
           componentId: 'history-search-input'
         })
       ),
-      React.createElement(View, { testID: 'View-62', style: { flexDirection: 'row', gap: 8 } },
-        React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial' } },
+      React.createElement(View, { style: { marginBottom: 10 } },
+        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6, fontWeight: '700' } }, 'Type'),
+        React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial', marginBottom: 10 } },
           ['All','Recurring','One-Time','Income'].map(function(t) {
             var count = t === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.type === t).length;
             return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-23', key: t, onPress: function() { setTypeFilter(t); },
               style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: typeFilter === t ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: typeFilter === t ? theme.colors.primary : '#FED7AA' },
               componentId: 'type-filter-' + t
             },
-              React.createElement(Text, { testID: 'Text-82', style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, t),
+              React.createElement(Text, { style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, t),
               count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: typeFilter === t ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
                 React.createElement(Text, { style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
               ) : null
             );
-          }),
+          })
+        )
+      ),
+      React.createElement(View, null,
+        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6, fontWeight: '700' } }, 'Status'),
+        React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', onPress: function() { setStatusDropdownVisible(true); },
+          style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background }
+        },
+          React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: '600' } }, statusFilter),
+          React.createElement(MaterialIcons, { name: 'keyboard-arrow-down', size: 22, color: theme.colors.textSecondary })
+        )
+      )
+    ),
+    React.createElement(Modal, { transparent: true, visible: statusDropdownVisible, animationType: 'fade', onRequestClose: function() { setStatusDropdownVisible(false); } },
+      React.createElement(TouchableOpacity, { onPress: function() { setStatusDropdownVisible(false); }, style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: 20 } },
+        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden' } },
           ['All','Pending','Paid','Paid in Advance','Spent','Received'].map(function(s) {
-            var count = s === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.status === s).length;
-            return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', key: s, onPress: function() { setStatusFilter(s); },
-              style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginRight: 6, backgroundColor: statusFilter === s ? theme.colors.info : theme.colors.background, borderWidth: 1, borderColor: statusFilter === s ? theme.colors.info : '#FED7AA' },
-              componentId: 'status-filter-' + s
+            var isActive = statusFilter === s;
+            return React.createElement(TouchableOpacity, { key: s, onPress: function() { setStatusFilter(s); setStatusDropdownVisible(false); },
+              style: { paddingHorizontal: 16, paddingVertical: 14, backgroundColor: isActive ? (theme.colors.primary + '15') : theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border }
             },
-              React.createElement(Text, { testID: 'Text-83', style: { color: statusFilter === s ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: '600' } }, s),
-              count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: statusFilter === s ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
-                React.createElement(Text, { style: { color: statusFilter === s ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
-              ) : null
+              React.createElement(Text, { style: { color: isActive ? theme.colors.primary : theme.colors.textPrimary, fontSize: 15, fontWeight: isActive ? '700' : '600' } }, s)
             );
           })
         )
