@@ -76,10 +76,6 @@ const StatisticsScreen = function() {
 
   var incomeReceivedBySource = useMemo(function() {
     var received = {};
-    incomeSources.forEach(function(src) {
-      var key = src.id || 'unlinked';
-      received[key] = (received[key] || 0) + (parseFloat(src.amount) || 0);
-    });
     incomeHistory.forEach(function(h) {
       var key = h.category || 'unlinked';
       received[key] = (received[key] || 0) + (parseFloat(h.amount) || 0);
@@ -103,10 +99,6 @@ const StatisticsScreen = function() {
 
   var incomeReceivedByAccount = useMemo(function() {
     var received = {};
-    incomeSources.forEach(function(src) {
-      var accountId = src.account_id || 'unlinked';
-      received[accountId] = (received[accountId] || 0) + (parseFloat(src.amount) || 0);
-    });
     incomeHistory.forEach(function(h) {
       var accountId = h.account_id || 'unlinked';
       received[accountId] = (received[accountId] || 0) + (parseFloat(h.amount) || 0);
@@ -119,15 +111,13 @@ const StatisticsScreen = function() {
         amount: received[accountId]
       };
     }).sort(function(a, b) { return b.amount - a.amount; });
-  }, [accounts, incomeHistory, incomeSources]);
+  }, [accounts, incomeHistory]);
 
   var totalMonthlyIncome = useMemo(function() {
-    var base = incomeSources.reduce(function(sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
-    var extra = incomeHistory.reduce(function(sum, h) {
+    return incomeHistory.reduce(function(sum, h) {
       return sum + (parseFloat(h.amount) || 0);
     }, 0);
-    return base + extra;
-  }, [incomeHistory, incomeSources]);
+  }, [incomeHistory]);
 
   var totalIncomeThisMonth = totalMonthlyIncome;
   var incomeSourceTotal = useMemo(function() {
@@ -179,19 +169,15 @@ const StatisticsScreen = function() {
   var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
 
   var handleIncomeInfo = function() {
-    var base = 0;
-    if (userSettings) {
-      if (userSettings.income_sources) {
-        var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-        base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
+    var templateIncome = 0;
+    var manualIncome = 0;
+    incomeHistory.forEach(function(h) {
+      var isTemplate = incomeSources.some(function(src) { return src.id === h.category; });
+      var amt = parseFloat(h.amount) || 0;
+      if (isTemplate) {
+        templateIncome += amt;
       } else {
-        base = parseFloat(userSettings.monthly_salary) || 0;
-      }
-    }
-    var extra = 0;
-    userHistory.forEach(function(h) {
-      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
-        extra += (parseFloat(h.amount) || 0);
+        manualIncome += amt;
       }
     });
 
@@ -201,16 +187,16 @@ const StatisticsScreen = function() {
       content: (
         <View>
           <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
-            This is the total income earned or added this month. 'Expected Income' is your baseline setup, while 'Extra Income' includes manual wallet top-ups and any external income you log. (Note: Initial wallet seed balances are considered starting capital, not income).
+            This is the total income earned or logged this month. All money comes strictly from actual logged transactions.
           </Text>
           <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Expected Income</Text>
-              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(base)}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Template-Logged Income</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(templateIncome)}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Extra Income</Text>
-              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(extra)}</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>Manual & Extra Income</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(manualIncome)}</Text>
             </View>
             <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 14 }} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -349,24 +335,10 @@ const StatisticsScreen = function() {
           }
         }
       });
-      
-      // 3. Add expected base recurring income configured in settings (only for current month)
-      if (m.key === curMonth) {
-        var base = 0;
-        if (userSettings) {
-          if (userSettings.income_sources) {
-            var src = typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-            base = (Array.isArray(src) ? src : []).reduce(function(s, x) { return s + (parseFloat(x.amount) || 0); }, 0);
-          } else {
-            base = parseFloat(userSettings.monthly_salary) || 0;
-          }
-        }
-        income += base;
-      }
 
       return { label: m.label, spent: spent, income: income, key: m.key };
     });
-  }, [userOneTime, userHistory, userSettings, curMonth]);
+  }, [userOneTime, userHistory]);
 
   var maxTrendValue = Math.max.apply(null, monthlyTotals.map(function(m) { return Math.max(m.spent, m.income); }).concat([1]));
 

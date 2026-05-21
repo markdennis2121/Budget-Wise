@@ -59,12 +59,6 @@ export function buildAccountsWithBalances(opts) {
     };
   });
 
-  (opts.incomeSources || []).forEach(function (src) {
-    if (src.account_id && src.account_id !== 'unlinked') {
-      var acc = accs.find(function (a) { return a.id === src.account_id; });
-      if (acc) acc.balance += parseFloat(src.amount) || 0;
-    }
-  });
 
   (opts.oneTimeExpenses || []).forEach(function (o) {
     if (o.account_id && o.account_id !== 'unlinked') {

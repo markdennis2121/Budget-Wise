@@ -70,15 +70,14 @@ export function useDashboardState(userId) {
   }, [accounts]);
 
   var totalIncome = useMemo(function () {
-    var base = incomeSources.reduce(function (sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
-    var extra = 0;
+    var sum = 0;
     userHistory.forEach(function (h) {
       if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
-        extra += (parseFloat(h.amount) || 0);
+        sum += (parseFloat(h.amount) || 0);
       }
     });
-    return base + extra;
-  }, [incomeSources, userHistory, curMonth]);
+    return sum;
+  }, [userHistory, curMonth]);
 
   var totalAssigned = useMemo(function () {
     return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
