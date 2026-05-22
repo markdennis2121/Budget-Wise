@@ -12,6 +12,7 @@ import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { findEnvelopeForCategory } from '../utils/envelopeBudget';
 import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateEnvelopeForSpend } from '../utils/envelopeGuards';
 import { formatCurrency, formatDate, isWithin5Days, isOverdue, getCurrentMonthStr } from '../utils/helpers';
+import { triggerImpactHaptic } from '../utils/feedback';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
 import emptyRecurringImg from '../assets/empty_recurring.png';
 
@@ -196,8 +197,8 @@ const RecurringScreen = function(props) {
   return React.createElement(View, { testID: 'View-48', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'recurring-screen' },
     React.createElement(SaveSuccessOverlay, { visible: showSaveSuccess, theme: theme, message: successMessage }),
     React.createElement(View, { testID: 'View-49', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 20, paddingHorizontal: 20 }, componentId: 'recurring-header' },
-      React.createElement(Text, { testID: 'Text-67', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Recurring Expenses'),
-      React.createElement(Text, { testID: 'Text-68', style: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 } }, String(recurringExpenses.length) + ' total bills')
+      React.createElement(Text, { testID: 'Text-67', style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Recurring Expenses'),
+      React.createElement(Text, { testID: 'Text-68', style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, String(recurringExpenses.length) + ' total bills')
     ),
     React.createElement(ScrollView, { testID: 'ScrollView-8', horizontal: true, style: { flexGrow: 'initial', backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, showsHorizontalScrollIndicator: false, contentContainerStyle: { paddingHorizontal: 16, paddingVertical: 12 } },
       filters.map(function(f) {
@@ -247,7 +248,7 @@ const RecurringScreen = function(props) {
             )
           ),
           React.createElement(View, { testID: 'View-57', style: { flexDirection: 'row', marginTop: 14, gap: 8 } },
-            expense.status === 'Pending' ? React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-19', onPress: function() { handlePayPress(expense); },
+            expense.status === 'Pending' ? React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-19', onPress: function() { triggerImpactHaptic('Light'); handlePayPress(expense); },
               style: { flex: 1, backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
               componentId: 'pay-btn-' + idx
             },
@@ -274,6 +275,7 @@ const RecurringScreen = function(props) {
       }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold' } }, "See More (" + (filtered.length - visibleCount) + " hidden)")) : null]
     ),
     React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-22', onPress: function() {
+        triggerImpactHaptic('Medium');
         if (!hasUserEnvelopes(userSettings)) {
           showEnvelopeRequiredAlert();
           return;

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -16,6 +16,7 @@ import { deleteEnvelopeAndCleanup } from '../utils/envelopeBudget';
 import { hasUserEnvelopes, showEnvelopeRequiredAlert } from '../utils/envelopeGuards';
 import logoImg from '../assets/logo.png';
 import { formatCurrency } from '../utils/helpers';
+import { triggerImpactHaptic } from '../utils/feedback';
 import {
   TAB_MENU_HEIGHT,
   SCROLL_EXTRA_PADDING,
@@ -47,6 +48,39 @@ const DashboardScreen = function (props) {
   var userName = userCtx.currentUser ? userCtx.currentUser.name : 'User';
   var insets = useSafeAreaInsets();
   var state = useDashboardState(userId);
+
+  // Entrance Animations
+  var contentFade = useRef(new Animated.Value(0)).current;
+  var walletsFade = useRef(new Animated.Value(0)).current;
+  var envelopesFade = useRef(new Animated.Value(0)).current;
+
+  useEffect(function() {
+    Animated.stagger(150, [
+      Animated.timing(contentFade, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(walletsFade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(envelopesFade, { toValue: 1, duration: 500, useNativeDriver: true })
+    ]).start();
+  }, []);
+
+  // FAB Animation
+  var fabScale = useRef(new Animated.Value(1)).current;
+  var animatedFabStyle = {
+    transform: [{ scale: fabScale }]
+  };
+
+  var onPressFab = function() {
+    triggerImpactHaptic('Medium');
+    Animated.sequence([
+      Animated.spring(fabScale, { toValue: 1.15, useNativeDriver: true }),
+      Animated.spring(fabScale, { toValue: 1, useNativeDriver: true })
+    ]).start();
+
+    if (!hasUserEnvelopes(state.userSettings)) {
+      showEnvelopeRequiredAlert({ onAcknowledge: function () { setShowAddEnvModal(true); } });
+      return;
+    }
+    state.setShowAddModal(true);
+  };
   var [showSpentModal, setShowSpentModal] = useState(false);
   var [spentFilter, setSpentFilter] = useState(null);
   var [showIncomeModal, setShowIncomeModal] = useState(false);
@@ -295,20 +329,20 @@ const DashboardScreen = function (props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Image source={logoImg} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: theme.colors.border }} />
               <View>
-                <Text style={{ color: theme.colors.textSecondary, fontSize: 10, fontWeight: '900', letterSpacing: 1 }}>PENNY BUDGETING</Text>
-                <Text style={{ color: theme.colors.textPrimary, fontSize: 18, fontWeight: 'bold' }}>{greeting}, {userName}!</Text>
+                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>PENNY BUDGETING</Text>
+                <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{greeting}, {userName}!</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity
-              onPress={function () { state.setShowOnboarding(true); }}
+              onPress={function () { triggerImpactHaptic('Light'); state.setShowOnboarding(true); }}
               accessibilityLabel="Open app tour"
               style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
             >
               <MaterialIcons name="help-outline" size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={function () { setShowNotificationCenter(true); setHasViewedAlerts(true); }}
+              onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); setHasViewedAlerts(true); }}
               style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
             >
               <MaterialIcons name="notifications-active" size={22} color={theme.colors.primary} />
@@ -343,10 +377,10 @@ const DashboardScreen = function (props) {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View>
                 <TouchableOpacity onPress={handleReadyToAssignInfo} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '700', marginRight: 6, letterSpacing: 0.5 }}>READY TO ASSIGN</Text>
-                  <MaterialIcons name="info-outline" size={14} color="rgba(255,255,255,0.8)" />
+                  <Text style={{ ...theme.typography.caption, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>READY TO ASSIGN</Text>
+                  <MaterialIcons name="info-outline" size={14} color="rgba(255,255,255,0.8)" style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
-                <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900', letterSpacing: -1 }}>{formatCurrency(state.readyToAssign)}</Text>
+                <Text style={{ ...theme.typography.h1, color: '#FFFFFF' }}>{formatCurrency(state.readyToAssign)}</Text>
               </View>
             </View>
 
@@ -355,20 +389,20 @@ const DashboardScreen = function (props) {
             <TouchableOpacity onPress={handleTotalMoneyInfo} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700', marginRight: 6, letterSpacing: 0.5 }}>TOTAL CURRENT MONEY</Text>
-                  <MaterialIcons name="info-outline" size={14} color="rgba(255,255,255,0.8)" />
+                  <Text style={{ ...theme.typography.caption, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>TOTAL CURRENT MONEY</Text>
+                  <MaterialIcons name="info-outline" size={14} color="rgba(255,255,255,0.8)" style={{ marginLeft: 4 }} />
                 </View>
-                <Text style={{ color: '#6EE7B7', fontSize: 22, fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
+                <Text style={{ ...theme.typography.subtitle, color: '#6EE7B7', fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Content Container with standard padding */}
-        <View
-          style={{ paddingHorizontal: 20, paddingTop: 20 }}
-          onLayout={function (e) { scrollContentY.current = e.nativeEvent.layout.y; }}
-        >
+      <Animated.View
+        style={{ paddingHorizontal: 20, paddingTop: 20, opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
+        onLayout={function (e) { scrollContentY.current = e.nativeEvent.layout.y; }}
+      >
 
           <TrialCountdownBanner theme={theme} />
 
@@ -421,14 +455,14 @@ const DashboardScreen = function (props) {
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
-              <TouchableOpacity onPress={function () { setShowIncomeModal(true); }} style={{ flex: 1, alignItems: 'center', backgroundColor: '#FFEDD5', borderRadius: 10, padding: 10, marginRight: 6 }}>
+              <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setShowIncomeModal(true); }} style={{ flex: 1, alignItems: 'center', backgroundColor: '#FFEDD5', borderRadius: 10, padding: 10, marginRight: 6 }}>
                 <View style={{ position: 'absolute', right: 8, top: 8 }}>
                   <MaterialIcons name="add-circle-outline" size={13} color="#C2410C" />
                 </View>
                 <Text style={{ fontSize: 11, color: '#C2410C', fontWeight: '700', marginBottom: 3 }}>INCOME</Text>
                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.primary }} numberOfLines={1}>{formatCurrency(state.totalIncome)}</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={function () { setSpentFilter(null); setShowSpentModal(true); }} style={{ flex: 1, alignItems: 'center', backgroundColor: '#FEE2E2', borderRadius: 10, padding: 10, marginRight: 6 }}>
+              <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }} style={{ flex: 1, alignItems: 'center', backgroundColor: '#FEE2E2', borderRadius: 10, padding: 10, marginRight: 6 }}>
                 <View style={{ position: 'absolute', right: 8, top: 8 }}>
                   <MaterialIcons name="visibility" size={13} color="#B91C1C" />
                 </View>
@@ -436,6 +470,7 @@ const DashboardScreen = function (props) {
                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.error }} numberOfLines={1}>{formatCurrency(state.totalExpenses)}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={function () {
+                triggerImpactHaptic('Light');
                 setShowSavingsManagerModal(true);
               }} style={{ flex: 1, alignItems: 'center', backgroundColor: '#DCFCE7', borderRadius: 10, padding: 10 }}>
                 <View style={{ position: 'absolute', right: 8, top: 8 }}>
@@ -473,13 +508,13 @@ const DashboardScreen = function (props) {
           ) : null}
 
           {/* Wallets & Bank Accounts Section */}
-          <View style={{ marginBottom: 24 }}>
+          <Animated.View style={{ marginBottom: 24, opacity: walletsFade, transform: [{ translateX: walletsFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <TouchableOpacity onPress={handleWalletsInfo} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>Wallets & Accounts</Text>
+                <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 6 }}>Wallets & Accounts</Text>
                 <MaterialIcons name="info-outline" size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowAddAccountModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowAddAccountModal(true); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
                 <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add Account</Text>
               </TouchableOpacity>
@@ -505,58 +540,60 @@ const DashboardScreen = function (props) {
                 {state.accounts.map(function (acc) {
                   var walletStyle = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                   var openWalletEditor = function () {
+                    triggerImpactHaptic('Light');
                     setSelectedAccount(acc);
                     setShowEditAccountModal(true);
                   };
                   return (
-                    <Pressable
-                      key={acc.id}
-                      onPress={openWalletEditor}
-                      style={function (pressed) {
-                        return {
-                          width: 170,
-                          height: 100,
-                          backgroundColor: acc.color || walletStyle.color,
-                          borderRadius: 14,
-                          padding: 12,
-                          marginRight: 12,
-                          justifyContent: 'space-between',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.12,
-                          shadowRadius: 4,
-                          elevation: 4,
-                          opacity: pressed ? 0.92 : 1,
-                          transform: [{ scale: pressed ? 0.98 : 1 }]
-                        };
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <BrandLogo type={acc.type} size={28} />
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="edit" size={12} color="#FFFFFF" />
+                    <Animated.View key={acc.id}>
+                      <Pressable
+                        onPress={openWalletEditor}
+                        style={function (pressed) {
+                          return {
+                            width: 170,
+                            height: 100,
+                            backgroundColor: acc.color || walletStyle.color,
+                            borderRadius: 14,
+                            padding: 12,
+                            marginRight: 12,
+                            justifyContent: 'space-between',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.12,
+                            shadowRadius: 4,
+                            elevation: 4,
+                            opacity: pressed ? 0.92 : 1,
+                            transform: [{ scale: pressed ? 0.98 : 1 }]
+                          };
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <BrandLogo type={acc.type} size={28} />
+                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                            <MaterialIcons name="edit" size={12} color="#FFFFFF" />
+                          </View>
                         </View>
-                      </View>
-                      <View>
-                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '600' }} numberOfLines={1}>
-                          {acc.name || 'Wallet'}
-                        </Text>
-                        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold', marginTop: 2 }}>
-                          {formatCurrency(acc.balance)}
-                        </Text>
-                      </View>
-                    </Pressable>
+                        <View>
+                          <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.7)', fontWeight: '600' }} numberOfLines={1}>
+                            {acc.name || 'Wallet'}
+                          </Text>
+                          <Text style={{ ...theme.typography.subtitle, color: '#FFFFFF', fontWeight: 'bold', marginTop: 2 }}>
+                            {formatCurrency(acc.balance)}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    </Animated.View>
                   );
                 })}
               </ScrollView>
             )}
-          </View>
+          </Animated.View>
 
-          <View
+          <Animated.View
             onLayout={function (e) { envelopeRowY.current = e.nativeEvent.layout.y; }}
-            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, opacity: envelopesFade, transform: [{ translateX: envelopesFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
           >
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelopes</Text>
+            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Envelopes</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity onPress={() => setShowTransferEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
                 <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
@@ -567,7 +604,7 @@ const DashboardScreen = function (props) {
                 <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
           {hasNoEnvelopes ? (
             <EmptyStateCard
               theme={theme}
@@ -578,7 +615,7 @@ const DashboardScreen = function (props) {
               onAction={function () { setShowAddEnvModal(true); }}
             />
           ) : null}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <Animated.View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', opacity: envelopesFade, transform: [{ translateY: envelopesFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
             {!hasNoEnvelopes && state.envelopeBalances.map(env => {
               var actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
               var goalAmount = actualEnv.goal_amount || 0;
@@ -594,10 +631,11 @@ const DashboardScreen = function (props) {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <MaterialIcons name={getEnvelopeIcon(env.name)} size={20} color={theme.colors.primary} />
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 11, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textSecondary }}>
+                      <Text style={{ ...theme.typography.caption, color: env.available < 0 ? theme.colors.error : theme.colors.textSecondary }}>
                         {env.available < 0 ? 'OVERSPENT' : ''}
                       </Text>
                       <TouchableOpacity onPress={function (e) {
+                        triggerImpactHaptic('Light');
                         e.stopPropagation();
                         promptDeleteEnvelope({
                           envelopeId: env.id,
@@ -630,8 +668,8 @@ const DashboardScreen = function (props) {
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>{env.name}</Text>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: env.available < 0 ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(env.available)}</Text>
+                  <Text style={{ ...theme.typography.bodyMedium, color: theme.colors.textPrimary, marginBottom: 4 }} numberOfLines={1}>{env.name}</Text>
+                  <Text style={{ ...theme.typography.subtitle, fontWeight: '800', color: env.available < 0 ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(env.available)}</Text>
 
                   <View style={{ height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, marginTop: 12, overflow: 'hidden' }}>
                     <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
@@ -654,19 +692,30 @@ const DashboardScreen = function (props) {
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </Animated.View>
 
-        </View>
+        </Animated.View>
       </ScrollView>
-      <TouchableOpacity onPress={function () {
-          if (!hasUserEnvelopes(state.userSettings)) {
-            showEnvelopeRequiredAlert({ onAcknowledge: function () { setShowAddEnvModal(true); } });
-            return;
-          }
-          state.setShowAddModal(true);
-        }} style={{ position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 }}>
-        <MaterialIcons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
+      <Animated.View style={[{ position: 'absolute', right: 20, bottom: fabBottom, zIndex: 100 }, animatedFabStyle]}>
+        <TouchableOpacity
+          onPress={onPressFab}
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: theme.colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: theme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.4,
+            shadowRadius: 8,
+            elevation: 6
+          }}
+        >
+          <MaterialIcons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
 
       <AddExpenseModal visible={state.showAddModal} onClose={() => state.setShowAddModal(false)} onSaved={state.refetchAll} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} envelopes={state.envelopeBalances} accounts={state.accounts} />
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />

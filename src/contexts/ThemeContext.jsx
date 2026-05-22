@@ -1,6 +1,17 @@
 import React, { createContext, useState, useMemo, useContext, useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
 
+const typography = {
+  h1: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  h2: { fontSize: 24, fontWeight: 'bold', letterSpacing: -0.5 },
+  h3: { fontSize: 20, fontWeight: 'bold' },
+  subtitle: { fontSize: 16, fontWeight: '600' },
+  body: { fontSize: 14, fontWeight: 'normal' },
+  bodyMedium: { fontSize: 14, fontWeight: '600' },
+  bodySmall: { fontSize: 12, fontWeight: 'normal' },
+  caption: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' }
+};
+
 const lightTheme = {
   colors: {
     primary: '#10B981',
@@ -16,6 +27,7 @@ const lightTheme = {
     info: '#10B981',
     inputBg: '#FFFFFF'
   },
+  typography,
   isDark: false
 };
 
@@ -34,6 +46,7 @@ const darkTheme = {
     info: '#10B981',
     inputBg: '#111827'
   },
+  typography,
   isDark: true
 };
 

@@ -48,7 +48,8 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
       var finalAmt = (parseFloat(e.assigned) || 0) + addedAmt;
       if (finalAmt < 0) {
         var msg = `Cannot reduce "${e.name}" envelope below ₱0.00! Current assigned: ${formatCurrency(e.assigned)}`;
-        Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Error', msg);
+        triggerErrorHaptic();
+        showUndoToast({ message: msg, type: 'error' });
         return;
       }
     }
@@ -61,7 +62,8 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
     }, 0);
     if (readyToAssign - totalInput < 0) {
       var overspendMsg = 'You cannot assign more money than you have available in Ready to Assign!';
-      Platform.OS === 'web' ? window.alert(overspendMsg) : Alert.alert('Error', overspendMsg);
+      triggerErrorHaptic();
+      showUndoToast({ message: overspendMsg, type: 'error' });
       return;
     }
 
@@ -122,8 +124,26 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insets.top }}>
-        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '90%', position: 'relative', overflow: 'hidden' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insets.bottom + 24,
+          maxHeight: '92%',
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Assign Money</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -235,9 +255,26 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Envelope</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -410,9 +447,26 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Manage Savings</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -497,8 +551,24 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insets.top }}>
-        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24, maxHeight: '85%' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insets.bottom + 24,
+          maxHeight: '92%',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <MaterialIcons name="notifications-none" size={24} color={theme.colors.primary} />
@@ -602,11 +672,13 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   var handleCreate = function () {
     var finalName = type === 'Custom' ? name.trim() : (WALLET_STYLES[type]?.name || type);
     if (!finalName) {
-      Platform.OS === 'web' ? window.alert('Please enter an account name.') : Alert.alert('Error', 'Please enter an account name.');
+      triggerErrorHaptic();
+      showUndoToast({ message: 'Please enter an account name.', type: 'error' });
       return;
     }
     if (accounts.find(a => a.name.toLowerCase() === finalName.toLowerCase())) {
-      Platform.OS === 'web' ? window.alert('Account already exists!') : Alert.alert('Error', 'Account already exists!');
+      triggerErrorHaptic();
+      showUndoToast({ message: 'Account already exists!', type: 'error' });
       return;
     }
     var walletStyle = WALLET_STYLES[type] || WALLET_STYLES.Custom;
@@ -630,9 +702,26 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Wallet / Bank Account</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -691,6 +780,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var [name, setName] = useState('');
+  var [startingBalance, setStartingBalance] = useState('');
   var [addAmount, setAddAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
@@ -714,6 +804,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   useEffect(() => {
     if (visible && account) {
       setName(account.name);
+      setStartingBalance(account.starting_balance ? String(account.starting_balance) : '');
       setAddAmount('');
       setEditingTopUpId(null);
       setEditTopUpAmount('');
@@ -732,7 +823,8 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     if (!editingTopUpId) return true;
     var amt = parseAmount(editTopUpAmount);
     if (isNaN(amt) || amt <= 0) {
-      Platform.OS === 'web' ? window.alert('Enter a valid amount greater than zero.') : Alert.alert('Invalid amount', 'Enter a valid amount greater than zero.');
+      triggerErrorHaptic();
+      showUndoToast({ message: 'Enter a valid amount greater than zero.', type: 'error' });
       return false;
     }
     setPendingTopUpEdits(function (prev) {
@@ -750,6 +842,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     if (!stageCurrentTopUpEdit()) return;
 
     var topUp = parseAmount(addAmount);
+    var newStartingBalance = parseAmount(startingBalance);
     var stagedEdits = { ...pendingTopUpEdits };
 
     var newList = getStoredAccountsList(userSettings).map(function (a) {
@@ -757,7 +850,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
         return {
           id: a.id,
           name: name.trim(),
-          starting_balance: parseFloat(a.starting_balance) || 0,
+          starting_balance: newStartingBalance,
           type: a.type || account.type || 'Custom',
           color: a.color || account.color || '#0F766E'
         };
@@ -893,9 +986,27 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var previewBal = liveBal + topUp;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, maxHeight: '90%', position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          maxHeight: '92%',
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet / Account</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -909,6 +1020,10 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
             placeholder="Account Name"
             style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
           />
+
+          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>Initial Seed Balance</Text>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>The balance this account started with before any tracked income/expenses.</Text>
+          <AmountInput value={startingBalance} onChangeText={setStartingBalance} theme={theme} containerStyle={{ marginBottom: 16 }} />
 
           <View style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(15, 118, 110, 0.15)' }}>
             <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: 'bold', marginBottom: 2 }}>CURRENT LIVE BALANCE</Text>
@@ -1011,7 +1126,8 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
     if (!name.trim()) return;
     var newGoalAmt = parseAmount(goalAmount);
     if (newGoalAmt < 0) {
-      Platform.OS === 'web' ? window.alert('Goal target amount cannot be negative!') : Alert.alert('Error', 'Goal target amount cannot be negative!');
+      triggerErrorHaptic();
+      showUndoToast({ message: 'Goal target amount cannot be negative!', type: 'error' });
       return;
     }
     var newGoalDate = goalDate.trim() || '';
@@ -1077,9 +1193,26 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
   if (!visible || !envelope) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Envelope</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -1206,9 +1339,26 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: 40,
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelope Budget Transfer</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
@@ -1665,8 +1815,25 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop }}>
-        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insetsBottom + 24, maxHeight: '85%', position: 'relative', overflow: 'hidden' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insetsBottom + 24,
+          maxHeight: '92%',
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
 
           {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -2181,8 +2348,25 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop }}>
-        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insetsBottom + 24, maxHeight: '85%', position: 'relative', overflow: 'hidden' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insetsBottom + 24,
+          maxHeight: '85%',
+          position: 'relative',
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{title}</Text>

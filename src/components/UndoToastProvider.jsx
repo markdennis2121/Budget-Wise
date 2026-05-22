@@ -26,7 +26,7 @@ const UndoToastProvider = function ({ children }) {
     }
     Animated.timing(slide, {
       toValue: 120,
-      duration: 200,
+      duration: 250,
       useNativeDriver: true
     }).start(function () {
       setToast(null);
@@ -36,10 +36,13 @@ const UndoToastProvider = function ({ children }) {
   var showToast = useCallback(function (opts) {
     opts = opts || {};
     if (timerRef.current) clearTimeout(timerRef.current);
+
     setToast({
       message: opts.message || 'Saved',
-      onUndo: opts.onUndo
+      onUndo: opts.onUndo,
+      type: opts.type || 'success' // success, error, info
     });
+
     slide.setValue(120);
     Animated.spring(slide, {
       toValue: 0,
@@ -47,6 +50,7 @@ const UndoToastProvider = function ({ children }) {
       tension: 80,
       useNativeDriver: true
     }).start();
+
     timerRef.current = setTimeout(dismiss, opts.duration || UNDO_TOAST_MS);
   }, [dismiss, slide]);
 
@@ -70,6 +74,19 @@ const UndoToastProvider = function ({ children }) {
 
   var bottom = Platform.OS === 'web' ? 90 : TAB_MENU_HEIGHT + insets.bottom + 12;
 
+  // Type styling
+  var getIcon = () => {
+    if (toast?.type === 'error') return 'error-outline';
+    if (toast?.type === 'info') return 'info-outline';
+    return 'check-circle';
+  };
+
+  var getIconColor = () => {
+    if (toast?.type === 'error') return theme.colors.error;
+    if (toast?.type === 'info') return '#2563EB';
+    return theme.colors.primary;
+  };
+
   return (
     <View style={{ flex: 1 }}>
       {children}
@@ -89,7 +106,7 @@ const UndoToastProvider = function ({ children }) {
           <View
             style={{
               backgroundColor: theme.colors.card,
-              borderRadius: 14,
+              borderRadius: 16,
               paddingVertical: 14,
               paddingHorizontal: 16,
               flexDirection: 'row',
@@ -97,30 +114,40 @@ const UndoToastProvider = function ({ children }) {
               borderWidth: 1,
               borderColor: theme.colors.border,
               shadowColor: '#000',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 10,
-              elevation: 8
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.2,
+              shadowRadius: 12,
+              elevation: 10
             }}
           >
-            <MaterialIcons name="check-circle" size={22} color={theme.colors.primary} style={{ marginRight: 10 }} />
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: getIconColor() + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+              <MaterialIcons name={getIcon()} size={20} color={getIconColor()} />
+            </View>
+
             <Text style={{ flex: 1, fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }} numberOfLines={2}>
               {toast.message}
             </Text>
-            <TouchableOpacity
-              onPress={handleUndo}
-              style={{
-                marginLeft: 10,
-                paddingVertical: 8,
-                paddingHorizontal: 14,
-                backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : '#FFEDD5',
-                borderRadius: 8,
-                minHeight: 40,
-                justifyContent: 'center'
-              }}
-            >
-              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Undo</Text>
-            </TouchableOpacity>
+
+            {toast.onUndo ? (
+              <TouchableOpacity
+                onPress={handleUndo}
+                style={{
+                  marginLeft: 10,
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : '#FFEDD5',
+                  borderRadius: 8,
+                  minHeight: 36,
+                  justifyContent: 'center'
+                }}
+              >
+                <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 13 }}>Undo</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={dismiss} style={{ padding: 4 }}>
+                <MaterialIcons name="close" size={18} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
       ) : null}

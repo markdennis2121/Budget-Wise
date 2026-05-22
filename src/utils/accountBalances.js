@@ -71,6 +71,7 @@ export function buildAccountsWithBalances(opts) {
     if (!h.account_id || h.account_id === 'unlinked') return;
 
     if (h.expense_type === 'Recurring') {
+      // Recurring bills only affect balance in the month they are paid
       if (curMonth && getMonthStr(h.date) !== curMonth) return;
       var accR = accs.find(function (a) { return a.id === h.account_id; });
       if (accR) accR.balance -= parseFloat(h.amount) || 0;
@@ -78,13 +79,14 @@ export function buildAccountsWithBalances(opts) {
     }
 
     if (h.expense_type === 'Income') {
-      if (curMonth && getMonthStr(h.date) !== curMonth) return;
+      // Income stays in the wallet until spent, regardless of which month it was earned.
       var accI = accs.find(function (a) { return a.id === h.account_id; });
       if (accI) accI.balance += parseFloat(h.amount) || 0;
       return;
     }
 
     if (h.expense_type === 'Transfer' && h.dest_account_id) {
+      // Transfers also persist across months
       var amt = parseFloat(h.amount) || 0;
       var srcAcc = accs.find(function (a) { return a.id === h.account_id; });
       var destAcc = accs.find(function (a) { return a.id === h.dest_account_id; });

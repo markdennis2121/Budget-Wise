@@ -34,12 +34,17 @@ export function validateBackupPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     return { ok: false, error: 'This file is not a valid backup.' };
   }
-  if (!payload.data || typeof payload.data !== 'object') {
-    return { ok: false, error: 'Backup is missing budget data.' };
+
+  // If it's a raw database export (no .data wrapper), normalize it
+  var data = payload.data;
+  if (!data || typeof data !== 'object') {
+    data = payload;
   }
+
   var hasAny = USER_DATA_TABLES.some(function (table) {
-    return Array.isArray(payload.data[table]) && payload.data[table].length > 0;
+    return Array.isArray(data[table]) && data[table].length > 0;
   });
+
   if (!hasAny) {
     return { ok: false, error: 'Backup contains no budget records.' };
   }
@@ -49,8 +54,14 @@ export function validateBackupPayload(payload) {
 export function summarizeBackup(payload) {
   var counts = {};
   var total = 0;
+
+  // Support both wrapped and raw backup formats
+  var data = (payload && payload.data && typeof payload.data === 'object')
+    ? payload.data
+    : (payload || {});
+
   USER_DATA_TABLES.forEach(function (table) {
-    var n = Array.isArray(payload.data[table]) ? payload.data[table].length : 0;
+    var n = Array.isArray(data[table]) ? data[table].length : 0;
     counts[table] = n;
     total += n;
   });
@@ -68,8 +79,13 @@ export function restoreUserBackup(userId, payload) {
 
   var db = getDatabase();
 
+  // Support both wrapped and raw backup formats
+  var data = (payload && payload.data && typeof payload.data === 'object')
+    ? payload.data
+    : payload;
+
   USER_DATA_TABLES.forEach(function (table) {
-    var incoming = (payload.data[table] || []).map(function (row) {
+    var incoming = (data[table] || []).map(function (row) {
       return Object.assign({}, row, { user_id: userId });
     });
     var others = (db[table] || []).filter(function (row) {
@@ -100,7 +116,14 @@ export function formatBackupDate(iso) {
 
 export function downloadBackupFile(backup) {
   var json = JSON.stringify(backup, null, 2);
-  var stamp = (backup.exportedAt || new Date().toISOString()).slice(0, 10);
+
+  // Use LOCAL date (not UTC) so the filename matches the user's timezone.
+  // e.g. exporting at 07:30 +08:00 would give 2026-05-21 in UTC but 2026-05-22 locally.
+  var exportDate = backup.exportedAt ? new Date(backup.exportedAt) : new Date();
+  var yyyy = exportDate.getFullYear();
+  var mm = String(exportDate.getMonth() + 1).padStart(2, '0');
+  var dd = String(exportDate.getDate()).padStart(2, '0');
+  var stamp = yyyy + '-' + mm + '-' + dd;
   var filename = 'budget-wise-backup-' + stamp + '.json';
 
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -109,8 +132,13 @@ export function downloadBackupFile(backup) {
     var link = document.createElement('a');
     link.href = url;
     link.download = filename;
+    // Must be in the DOM for Android WebView (Capacitor) to trigger the download.
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+    // Delay revocation so the browser has time to start the download.
+    setTimeout(function () { URL.revokeObjectURL(url); }, 200);
     return Promise.resolve({ method: 'download', filename: filename });
   }
 

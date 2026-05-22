@@ -8,6 +8,8 @@ import { useUser } from '../contexts/UserContext';
 import { formatCurrency, getCurrentMonthStr, getMonthStr } from '../utils/helpers';
 import { buildMonthlyInsight, getLast6Months, MONTH_LABELS } from '../utils/monthlyInsights';
 import { buildEnvelopeSpendingForMonth } from '../utils/envelopeBudget';
+import { getStoredAccountsList, buildAccountsWithBalances } from '../utils/accountBalances';
+import { parseUserEnvelopes } from '../utils/envelopeGuards';
 import TrialCountdownBanner from '../components/TrialCountdownBanner';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -42,20 +44,17 @@ const StatisticsScreen = function() {
   var curMonth = getCurrentMonthStr();
 
   var envelopes = useMemo(function() {
-    if (userSettings && userSettings.envelopes) {
-      var raw = typeof userSettings.envelopes === 'string' ? JSON.parse(userSettings.envelopes) : userSettings.envelopes;
-      return Array.isArray(raw) ? raw : [];
-    }
-    return [];
+    return parseUserEnvelopes(userSettings);
   }, [userSettings]);
 
   var accounts = useMemo(function() {
-    if (userSettings && userSettings.accounts) {
-      var raw = typeof userSettings.accounts === 'string' ? JSON.parse(userSettings.accounts) : userSettings.accounts;
-      return Array.isArray(raw) ? raw : [];
-    }
-    return [];
-  }, [userSettings]);
+    return buildAccountsWithBalances({
+      userSettings: userSettings,
+      userHistory: userHistory,
+      oneTimeExpenses: userOneTime,
+      curMonth: curMonth
+    });
+  }, [userSettings, userHistory, userOneTime, curMonth]);
 
   var totalStartingBalances = useMemo(function() {
     return accounts.reduce(function(sum, acc) { return sum + (parseFloat(acc.starting_balance) || 0); }, 0);
@@ -86,7 +85,7 @@ const StatisticsScreen = function() {
       var name = 'Unknown Source';
       if (src) name = src.name;
       else if (key === 'unlinked') name = 'Unlinked Source';
-      else if (key === 'Income') name = 'Wallet Top-up';
+      else if (key === 'Income') name = 'Other Income';
       
       return {
         id: key,
@@ -163,7 +162,11 @@ const StatisticsScreen = function() {
   var maxEnvSpent = envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1;
   var savings = totalMonthlyIncome - totalMonthSpent;
   var savingsRate = totalMonthlyIncome > 0 ? Math.round((savings / totalMonthlyIncome) * 100) : 0;
-  var spendPct = totalMonthlyIncome > 0 ? Math.min(100, Math.round((totalMonthSpent / totalMonthlyIncome) * 100)) : 0;
+
+  var dailyAvg = useMemo(function() {
+    var day = new Date().getDate();
+    return totalMonthSpent / day;
+  }, [totalMonthSpent]);
 
   var [selectedEnvIndex, setSelectedEnvIndex] = useState(null);
   var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
@@ -354,8 +357,8 @@ const StatisticsScreen = function() {
 
     // Header
     React.createElement(View, { style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 28, paddingHorizontal: 20 } },
-      React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Statistics'),
-      React.createElement(Text, { style: { color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 } }, 'Insights for ' + (MONTH_LABELS[new Date().getMonth()] || '') + ' ' + new Date().getFullYear())
+      React.createElement(Text, { style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Statistics'),
+      React.createElement(Text, { style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, 'Insights for ' + (MONTH_LABELS[new Date().getMonth()] || '') + ' ' + new Date().getFullYear())
     ),
 
     React.createElement(ScrollView, { style: { flex: 1 }, contentContainerStyle: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: scrollBottomPadding } },
@@ -383,8 +386,8 @@ const StatisticsScreen = function() {
           <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
             <MaterialIcons name="account-balance-wallet" size={18} color={theme.colors.primary} />
           </View>
-          <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary }}>{formatCurrency(totalMonthlyIncome)}</Text>
-          <Text style={{ fontSize: 11, color: '#92400E', marginTop: 2 }}>Income</Text>
+          <Text style={{ ...theme.typography.subtitle, color: theme.colors.textPrimary }}>{formatCurrency(totalMonthlyIncome)}</Text>
+          <Text style={{ ...theme.typography.caption, color: '#92400E', marginTop: 2 }}>Income</Text>
         </TouchableOpacity>
 
         <TouchableOpacity activeOpacity={0.8} onPress={handleSpentInfo} style={{ flex: 1, backgroundColor: '#FEE2E2', borderRadius: 14, padding: 14, position: 'relative' }}>
@@ -394,8 +397,8 @@ const StatisticsScreen = function() {
           <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
             <MaterialIcons name="shopping-cart" size={18} color="#DC2626" />
           </View>
-          <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#DC2626' }}>{formatCurrency(totalMonthSpent)}</Text>
-          <Text style={{ fontSize: 11, color: '#991B1B', marginTop: 2 }}>Spent</Text>
+          <Text style={{ ...theme.typography.subtitle, color: '#DC2626' }}>{formatCurrency(totalMonthSpent)}</Text>
+          <Text style={{ ...theme.typography.caption, color: '#991B1B', marginTop: 2 }}>Spent</Text>
         </TouchableOpacity>
 
         <TouchableOpacity activeOpacity={0.8} onPress={handleSavedInfo} style={{ flex: 1, backgroundColor: savings >= 0 ? '#DCFCE7' : '#FEE2E2', borderRadius: 14, padding: 14, position: 'relative' }}>
@@ -405,8 +408,8 @@ const StatisticsScreen = function() {
           <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
             <MaterialIcons name="savings" size={18} color={savings >= 0 ? '#16A34A' : '#DC2626'} />
           </View>
-          <Text style={{ fontSize: 17, fontWeight: 'bold', color: savings >= 0 ? '#16A34A' : '#DC2626' }}>{formatCurrency(Math.abs(savings))}</Text>
-          <Text style={{ fontSize: 11, color: savings >= 0 ? '#14532D' : '#991B1B', marginTop: 2 }}>{savings >= 0 ? 'Saved' : 'Over budget'}</Text>
+          <Text style={{ ...theme.typography.subtitle, color: savings >= 0 ? '#16A34A' : '#DC2626' }}>{formatCurrency(Math.abs(savings))}</Text>
+          <Text style={{ ...theme.typography.caption, color: savings >= 0 ? '#14532D' : '#991B1B', marginTop: 2 }}>{savings >= 0 ? 'Saved' : 'Over budget'}</Text>
         </TouchableOpacity>
       </View>,
 
@@ -417,16 +420,16 @@ const StatisticsScreen = function() {
             React.createElement(MaterialIcons, { name: 'trending-up', size: 22, color: '#2563EB' })
           ),
           React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Income This Month'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2, lineHeight: 18 } }, 'Actual income recorded in the current month.')
+            React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary } }, 'Income This Month'),
+            React.createElement(Text, { style: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: 2 } }, 'Actual income recorded in the current month.')
           )
         ),
-        React.createElement(Text, { style: { fontSize: 28, fontWeight: 'bold', color: theme.colors.primary, marginTop: 4 } }, formatCurrency(totalMonthlyIncome))
+        React.createElement(Text, { style: { ...theme.typography.h2, color: theme.colors.primary, marginTop: 4 } }, formatCurrency(totalMonthlyIncome))
       ),
 
       // ── Income by Source ─────────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
-        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Income by Source'),
+        React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary, marginBottom: 14 } }, 'Income by Source'),
         incomeBySourceWithPercent.length === 0
           ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No income transactions recorded this month.')
           : incomeBySourceWithPercent.map(function(src) {
@@ -443,9 +446,25 @@ const StatisticsScreen = function() {
             })
       ),
 
+      // ── Wallets & Accounts Summary ───────────────────────────────────────
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
+        React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary, marginBottom: 14 } }, 'Wallets & Accounts'),
+        accounts.length === 0
+          ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No accounts found.')
+          : accounts.map(function(acc, idx) {
+              return React.createElement(View, { key: acc.id, style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: idx < accounts.length - 1 ? 1 : 0, borderBottomColor: theme.colors.border } },
+                React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+                  React.createElement(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: acc.color || theme.colors.primary, marginRight: 8 } }),
+                  React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textPrimary } }, acc.name)
+                ),
+                React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.textPrimary } }, formatCurrency(acc.balance))
+              );
+            })
+      ),
+
       // ── Deposits by Account ───────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
-        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Deposits by Account'),
+        React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary, marginBottom: 14 } }, 'Deposits by Account'),
         incomeReceivedByAccount.length === 0
           ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No account deposits recorded this month.')
           : incomeReceivedByAccount.map(function(acc, idx) {
@@ -458,7 +477,7 @@ const StatisticsScreen = function() {
 
       // ── Recent Income Activity ───────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
-        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 14 } }, 'Recent Income Activity'),
+        React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary, marginBottom: 14 } }, 'Recent Income Activity'),
         recentIncomeActivity.length === 0
           ? React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'No income transactions yet.')
           : recentIncomeActivity.map(function(item) {
@@ -477,38 +496,33 @@ const StatisticsScreen = function() {
             })
       ),
 
-      // ── Savings rate card ─────────────────────────────────────────────────
+      // ── Daily Average Card ────────────────────────────────────────────────
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 } },
         React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 } },
           <TouchableOpacity onPress={() => setInfoModalConfig({
               visible: true,
-              title: 'Budget Used',
+              title: 'Daily Spending Average',
               content: (
                 <View>
                   <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 12, lineHeight: 22 }}>
-                    This calculates the percentage of your total monthly income that has already been spent.
+                    This is your total spending this month divided by the number of days passed so far.
                   </Text>
-                  <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
-                    <MaterialIcons name="lightbulb" size={20} color="#F59E0B" style={{ marginRight: 10 }} />
-                    <Text style={{ fontSize: 13, color: '#B45309', fontWeight: 'bold', flex: 1 }}>
-                      Aim to keep this under 80% to ensure you have room for savings!
+                  <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+                    <MaterialIcons name="speed" size={20} color="#3B82F6" style={{ marginRight: 10 }} />
+                    <Text style={{ fontSize: 13, color: '#1D4ED8', fontWeight: 'bold', flex: 1 }}>
+                      Knowing your daily pace helps you decide if you can afford that extra treat today!
                     </Text>
                   </View>
                 </View>
               )
             })} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>Budget Used</Text>
+            <Text style={{ ...theme.typography.subtitle, color: theme.colors.textPrimary, marginRight: 6 }}>Daily Average</Text>
             <MaterialIcons name="info-outline" size={16} color={theme.colors.textSecondary} />
           </TouchableOpacity>,
-          React.createElement(Text, { style: { fontSize: 20, fontWeight: 'bold', color: spendPct >= 90 ? '#DC2626' : theme.colors.primary } }, spendPct + '%')
-        ),
-        React.createElement(View, { style: { height: 10, backgroundColor: theme.colors.border, borderRadius: 5, overflow: 'hidden', marginBottom: 8 } },
-          React.createElement(View, { style: { width: spendPct + '%', height: '100%', backgroundColor: spendPct >= 90 ? '#DC2626' : spendPct >= 70 ? '#F59E0B' : theme.colors.primary, borderRadius: 5 } })
+          React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.primary } }, formatCurrency(dailyAvg))
         ),
         React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } },
-          spendPct >= 90 ? '⚠️  You are near or over your budget!' :
-          spendPct >= 70 ? '💡  You have used over 70% of your income.' :
-          '✅  You are spending within your budget.'
+          'On average, you spend ' + formatCurrency(dailyAvg) + ' every day this month.'
         )
       ),
 
@@ -553,7 +567,7 @@ const StatisticsScreen = function() {
                     }
                   },
                     React.createElement(Text, { numberOfLines: 1, style: { fontSize: 9, color: theme.colors.textSecondary, textTransform: 'uppercase', fontWeight: 'bold', textAlign: 'center', width: 90 } }, centerLabel),
-                    React.createElement(Text, { numberOfLines: 1, style: { fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, marginTop: 2, textAlign: 'center', width: 95 } }, centerValue)
+                    React.createElement(Text, { numberOfLines: 1, style: { ...theme.typography.subtitle, color: theme.colors.textPrimary, marginTop: 2, textAlign: 'center', width: 95 } }, centerValue)
                   )
                 )
               ),
@@ -623,7 +637,7 @@ const StatisticsScreen = function() {
                   </View>
                 )
               })} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>6-Month Trend</Text>
+              <Text style={{ ...theme.typography.subtitle, color: theme.colors.textPrimary, marginRight: 6 }}>6-Month Trend</Text>
               <MaterialIcons name="info-outline" size={16} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           ),
@@ -664,7 +678,7 @@ const StatisticsScreen = function() {
           React.createElement(View, { style: { width: 34, height: 34, borderRadius: 9, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 10 } },
             React.createElement(MaterialIcons, { name: 'payments', size: 18, color: '#10B981' })
           ),
-          React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Money Inserted per Month')
+          React.createElement(Text, { style: { ...theme.typography.subtitle, color: theme.colors.textPrimary } }, 'Money Inserted per Month')
         ),
         React.createElement(View, null,
           monthlyTotals.slice().reverse().map(function(m, i) {

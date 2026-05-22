@@ -6,6 +6,7 @@ import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { formatDate, generateId } from '../utils/helpers';
+import { getDatabase, persistDatabase } from '../platform-hooks';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
 import TrialCountdownBanner from '../components/TrialCountdownBanner';
 import OnboardingModal from '../components/OnboardingModal';
@@ -86,6 +87,16 @@ const SettingsScreen = function(props) {
       Platform.OS === 'web' ? window.alert('PIN must be 6 digits') : Alert.alert('Error', 'PIN must be 6 digits');
       return;
     }
+    // Block if another account already uses this PIN
+    var duplicate = allSettings.find(function (s) {
+      return s.pin_code === newPin && s.user_id !== userId;
+    });
+    if (duplicate) {
+      var msg = 'That PIN is already used by another account. Please choose a different PIN.';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('PIN Already Taken', msg);
+      setNewPin('');
+      return;
+    }
     if (userSettings) {
       runSaveWithFeedback(
         mutateUpdate({ id: userSettings.id, data: { pin_code: newPin } }),
@@ -146,6 +157,53 @@ const SettingsScreen = function(props) {
       .then(function () {
         setBackupBusy(false);
       });
+  };
+
+  var handleRepairData = function () {
+    var msg = "This will attempt to fix 'messy' data by recalculating all wallet balances from your transaction history. No data will be deleted. Continue?";
+    var performRepair = function () {
+      var db = getDatabase();
+      if (!db) return;
+
+      // Force clean numeric fields
+      if (db.user_settings) {
+        db.user_settings = db.user_settings.map(s => ({
+          ...s,
+          monthly_salary: parseFloat(s.monthly_salary) || 0,
+          accounts: (s.accounts || []).map(a => {
+            var sBal = a.starting_balance !== undefined ? a.starting_balance : (a.startingBalance !== undefined ? a.startingBalance : 0);
+            return {
+              ...a,
+              starting_balance: parseFloat(sBal) || 0
+            };
+          }),
+          envelopes: (s.envelopes || []).map(e => ({
+            ...e,
+            assigned: parseFloat(e.assigned) || 0
+          }))
+        }));
+      }
+
+      if (db.expense_history) {
+        db.expense_history = db.expense_history.map(h => ({
+          ...h,
+          amount: parseFloat(h.amount) || 0
+        }));
+      }
+
+      persistDatabase(db);
+      refetch();
+      showAlert('Repair Complete', 'Your balances have been recalculated and sanitized.');
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) performRepair();
+    } else {
+      Alert.alert('Repair & Resync Data', msg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Repair Now', onPress: performRepair }
+      ]);
+    }
   };
 
   var handleImportBackup = function () {
@@ -240,7 +298,7 @@ const SettingsScreen = function(props) {
 
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(251,146,60,0.18)' : '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
             React.createElement(MaterialIcons, { name: 'security', size: 22, color: theme.colors.info })
           ),
           React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Security')
@@ -250,8 +308,8 @@ const SettingsScreen = function(props) {
             React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'App PIN Lock'),
             React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, userSettings?.pin_code ? '6-Digit PIN Enabled' : 'Disabled')
           ),
-          userSettings?.pin_code ? 
-            React.createElement(TouchableOpacity, { onPress: handleRemovePin, style: { backgroundColor: '#FEF2F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
+          userSettings?.pin_code ?
+            React.createElement(TouchableOpacity, { onPress: handleRemovePin, style: { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEF2F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
               React.createElement(Text, { style: { color: theme.colors.error, fontWeight: 'bold', fontSize: 13 } }, 'Remove PIN')
             )
           :
@@ -259,10 +317,20 @@ const SettingsScreen = function(props) {
               React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 } }, pinMode ? 'Cancel' : 'Set PIN')
             )
         ),
-        pinMode && !userSettings?.pin_code ? React.createElement(View, { style: { marginTop: 16, backgroundColor: theme.colors.background, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border } },
-          React.createElement(Text, { style: { fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8 } }, 'Enter 6-digit PIN'),
+        pinMode && !userSettings?.pin_code ? React.createElement(View, { style: { marginTop: 16, backgroundColor: theme.colors.inputBg, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border } },
+          React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.textPrimary, marginBottom: 4 } }, 'Enter 6-digit PIN'),
+          React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 10 } }, 'Must be unique — PINs are shared across all accounts on this device.'),
           React.createElement(View, { style: { flexDirection: 'row', gap: 10 } },
-            React.createElement(TextInput, { value: newPin, onChangeText: setNewPin, placeholder: '123456', keyboardType: 'numeric', maxLength: 6, secureTextEntry: true, style: { flex: 1, backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: theme.colors.textPrimary, letterSpacing: 6 } }),
+            React.createElement(TextInput, {
+              value: newPin,
+              onChangeText: setNewPin,
+              placeholder: '● ● ● ● ● ●',
+              placeholderTextColor: theme.colors.textSecondary,
+              keyboardType: 'numeric',
+              maxLength: 6,
+              secureTextEntry: true,
+              style: { flex: 1, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, color: theme.colors.textPrimary, letterSpacing: 8 }
+            }),
             React.createElement(TouchableOpacity, { onPress: handleSavePin, style: { backgroundColor: theme.colors.info, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' } },
               React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 } }, 'Save')
             )
@@ -332,7 +400,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(TouchableOpacity, {
           onPress: function () { setShowAppTour(true); },
-          style: { padding: 16, flexDirection: 'row', alignItems: 'center' }
+          style: { padding: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border }
         },
           React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
             React.createElement(MaterialIcons, { name: 'school', size: 22, color: theme.colors.primary })
@@ -342,6 +410,19 @@ const SettingsScreen = function(props) {
             React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, 'Envelope budgeting, taps, privacy & quick start')
           ),
           React.createElement(MaterialIcons, { name: 'chevron-right', size: 22, color: theme.colors.textSecondary })
+        ),
+        React.createElement(TouchableOpacity, {
+          onPress: handleRepairData,
+          style: { padding: 16, flexDirection: 'row', alignItems: 'center' }
+        },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
+            React.createElement(MaterialIcons, { name: 'build-circle', size: 22, color: theme.colors.error })
+          ),
+          React.createElement(View, { style: { flex: 1 } },
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Repair & Resync Data'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, 'Recalculate balances and fix "messy" historical data')
+          ),
+          React.createElement(MaterialIcons, { name: 'sync', size: 22, color: theme.colors.textSecondary })
         )
       ),
 
@@ -398,7 +479,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '1.0.0')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '3.0.0')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

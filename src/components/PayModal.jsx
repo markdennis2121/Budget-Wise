@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { formatCurrency, isWithin5Days, isOverdue, getTodayStr, generateId } from '../utils/helpers';
 import SaveSuccessOverlay from './SaveSuccessOverlay';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
+import { triggerImpactHaptic, triggerErrorHaptic, showUndoToast } from '../utils/feedback';
 import { validateEnvelopeForSpend } from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
 
@@ -79,12 +80,14 @@ const PayModal = function(props) {
     if (!expense) return;
     var spendCheck = validateEnvelopeForSpend(userSettings, expense.category);
     if (!spendCheck.ok) {
+      triggerErrorHaptic();
       setErrorMsg(spendCheck.message);
       return;
     }
     var amt = parseFloat(expense.amount) || 0;
     var acc = accounts.find(a => a.id === selectedAccount);
     if (acc && acc.balance < amt) {
+      triggerErrorHaptic();
       setErrorMsg(`Insufficient funds in ${acc.name}. Balance: ₱${acc.balance.toFixed(2)}`);
       return;
     }
@@ -147,15 +150,28 @@ const PayModal = function(props) {
   var cannotPay = !payBlocked.ok;
   
   return (
-    <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop, paddingHorizontal: 20, position: 'relative' }}>
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', position: 'relative' }}>
         <SaveSuccessOverlay visible={showSaveSuccess} theme={themeCtx.theme} message="Paid!" />
-        <View style={{ backgroundColor: cardColor, borderRadius: 20, padding: 24, paddingBottom: insetsBottom + 24 }}>
-          <View style={{ alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: '#FED7AA', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-              <MaterialIcons name="payment" size={30} color={primaryColor} />
-            </View>
+        <View style={{
+          backgroundColor: cardColor,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insetsBottom + 24,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <Text style={{ fontSize: 20, fontWeight: 'bold', color: textPrimary }}>Confirm Payment</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={textSecondary} /></TouchableOpacity>
           </View>
 
           <View style={{ backgroundColor: backgroundColor, borderRadius: 12, padding: 16, marginBottom: 16 }}>
@@ -265,7 +281,7 @@ const PayModal = function(props) {
             </TouchableOpacity>
             
             <TouchableOpacity 
-              onPress={handlePay} 
+              onPress={function() { triggerImpactHaptic('Medium'); handlePay(); }}
               disabled={isLoading || !selectedAccount || cannotPay} 
               style={{ flex: 1, backgroundColor: primaryColor, borderRadius: 12, padding: 14, alignItems: 'center', opacity: cannotPay ? 0.5 : 1 }}
             >

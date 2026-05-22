@@ -18,7 +18,7 @@ const DB_STORAGE_KEYS = [
   'budget_app_db'
 ];
 const DB_SCHEMA_VERSION_KEY = 'budget_tracker_schema_version';
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 const STARTER_ACCOUNTS = [
   { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
@@ -101,6 +101,47 @@ const runVersionedMigrations = (db, fromVersion) => {
       return { ...setting, accounts: accounts };
     });
     version = 4;
+  }
+
+  if (version < 5) {
+    // CRITICAL FIX: Ensure all account IDs are consistent and no balances are NaN
+    db.user_settings = (db.user_settings || []).map(function (setting) {
+      if (setting.accounts && Array.isArray(setting.accounts)) {
+        setting.accounts = setting.accounts.map(function (acc) {
+          // Map any remaining legacy property names
+          var sBal = acc.starting_balance !== undefined ? acc.starting_balance :
+                    (acc.startingBalance !== undefined ? acc.startingBalance : 0);
+          return {
+            ...acc,
+            id: acc.id || ('acc-' + Math.random().toString(36).substr(2, 9)),
+            starting_balance: parseFloat(sBal) || 0,
+            type: acc.type || 'Custom'
+          };
+        });
+      }
+
+      // Fix potential NaN in envelopes
+      if (setting.envelopes && Array.isArray(setting.envelopes)) {
+        setting.envelopes = setting.envelopes.map(function (e) {
+          return {
+            ...e,
+            assigned: parseFloat(e.assigned) || 0
+          };
+        });
+      }
+      return setting;
+    });
+
+    // Ensure history rows have valid numbers
+    db.expense_history = (db.expense_history || []).map(function (h) {
+      return {
+        ...h,
+        amount: parseFloat(h.amount) || 0,
+        account_id: h.account_id || 'unlinked'
+      };
+    });
+
+    version = 5;
   }
 
   return db;
@@ -192,7 +233,9 @@ const sanitizeDb = (db) => {
       accounts = accounts.map((acc, idx) => {
         const id = acc.id || ('acc-' + idx);
         const name = acc.name || 'Wallet';
-        let starting_balance = parseFloat(acc.starting_balance);
+        // Map startingBalance (legacy) to starting_balance
+        let sBal = acc.starting_balance !== undefined ? acc.starting_balance : acc.startingBalance;
+        let starting_balance = parseFloat(sBal);
         if (isNaN(starting_balance) || starting_balance < 0) starting_balance = 0;
         return {
           id,

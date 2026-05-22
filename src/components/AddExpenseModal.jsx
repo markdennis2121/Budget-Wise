@@ -9,6 +9,7 @@ import AmountInput from './AmountInput';
 import SaveSuccessOverlay from './SaveSuccessOverlay';
 import { scheduleBillNotification } from '../utils/notifications';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
+import { triggerImpactHaptic, triggerErrorHaptic, showUndoToast } from '../utils/feedback';
 import {
   parseUserEnvelopes,
   expenseTypeRequiresEnvelope,
@@ -226,6 +227,7 @@ const AddExpenseModal = function (props) {
 
   var handleSave = function () {
     if (expType !== 'transfer' && !expName.trim()) {
+      triggerErrorHaptic();
       setErrorMsg(expType === 'recurring' ? 'Please enter a bill name.' : 'Please enter what you spent on.');
       return;
     }
@@ -234,7 +236,11 @@ const AddExpenseModal = function (props) {
       var evaluated = evaluateAmountExpression(expAmount);
       if (!isNaN(evaluated)) amt = evaluated;
     }
-    if (isNaN(amt) || amt <= 0) { setErrorMsg('Please enter a valid amount.'); return; }
+    if (isNaN(amt) || amt <= 0) {
+      triggerErrorHaptic();
+      setErrorMsg('Please enter a valid amount.');
+      return;
+    }
     setErrorMsg('');
 
     if (expenseTypeRequiresEnvelope(expType)) {
@@ -372,10 +378,26 @@ const AddExpenseModal = function (props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', marginTop: insetsTop, position: 'relative' }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', position: 'relative' }}>
         <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={saveMessage} />
-        <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insetsBottom + 24, maxHeight: '90%' }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <View style={{
+          backgroundColor: theme.colors.card,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: 24,
+          paddingTop: 10,
+          paddingBottom: insetsBottom + 24,
+          maxHeight: '92%',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 10,
+          elevation: 20
+        }}>
+          {/* Bottom Sheet Handle */}
+          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>{typeHelp.modalTitle}</Text>
               <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 3 }}>Tap a tab below to switch type</Text>
@@ -387,7 +409,7 @@ const AddExpenseModal = function (props) {
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 12 }}>
               <TouchableOpacity
-                onPress={() => { if (rawEnvelopes.length > 0) setExpType('one_time'); }}
+                onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('one_time'); }}
                 disabled={rawEnvelopes.length === 0}
                 style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
               >
@@ -395,7 +417,7 @@ const AddExpenseModal = function (props) {
                 <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => { if (rawEnvelopes.length > 0) setExpType('recurring'); }}
+                onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('recurring'); }}
                 disabled={rawEnvelopes.length === 0}
                 style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
               >
@@ -403,7 +425,7 @@ const AddExpenseModal = function (props) {
                 <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setExpType('transfer')}
+                onPress={() => { triggerImpactHaptic('Light'); setExpType('transfer'); }}
                 style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'transfer' ? theme.colors.primary : 'transparent' }}
               >
                 <MaterialIcons name="swap-horiz" size={16} color={expType === 'transfer' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
@@ -597,7 +619,7 @@ const AddExpenseModal = function (props) {
             )}
 
             <TouchableOpacity
-              onPress={handleSave}
+              onPress={function () { triggerImpactHaptic('Medium'); handleSave(); }}
               disabled={transferNeedsWallets}
               style={{ backgroundColor: theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24, opacity: transferNeedsWallets ? 0.5 : 1 }}
             >

@@ -55,10 +55,13 @@ export function runSaveWithFeedback(promise, opts) {
     triggerErrorHaptic();
     if (typeof onError === 'function') {
       onError(err, errorMessage);
-    } else if (Platform.OS === 'web') {
-      window.alert(errorMessage);
     } else {
-      Alert.alert('Save Failed', errorMessage);
+      // Use modern Toast for errors instead of blocking Alerts
+      showUndoToast({
+        message: errorMessage,
+        type: 'error',
+        duration: 4000
+      });
     }
     return Promise.reject(err);
   });

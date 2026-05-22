@@ -114,8 +114,8 @@ const HistoryScreen = function() {
   
   return React.createElement(View, { testID: 'View-58', style: { flex: 1, backgroundColor: theme.colors.background }, componentId: 'history-screen' },
     React.createElement(View, { testID: 'View-59', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 20, paddingHorizontal: 20 }, componentId: 'history-header' },
-      React.createElement(Text, { testID: 'Text-80', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Expense History'),
-      React.createElement(Text, { testID: 'Text-81', style: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 } }, String(filteredHistory.length) + ' records')
+      React.createElement(Text, { testID: 'Text-80', style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Expense History'),
+      React.createElement(Text, { testID: 'Text-81', style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, String(filteredHistory.length) + ' records')
     ),
     React.createElement(View, { testID: 'View-60', style: { backgroundColor: theme.colors.card, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, componentId: 'history-filters' },
       React.createElement(View, { testID: 'View-61', style: { backgroundColor: theme.colors.background, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', marginBottom: 10 } },
@@ -126,7 +126,7 @@ const HistoryScreen = function() {
         })
       ),
       React.createElement(View, { style: { marginBottom: 10 } },
-        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6, fontWeight: '700' } }, 'Type'),
+        React.createElement(Text, { style: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: 6 } }, 'Type'),
         React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial', marginBottom: 10 } },
           ['All','Recurring','One-Time','Income'].map(function(t) {
             var count = t === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.type === t).length;
@@ -143,7 +143,7 @@ const HistoryScreen = function() {
         )
       ),
       React.createElement(View, null,
-        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6, fontWeight: '700' } }, 'Status'),
+        React.createElement(Text, { style: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: 6 } }, 'Status'),
         React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', onPress: function() { setStatusDropdownVisible(true); },
           style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background }
         },

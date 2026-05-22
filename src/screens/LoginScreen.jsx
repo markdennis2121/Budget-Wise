@@ -11,6 +11,15 @@ import logoImg from '../assets/logo.png';
 
 const PIN_LENGTH = 6;
 
+// Persist the last-logged-in user across logouts so PIN/biometric targets the right account.
+const LAST_PIN_USER_KEY = 'penny_last_user_id';
+var getLastPinUserId = function () {
+  try { return localStorage.getItem(LAST_PIN_USER_KEY) || null; } catch (e) { return null; }
+};
+var saveLastPinUserId = function (id) {
+  try { if (id) localStorage.setItem(LAST_PIN_USER_KEY, id); } catch (e) {} 
+};
+
 const LoginScreen = function (props) {
   var navigation = props.navigation;
   var route = props.route;
@@ -36,12 +45,31 @@ const LoginScreen = function (props) {
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
 
-  // Find any user who has a PIN set
-  var pinEntry = allUsers.reduce(function (found, u) {
-    if (found) return found;
+  // Build the full list of all users that have a PIN set.
+  // Used for PIN matching (any account's PIN unlocks that account).
+  var allPinEntries = allUsers.reduce(function (acc, u) {
     var s = allSettings.find(function (st) { return st.user_id === u.id && st.pin_code; });
-    return s ? { user: u, pinCode: s.pin_code, biometricsEnabled: s.biometrics_enabled } : null;
-  }, null);
+    if (s) acc.push({ user: u, pinCode: s.pin_code, biometricsEnabled: s.biometrics_enabled });
+    return acc;
+  }, []);
+
+  // pinEntry: used ONLY for biometrics — targets the last-logged-in user.
+  // Falls back to the first account that has biometrics enabled.
+  var lastUserId = getLastPinUserId();
+  var pinEntry = (function () {
+    if (lastUserId) {
+      var lastEntry = allPinEntries.find(function (e) { return e.user.id === lastUserId; });
+      if (lastEntry) return lastEntry;
+    }
+    // Fallback: first account that has biometrics enabled
+    var bioEntry = allPinEntries.find(function (e) { return e.biometricsEnabled; });
+    if (bioEntry) return bioEntry;
+    // Last resort: first account with any PIN
+    return allPinEntries[0] || null;
+  }());
+
+  // Whether the PIN button should be shown (at least one account has a PIN)
+  var hasPinAccount = allPinEntries.length > 0;
 
   var triggerModalBiometrics = async function () {
     try {
@@ -55,6 +83,7 @@ const LoginScreen = function (props) {
         if (pinEntry) {
           setShowPinModal(false);
           setPin('');
+          saveLastPinUserId(pinEntry.user.id);
           userCtx.setCurrentUser(pinEntry.user);
           navigation.replace('MainApp');
         }
@@ -73,14 +102,17 @@ const LoginScreen = function (props) {
     }
   }, [showPinModal]);
 
-  // Handle PIN digit entry
+  // Handle PIN digit entry — scan ALL accounts for a matching PIN.
+  // This allows each account's unique PIN to unlock only that account.
   useEffect(function () {
     if (!showPinModal) return;
     if (pin.length === PIN_LENGTH) {
-      if (pinEntry && pin === pinEntry.pinCode) {
+      var matched = allPinEntries.find(function (e) { return e.pinCode === pin; });
+      if (matched) {
         setShowPinModal(false);
         setPin('');
-        userCtx.setCurrentUser(pinEntry.user);
+        saveLastPinUserId(matched.user.id);
+        userCtx.setCurrentUser(matched.user);
         navigation.replace('MainApp');
       } else {
         setPinError(true);
@@ -88,7 +120,7 @@ const LoginScreen = function (props) {
         setTimeout(function () { setPin(''); setPinError(false); }, 500);
       }
     }
-  }, [pin, showPinModal]);
+  }, [pin, showPinModal, allPinEntries]);
 
   var handlePinPress = function (num) {
     if (pin.length < PIN_LENGTH) { setPin(function (p) { return p + num; }); setPinError(false); }
@@ -110,6 +142,7 @@ const LoginScreen = function (props) {
     setTimeout(function () {
       var found = allUsers.find(function (u) { return u.email === email.trim().toLowerCase() && u.password === password; });
       if (found) {
+        saveLastPinUserId(found.id); // Remember this user for next PIN/biometric prompt
         userCtx.setCurrentUser(found);
         navigation.replace('MainApp');
       } else {
@@ -178,8 +211,8 @@ const LoginScreen = function (props) {
             React.createElement(Text, { testID: 'Text-14', style: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' } }, 'Sign In')
         ),
 
-        // PIN option — only show if any user has a PIN
-        pinEntry ? React.createElement(TouchableOpacity, {
+        // PIN option — show if ANY account has a PIN set
+        hasPinAccount ? React.createElement(TouchableOpacity, {
           onPress: function () { setShowPinModal(true); setPin(''); setPinError(false); },
           style: { marginTop: 16, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
           componentId: 'login-pin-btn'
@@ -209,7 +242,7 @@ const LoginScreen = function (props) {
           React.createElement(View, { style: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, marginBottom: 24 } }),
 
           React.createElement(Text, { style: { fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 } }, 'Enter your PIN'),
-          React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 24 } }, pinEntry ? pinEntry.user.name : ''),
+          React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 24 } }, 'Each account\'s PIN is unique'),
 
           // PIN dots
           React.createElement(View, { style: { flexDirection: 'row', gap: 10, marginBottom: 8 } },
