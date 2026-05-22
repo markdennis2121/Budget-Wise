@@ -35,12 +35,14 @@ const StatisticsScreen = function() {
   var recurringQuery = useQuery('recurring_expenses');
   var userRecurring = (recurringQuery.data || []).filter(function(r) { return r.user_id === userId; });
 
+  var historyQuery = useQuery('expense_history');
+  var userHistory = useMemo(function() {
+    return (historyQuery.data || []).filter(function(h) { return h.user_id === userId; });
+  }, [historyQuery.data, userId]);
+
   var userOneTime = useMemo(function() {
     return userHistory.filter(function(h) { return h.expense_type === 'One-Time'; });
   }, [userHistory]);
-
-  var historyQuery = useQuery('expense_history');
-  var userHistory = (historyQuery.data || []).filter(function(h) { return h.user_id === userId; });
 
   var curMonth = getCurrentMonthStr();
 
@@ -51,11 +53,9 @@ const StatisticsScreen = function() {
   var accounts = useMemo(function() {
     return buildAccountsWithBalances({
       userSettings: userSettings,
-      userHistory: userHistory,
-      oneTimeExpenses: userOneTime,
-      curMonth: curMonth
+      userHistory: userHistory
     });
-  }, [userSettings, userHistory, userOneTime, curMonth]);
+  }, [userSettings, userHistory]);
 
   var totalStartingBalances = useMemo(function() {
     return accounts.reduce(function(sum, acc) { return sum + (parseFloat(acc.starting_balance) || 0); }, 0);

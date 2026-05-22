@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated } from 'react-native';
+import { View, Text, Animated, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+
+const IS_WEB = Platform.OS === 'web';
 
 const SaveSuccessOverlay = function ({ visible, message, theme }) {
   var scale = useRef(new Animated.Value(0)).current;
@@ -13,9 +15,9 @@ const SaveSuccessOverlay = function ({ visible, message, theme }) {
     ringScale.setValue(0.6);
     opacity.setValue(0);
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.spring(scale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.spring(ringScale, { toValue: 1, friction: 6, tension: 100, useNativeDriver: Platform.OS !== 'web' })
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: !IS_WEB }),
+      Animated.spring(scale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: !IS_WEB }),
+      Animated.spring(ringScale, { toValue: 1, friction: 6, tension: 100, useNativeDriver: !IS_WEB })
     ]).start();
   }, [visible, scale, ringScale, opacity]);
 

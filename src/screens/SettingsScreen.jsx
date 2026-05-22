@@ -12,6 +12,8 @@ import TrialCountdownBanner from '../components/TrialCountdownBanner';
 import OnboardingModal from '../components/OnboardingModal';
 import { BETA_EXPIRATION_DATE } from '../utils/trial';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
+import { NativeBiometric } from 'capacitor-native-biometric';
+import { Capacitor } from '@capacitor/core';
 import {
   buildUserBackup,
   restoreUserBackup,
@@ -148,11 +150,16 @@ const SettingsScreen = function(props) {
     var backup = buildUserBackup(userId, currentUser);
     downloadBackupFile(backup)
       .then(function (result) {
-        setBackupNote('Saved ' + (result.filename || 'backup file') + ' to your device.');
+        if (result.method === 'share') {
+          setBackupNote('Backup shared successfully.');
+        } else {
+          setBackupNote('Saved ' + (result.filename || 'backup file') + ' to your device.');
+        }
       })
-      .catch(function () {
+      .catch(function (err) {
+        // Fallback for mobile if sharing fails or web if download fails
         return copyBackupToClipboard(backup).then(function () {
-          setBackupNote('Backup copied to clipboard. Paste it into Notes or email to save.');
+          setBackupNote('Backup copied to clipboard instead. Paste it into Notes or email to save.');
         });
       })
       .catch(function (err) {
@@ -271,6 +278,32 @@ const SettingsScreen = function(props) {
     }
   };
   
+  var handleToggleBiometrics = async () => {
+    // Check if we are in a real native app environment
+    var isNative = Capacitor.isNativePlatform();
+
+    if (!isNative && Platform.OS === 'web') {
+      showAlert('Not Supported', 'Biometrics are only available on the mobile app.');
+      return;
+    }
+    try {
+      const result = await NativeBiometric.isAvailable();
+      if (!result.isAvailable) {
+        showAlert('Not Available', 'Biometric authentication is not supported or set up on this device.');
+        return;
+      }
+
+      if (userSettings) {
+        mutateUpdate({
+          id: userSettings.id,
+          data: { biometrics_enabled: !userSettings?.biometrics_enabled }
+        }).then(() => refetch());
+      }
+    } catch (e) {
+      showAlert('Error', 'Could not access biometric settings.');
+    }
+  };
+
   return React.createElement(View, { testID: 'View-71', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'settings-screen' },
     React.createElement(OnboardingModal, {
       visible: showAppTour,
@@ -346,9 +379,7 @@ const SettingsScreen = function(props) {
             React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, 'Fingerprint / Face ID authentication')
           ),
           React.createElement(TouchableOpacity, { 
-            onPress: () => {
-              mutateUpdate({ id: userSettings.id, data: { biometrics_enabled: !userSettings?.biometrics_enabled } }).then(() => refetch());
-            }, 
+            onPress: handleToggleBiometrics,
             style: { width: 50, height: 28, borderRadius: 14, backgroundColor: userSettings?.biometrics_enabled ? theme.colors.primary : theme.colors.border, justifyContent: 'center', padding: 2 } 
           },
             React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: userSettings?.biometrics_enabled ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
@@ -441,7 +472,7 @@ const SettingsScreen = function(props) {
           React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-start' } },
             React.createElement(MaterialIcons, { name: 'info-outline', size: 18, color: '#3B82F6', style: { marginRight: 10, marginTop: 1 } }),
             React.createElement(Text, { style: { flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 } },
-              'Budget-Wise stores your budgets, bills, and transactions locally on this phone or browser. We do not upload them to a cloud server. Export a backup regularly — uninstalling the app or clearing browser data will permanently delete your records.'
+              'Penny stores your budgets, bills, and transactions locally on this phone or browser. We do not upload them to a cloud server. Export a backup regularly — uninstalling the app or clearing browser data will permanently delete your records.'
             )
           )
         ),
@@ -483,7 +514,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '3.1.0')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '4.4.0')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

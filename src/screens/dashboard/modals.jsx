@@ -793,71 +793,62 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   );
 };
 
-const EditAccountModal = function ({ visible, onClose, account, accounts, userSettings, mutateUpdateSettings, onSaved, userId, userHistory }) {
+const EditAccountModal = function ({ visible, onClose, account, accounts, userSettings, envelopeBalances, mutateUpdateSettings, onSaved, userId, userHistory }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var [name, setName] = useState('');
-  var [addAmount, setAddAmount] = useState('');
+  var [mode, setMode] = useState('add'); // 'add' or 'reduce'
+  var [amount, setAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
-  var [editingTopUpId, setEditingTopUpId] = useState(null);
-  var [editTopUpAmount, setEditTopUpAmount] = useState('');
-  var [pendingTopUpEdits, setPendingTopUpEdits] = useState({});
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
-  var updateHistory = useMutation('expense_history', 'update');
-  var mutateUpdateHistory = updateHistory.mutate;
   var deleteHistory = useMutation('expense_history', 'delete');
   var mutateDeleteHistory = deleteHistory.mutate;
-
-  var curMonth = getCurrentMonthStr();
-  var walletIncomeRows = useMemo(function () {
-    if (!account) return [];
-    return getWalletIncomeHistoryForAccount(userHistory, account.id, { curMonth: curMonth });
-  }, [userHistory, account, curMonth]);
 
   useEffect(() => {
     if (visible && account) {
       setName(account.name);
-      setAddAmount('');
-      setEditingTopUpId(null);
-      setEditTopUpAmount('');
-      setPendingTopUpEdits({});
+      setMode('add');
+      setAmount('');
       setShowSaveSuccess(false);
       setSuccessMessage('Saved!');
     }
   }, [visible, account]);
 
-  var envelopeAssignments = useMemo(function () {
-    var envelopes = parseUserEnvelopes(userSettings);
-    return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
-  }, [userSettings]);
-
-  var stageCurrentTopUpEdit = function () {
-    if (!editingTopUpId) return true;
-    var amt = parseAmount(editTopUpAmount);
-    if (isNaN(amt) || amt <= 0) {
-      triggerErrorHaptic();
-      showUndoToast({ message: 'Enter a valid amount greater than zero.', type: 'error' });
-      return false;
-    }
-    setPendingTopUpEdits(function (prev) {
-      var next = { ...prev };
-      next[editingTopUpId] = amt;
-      return next;
-    });
-    setEditingTopUpId(null);
-    setEditTopUpAmount('');
-    return true;
-  };
+  // Total money "promised" to envelopes (liabilities)
+  var totalEnvelopeLiabilities = useMemo(function () {
+    return (envelopeBalances || []).reduce(function (sum, env) {
+      return sum + Math.max(0, parseFloat(env.available) || 0);
+    }, 0);
+  }, [envelopeBalances]);
 
   var handleSave = () => {
     if (!name.trim()) return;
-    if (!stageCurrentTopUpEdit()) return;
 
-    var topUp = parseAmount(addAmount);
-    var stagedEdits = { ...pendingTopUpEdits };
+    var val = parseAmount(amount) || 0;
+    var addVal = mode === 'add' ? val : 0;
+    var redVal = mode === 'reduce' ? val : 0;
+
+    var liveBal = parseFloat(account.balance) || 0;
+    var previewBal = liveBal + addVal - redVal;
+
+    var otherWalletsTotal = (accounts || []).filter(a => a.id !== account.id).reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
+    var projectedTotalCash = otherWalletsTotal + previewBal;
+
+    if (previewBal < 0) {
+      var err = `Cannot save. Resulting balance would be negative (${formatCurrency(previewBal)}).`;
+      Platform.OS === 'web' ? window.alert(err) : Alert.alert('Invalid Balance', err);
+      return;
+    }
+
+    if (projectedTotalCash < totalEnvelopeLiabilities) {
+      var deficit = totalEnvelopeLiabilities - projectedTotalCash;
+      var err = `Budget Integrity Error: You need ${formatCurrency(totalEnvelopeLiabilities)} for your envelopes, but you will only have ${formatCurrency(projectedTotalCash)} cash left. Reduce your envelope budgets by ${formatCurrency(deficit)} first.`;
+      Platform.OS === 'web' ? window.alert(err) : Alert.alert('Budget Integrity', err);
+      return;
+    }
 
     var newList = getStoredAccountsList(userSettings).map(function (a) {
       if (a.id === account.id) {
@@ -874,130 +865,90 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
 
     if (userSettings) {
       var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } }).then(function () {
-        var chain = Promise.resolve();
-        Object.keys(stagedEdits).forEach(function (rowId) {
-          var amt = stagedEdits[rowId];
-          var row = walletIncomeRows.find(function (r) { return r.id === rowId; });
-          if (!row) return;
-          var label = isManualWalletTopUp(row) ? ('Manual Top-up: ' + name.trim()) : row.expense_name;
-          chain = chain.then(function () {
-            return mutateUpdateHistory({ id: rowId, data: { amount: amt, expense_name: label } });
+        var today = new Date().toISOString().split('T')[0];
+        if (val <= 0) return Promise.resolve();
+
+        if (mode === 'add') {
+          return mutateInsertHistory({
+            id: generateId(),
+            user_id: userId,
+            expense_name: 'Balance Correction (Add): ' + name.trim(),
+            amount: val,
+            date: today,
+            expense_type: 'Income',
+            category: 'Income',
+            account_id: account.id,
+            notes: 'Manual balance adjustment'
           });
-        });
-        return chain.then(function () {
-          if (topUp > 0) {
-            var today = new Date().toISOString().split('T')[0];
-            return mutateInsertHistory({
-              id: generateId(),
-              user_id: userId,
-              expense_name: 'Manual Top-up: ' + name.trim(),
-              amount: topUp,
-              date: today,
-              expense_type: 'Income',
-              category: 'Income',
-              account_id: account.id,
-              notes: 'Direct wallet balance top-up'
-            });
-          }
-        });
+        } else {
+          return mutateInsertHistory({
+            id: generateId(),
+            user_id: userId,
+            expense_name: 'Balance Correction (Reduce): ' + name.trim(),
+            amount: val,
+            date: today,
+            expense_type: 'One-Time',
+            category: 'Adjustment',
+            account_id: account.id,
+            notes: 'Manual balance adjustment'
+          });
+        }
       });
+
       runSaveWithFeedback(savePromise, {
         onClose: onClose,
         onSaved: onSaved,
         setShowSuccess: setShowSaveSuccess,
         setSuccessMessage: setSuccessMessage,
-        message: 'Saved!',
-        errorMessage: 'Could not save wallet changes. Please try again.'
-      }).then(function () {
-        setPendingTopUpEdits({});
+        message: 'Wallet updated!',
+        errorMessage: 'Could not save changes.'
       });
     }
   };
 
   var handleDelete = () => {
-    if (envelopeAssignments > 0) {
-      var blockMsg = 'This wallet cannot be deleted while you have active envelope allocations. Move assigned money back from your envelopes before deleting this account.';
-      if (Platform.OS === 'web') {
-        window.alert(blockMsg);
-      } else {
-        Alert.alert('Cannot delete wallet', blockMsg);
-      }
-      return;
-    }
-
     var performDelete = function () {
       var newList = getStoredAccountsList(userSettings).filter(function (a) { return a.id !== account.id; });
       if (userSettings) {
-        runSaveWithFeedback(
-          mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } }),
-          {
-            onClose: onClose,
-            onSaved: onSaved,
-            setShowSuccess: setShowSaveSuccess,
-            setSuccessMessage: setSuccessMessage,
-            message: 'Deleted!',
-            errorMessage: 'Could not delete wallet. Please try again.'
-          }
-        );
+        var relatedHistory = (userHistory || []).filter(function (h) {
+          return h.account_id === account.id || h.dest_account_id === account.id;
+        });
+        var historyCleanup = relatedHistory.map(function (h) {
+          return mutateDeleteHistory({ id: h.id });
+        });
+        var deletePromise = Promise.all(historyCleanup).then(function () {
+          return mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+        });
+        runSaveWithFeedback(deletePromise, {
+          onClose: onClose,
+          onSaved: onSaved,
+          setShowSuccess: setShowSaveSuccess,
+          setSuccessMessage: setSuccessMessage,
+          message: 'Wallet & History Deleted!',
+          errorMessage: 'Could not delete wallet history.'
+        });
       }
     };
 
-    var msg = `This will remove the "${account.name}" wallet from your account management. Live tracking for transactions tied to it will fallback.`;
-
+    var msg = `Deleting "${account.name}" will PERMANENTLY DELETE all linked spending and income history. Total cash will be updated. Continue?`;
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) {
-        performDelete();
-      }
+      if (window.confirm(msg)) performDelete();
     } else {
-      Alert.alert(
-        'Delete Wallet/Account',
-        msg,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Delete', style: 'destructive', onPress: performDelete }
-        ]
-      );
-    }
-  };
-
-  var handleStartEditTopUp = function (row) {
-    setEditingTopUpId(row.id);
-    setEditTopUpAmount(formatAmountForEdit(row.amount));
-  };
-
-  var handleDeleteTopUp = function (row) {
-    var amt = formatCurrency(parseFloat(row.amount) || 0);
-    var msg = 'Remove this ' + amt + ' addition? Your wallet balance will go down by that amount.';
-    var doDelete = function () {
-      setPendingTopUpEdits(function (prev) {
-        var next = { ...prev };
-        delete next[row.id];
-        return next;
-      });
-      runSaveWithFeedback(mutateDeleteHistory({ id: row.id }), {
-        onSaved: onSaved,
-        setShowSuccess: setShowSaveSuccess,
-        setSuccessMessage: setSuccessMessage,
-        message: 'Top-up removed!',
-        errorMessage: 'Could not remove top-up. Please try again.'
-      });
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm(msg)) doDelete();
-    } else {
-      Alert.alert('Remove top-up?', msg, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: doDelete }
-      ]);
+      Alert.alert('Delete Wallet & History?', msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete Everything', style: 'destructive', onPress: performDelete }]);
     }
   };
 
   if (!visible || !account) return null;
 
-  var topUp = parseFloat(addAmount) || 0;
-  var liveBal = parseFloat(account.balance);
-  if (isNaN(liveBal)) liveBal = parseFloat(account.starting_balance) || 0;
-  var previewBal = liveBal + topUp;
+  var valInput = parseAmount(amount) || 0;
+  var liveBal = parseFloat(account.balance) || 0;
+  var previewBal = mode === 'add' ? (liveBal + valInput) : (liveBal - valInput);
+
+  var otherWalletsTotal = (accounts || []).filter(a => a.id !== account.id).reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
+  var projectedTotalCash = otherWalletsTotal + previewBal;
+
+  var isNegativeWarning = previewBal < 0;
+  var isIntegrityWarning = projectedTotalCash < totalEnvelopeLiabilities;
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
@@ -1018,92 +969,65 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
           shadowRadius: 10,
           elevation: 20
         }}>
-          {/* Handle */}
           <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet / Account</Text>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ACCOUNT NAME</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Account Name"
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
-          />
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>WALLET NAME</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Account Name"
+              style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 20 }}
+            />
 
-          <View style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(15, 118, 110, 0.15)' }}>
-            <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: 'bold', marginBottom: 2 }}>CURRENT LIVE BALANCE</Text>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{formatCurrency(account.balance || 0)}</Text>
-            <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 4 }}>Live total from this month's income, spending, and transfers.</Text>
-          </View>
+            <View style={{ backgroundColor: (isNegativeWarning || isIntegrityWarning) ? 'rgba(239, 68, 68, 0.08)' : 'rgba(15, 118, 110, 0.08)', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : 'rgba(15, 118, 110, 0.15)' }}>
+              <Text style={{ fontSize: 11, color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.primary, fontWeight: '800', marginBottom: 4, letterSpacing: 0.5 }}>
+                {isNegativeWarning ? 'RESULTING BALANCE (NEGATIVE!)' : (isIntegrityWarning ? 'BUDGET INTEGRITY ERROR' : 'PROJECTED LIVE BALANCE')}
+              </Text>
+              <Text style={{ fontSize: 28, fontWeight: 'bold', color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(previewBal)}</Text>
 
-          {walletIncomeRows.length > 0 ? (
-            <View style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>This month's additions</Text>
-              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 10 }}>Tap edit to fix a wrong amount. Changes apply when you tap Done below.</Text>
-              {walletIncomeRows.map(function (row) {
-                var isEditing = editingTopUpId === row.id;
-                var rowLabel = isManualWalletTopUp(row) ? 'Direct top-up' : (row.expense_name || 'Income');
-                var displayAmt = pendingTopUpEdits[row.id] != null ? pendingTopUpEdits[row.id] : (parseFloat(row.amount) || 0);
-                var hasPending = pendingTopUpEdits[row.id] != null;
-                return (
-                  <View key={row.id} style={{ backgroundColor: theme.colors.background, borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: hasPending ? theme.colors.primary : theme.colors.border }}>
-                    {isEditing ? (
-                      <View>
-                        <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6 }}>{rowLabel} • {formatDate(row.date)}</Text>
-                        <AmountInput value={editTopUpAmount} onChangeText={setEditTopUpAmount} theme={theme} containerStyle={{ marginBottom: 8 }} />
-                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-                          <TouchableOpacity onPress={function () { stageCurrentTopUpEdit(); }} style={{ width: 40, height: 40, backgroundColor: theme.colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-                            <MaterialIcons name="check" size={22} color="#FFFFFF" />
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={function () { setEditingTopUpId(null); setEditTopUpAmount(''); }} style={{ width: 40, height: 40, backgroundColor: theme.colors.border, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
-                            <MaterialIcons name="close" size={22} color={theme.colors.textSecondary} />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>{rowLabel}</Text>
-                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(row.date)}{hasPending ? ' • pending' : ''}</Text>
-                        </View>
-                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: hasPending ? theme.colors.primary : theme.colors.textPrimary, marginRight: 10 }}>+{formatCurrency(displayAmt)}</Text>
-                        <TouchableOpacity onPress={function () { handleStartEditTopUp(row); }} style={{ padding: 6, backgroundColor: '#FFEDD5', borderRadius: 6, marginRight: 6 }}>
-                          <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={function () { handleDeleteTopUp(row); }} style={{ padding: 6, backgroundColor: '#FEF2F2', borderRadius: 6 }}>
-                          <MaterialIcons name="delete-outline" size={16} color={theme.colors.error} />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
+              {isIntegrityWarning && (
+                <Text style={{ fontSize: 12, color: theme.colors.error, marginTop: 8, fontWeight: '600', lineHeight: 18 }}>
+                  Budget Integrity: You need {formatCurrency(totalEnvelopeLiabilities)} for envelopes, but will only have {formatCurrency(projectedTotalCash)} left.
+                </Text>
+              )}
             </View>
-          ) : null}
 
-          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>Add Funds to This Wallet</Text>
-          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>Enter the amount you want to add on top of the current balance. Leave blank if you're only renaming.</Text>
-          <AmountInput value={addAmount} onChangeText={setAddAmount} theme={theme} containerStyle={{ marginBottom: topUp > 0 ? 10 : 20 }} />
+            <View style={{ marginBottom: 20 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <MaterialIcons name="tune" size={16} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>BALANCE ADJUSTMENT</Text>
+              </View>
 
-          {topUp > 0 ? (
-            <View style={{ backgroundColor: '#D1FAE5', borderRadius: 8, padding: 10, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 13, color: '#065F46', fontWeight: '600' }}>Balance after top-up:</Text>
-              <Text style={{ fontSize: 13, color: '#065F46', fontWeight: 'bold' }}>{formatCurrency(previewBal)}</Text>
+              <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
+                <TouchableOpacity onPress={() => setMode('add')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: 8 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD FUNDS</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setMode('reduce')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: 8 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE FUNDS</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>Amount to {mode === 'add' ? 'Deposit' : 'Withdraw'}</Text>
+              <AmountInput value={amount} onChangeText={setAmount} theme={theme} variant="boxed" containerStyle={{ marginBottom: 12 }} placeholder="0.00" />
             </View>
-          ) : null}
           </ScrollView>
 
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            <TouchableOpacity onPress={handleDelete} style={{ flex: 1, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+            <TouchableOpacity onPress={handleDelete} style={{ flex: 1, backgroundColor: theme.isDark ? '#2D1A1A' : '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: 14, paddingVertical: 14, alignItems: 'center' }}>
               <Text style={{ color: theme.colors.error, fontSize: 15, fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} style={{ flex: 2, backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Done</Text>
+            <TouchableOpacity
+              onPress={handleSave}
+              disabled={isNegativeWarning || isIntegrityWarning || !name.trim()}
+              style={{ flex: 2, backgroundColor: (isNegativeWarning || isIntegrityWarning || !name.trim()) ? theme.colors.border : (mode === 'reduce' ? theme.colors.error : theme.colors.primary), borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: (isNegativeWarning || isIntegrityWarning || !name.trim()) ? 0.6 : 1 }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Save Changes</Text>
             </TouchableOpacity>
           </View>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
@@ -1475,15 +1399,7 @@ const EditSalaryModal = function ({ visible, onClose, incomeSources, userSetting
   );
 };
 
-const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts = [], userSettings, userHistory, theme, insetsTop, insetsBottom, onSaved, readyToAssign, totalAvailableMoney, envelopes, envelopeBalances, oneTimeExpenses }) {
-  var [newSourceName, setNewSourceName] = useState('');
-  var [newSourceAmount, setNewSourceAmount] = useState('');
-  var [newSourceAccount, setNewSourceAccount] = useState('');
-  var [editingSourceId, setEditingSourceId] = useState(null);
-  var [editName, setEditName] = useState('');
-  var [editAmount, setEditAmount] = useState('');
-  var [editAccount, setEditAccount] = useState('');
-  
+const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSettings, userHistory, theme, insetsBottom, onSaved, onAddAccount }) {
   // Transaction logging form state
   var [logName, setLogName] = useState('');
   var [logAmount, setLogAmount] = useState('');
@@ -1493,9 +1409,6 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   // Success messages / overlay states
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
-  
-  // Collapsible configuration state
-  var [showConfigTemplates, setShowConfigTemplates] = useState(false);
 
   // Recent Incomes Editing State
   var [editingTxnId, setEditingTxnId] = useState(null);
@@ -1504,8 +1417,6 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   var [editTxnAccount, setEditTxnAccount] = useState('');
   var [editTxnDate, setEditTxnDate] = useState('');
 
-  var updateSettings = useMutation('user_settings', 'update');
-  var mutateUpdate = updateSettings.mutate;
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
   var updateHistory = useMutation('expense_history', 'update');
@@ -1514,35 +1425,18 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   var mutateDeleteHistory = deleteHistory.mutate;
   
   var userId = userSettings ? (userSettings.user_id || userSettings.id) : '';
-  var budgetCommitments = useMemo(function () {
-    return computeBudgetCommitments(envelopes, envelopeBalances, oneTimeExpenses, userHistory, getCurrentMonthStr());
-  }, [envelopes, envelopeBalances, oneTimeExpenses, userHistory]);
-
-  var incomeGuardBase = useMemo(function () {
-    return {
-      readyToAssign: readyToAssign,
-      totalAvailableMoney: totalAvailableMoney,
-      envelopes: envelopes,
-      envelopeBalances: envelopeBalances,
-      oneTimeExpenses: oneTimeExpenses,
-      userHistory: userHistory,
-      commitments: budgetCommitments
-    };
-  }, [readyToAssign, totalAvailableMoney, envelopes, envelopeBalances, oneTimeExpenses, userHistory, budgetCommitments]);
 
   useEffect(() => {
     if (visible) {
-      setNewSourceAccount(accounts[0] ? accounts[0].id : 'unlinked');
       setLogAccount(accounts[0] ? accounts[0].id : 'unlinked');
       setLogDate(getTodayStr());
       setLogName('');
       setLogAmount('');
       setShowSaveSuccess(false);
       setSuccessMessage('Saved!');
-      setEditingSourceId(null);
       setEditingTxnId(null);
     }
-  }, [visible]);
+  }, [visible, accounts]);
 
   var handleSaveLog = function () {
     if (!logName.trim()) {
@@ -1614,25 +1508,6 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
       return;
     }
 
-    var txn = (userHistory || []).find(function (h) { return h.id === txnId; });
-    var txnGuard = validateIncomeTransactionEdit({
-      transaction: txn,
-      newAmount: amt,
-      readyToAssign: incomeGuardBase.readyToAssign,
-      totalAvailableMoney: incomeGuardBase.totalAvailableMoney,
-      envelopes: incomeGuardBase.envelopes,
-      envelopeBalances: incomeGuardBase.envelopeBalances,
-      oneTimeExpenses: incomeGuardBase.oneTimeExpenses,
-      userHistory: incomeGuardBase.userHistory,
-      commitments: incomeGuardBase.commitments
-    });
-    if (!txnGuard.ok) {
-      Platform.OS === 'web'
-        ? window.alert(txnGuard.message)
-        : Alert.alert('Cannot Update Income', txnGuard.message);
-      return;
-    }
-
     runSaveWithFeedback(
       mutateUpdateHistory({ id: txnId, data: { expense_name: editTxnName.trim(), amount: amt, account_id: editTxnAccount, date: editTxnDate } }),
       {
@@ -1648,24 +1523,6 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
   };
 
   var handleDeleteTxn = function (txnId) {
-    var txn = (userHistory || []).find(function (h) { return h.id === txnId; });
-    var txnGuard = validateIncomeTransactionDelete({
-      transaction: txn,
-      readyToAssign: incomeGuardBase.readyToAssign,
-      totalAvailableMoney: incomeGuardBase.totalAvailableMoney,
-      envelopes: incomeGuardBase.envelopes,
-      envelopeBalances: incomeGuardBase.envelopeBalances,
-      oneTimeExpenses: incomeGuardBase.oneTimeExpenses,
-      userHistory: incomeGuardBase.userHistory,
-      commitments: incomeGuardBase.commitments
-    });
-    if (!txnGuard.ok) {
-      Platform.OS === 'web'
-        ? window.alert(txnGuard.message)
-        : Alert.alert('Cannot Delete Income', txnGuard.message);
-      return;
-    }
-
     runSaveWithFeedback(
       mutateDeleteHistory({ id: txnId }),
       {
@@ -1678,150 +1535,9 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
     );
   };
 
-  var handleAddSource = function () {
-    if (!newSourceName.trim()) {
-      Platform.OS === 'web' ? window.alert('Please enter template name.') : Alert.alert('Error', 'Please enter template name.');
-      return;
-    }
-    var amt = parseAmount(newSourceAmount);
-    if (isNaN(amt) || amt < 0) {
-      Platform.OS === 'web' ? window.alert('Please enter a valid amount.') : Alert.alert('Error', 'Please enter a valid amount.');
-      return;
-    }
-    var linkedAccount = newSourceAccount && newSourceAccount !== 'unlinked' ? newSourceAccount : (accounts[0] ? accounts[0].id : 'unlinked');
-    var newSrc = {
-      id: 'src-' + generateId(),
-      name: newSourceName.trim(),
-      amount: amt,
-      account_id: linkedAccount
-    };
-    var newList = incomeSources.concat(newSrc);
-
-    if (userSettings) {
-      runSaveWithFeedback(
-        mutateUpdate({ id: userSettings.id, data: { income_sources: newList } }),
-        {
-          onSaved: onSaved,
-          setShowSuccess: setShowSaveSuccess,
-          setSuccessMessage: setSuccessMessage,
-          message: 'Template added!',
-          errorMessage: 'Could not add template. Please try again.'
-        }
-      ).then(function () {
-        setNewSourceName('');
-        setNewSourceAmount('');
-        setNewSourceAccount(accounts[0] ? accounts[0].id : 'unlinked');
-      });
-    }
-  };
-
-  var handleDeleteSource = function (id) {
-    var deleteGuard = validateIncomeSourceDelete({
-      incomeSources: incomeSources,
-      sourceId: id,
-      readyToAssign: incomeGuardBase.readyToAssign,
-      totalAvailableMoney: incomeGuardBase.totalAvailableMoney,
-      envelopes: incomeGuardBase.envelopes,
-      envelopeBalances: incomeGuardBase.envelopeBalances,
-      oneTimeExpenses: incomeGuardBase.oneTimeExpenses,
-      userHistory: incomeGuardBase.userHistory,
-      commitments: incomeGuardBase.commitments
-    });
-    if (!deleteGuard.ok) {
-      Platform.OS === 'web'
-        ? window.alert(deleteGuard.message)
-        : Alert.alert('Cannot Delete Income', deleteGuard.message);
-      return;
-    }
-
-    var newList = incomeSources.filter(function (src) { return src.id !== id; });
-    var newMonthlySalary = userSettings ? (userSettings.monthly_salary || 0) : 0;
-    var deletedSource = incomeSources.find(function (src) { return src.id === id; });
-    if (deletedSource && deletedSource.id === 'main-salary') {
-      newMonthlySalary = 0;
-    }
-
-    if (userSettings) {
-      runSaveWithFeedback(
-        mutateUpdate({ id: userSettings.id, data: { income_sources: newList, monthly_salary: newMonthlySalary } }),
-        {
-          onSaved: onSaved,
-          setShowSuccess: setShowSaveSuccess,
-          setSuccessMessage: setSuccessMessage,
-          message: 'Template deleted!',
-          errorMessage: 'Could not delete template. Please try again.'
-        }
-      );
-    }
-  };
-
-  var handleStartEdit = function (src) {
-    setEditingSourceId(src.id);
-    setEditName(src.name);
-    setEditAmount(formatAmountForEdit(src.amount));
-    setEditAccount(src.account_id || (accounts[0] ? accounts[0].id : ''));
-  };
-
-  var handleSaveEdit = function (id) {
-    var amt = parseAmount(editAmount);
-    if (!editName.trim()) {
-      Platform.OS === 'web' ? window.alert('Please enter a template name.') : Alert.alert('Error', 'Please enter a template name.');
-      return;
-    }
-    if (amt < 0) {
-      Platform.OS === 'web' ? window.alert('Please enter a valid amount.') : Alert.alert('Error', 'Please enter a valid amount.');
-      return;
-    }
-
-    var editGuard = validateIncomeSourceAmountEdit({
-      incomeSources: incomeSources,
-      sourceId: id,
-      newAmount: amt,
-      readyToAssign: incomeGuardBase.readyToAssign,
-      totalAvailableMoney: incomeGuardBase.totalAvailableMoney,
-      envelopes: incomeGuardBase.envelopes,
-      envelopeBalances: incomeGuardBase.envelopeBalances,
-      oneTimeExpenses: incomeGuardBase.oneTimeExpenses,
-      userHistory: incomeGuardBase.userHistory,
-      commitments: incomeGuardBase.commitments
-    });
-    if (!editGuard.ok) {
-      Platform.OS === 'web'
-        ? window.alert(editGuard.message)
-        : Alert.alert('Cannot Update Income', editGuard.message);
-      return;
-    }
-
-    var newList = incomeSources.map(function (src) {
-      return src.id === id ? { ...src, name: editName.trim(), amount: amt, account_id: editAccount } : src;
-    });
-
-    var newMonthlySalary = userSettings ? (userSettings.monthly_salary || 0) : 0;
-    var mainSalarySource = newList.find(function (src) { return src.id === 'main-salary'; });
-    if (mainSalarySource) {
-      newMonthlySalary = mainSalarySource.amount;
-    }
-
-    if (userSettings) {
-      runSaveWithFeedback(
-        mutateUpdate({ id: userSettings.id, data: { income_sources: newList, monthly_salary: newMonthlySalary } }),
-        {
-          onSaved: onSaved,
-          setShowSuccess: setShowSaveSuccess,
-          setSuccessMessage: setSuccessMessage,
-          message: 'Template saved!',
-          errorMessage: 'Could not save template changes. Please try again.'
-        }
-      ).then(function () {
-        setEditingSourceId(null);
-        setEditName('');
-        setEditAmount('');
-        setEditAccount('');
-      });
-    }
-  };
-
   if (!visible) return null;
+
+  var hasNoAccounts = accounts.length === 0;
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
@@ -1842,367 +1558,155 @@ const IncomeManagerModal = function ({ visible, onClose, incomeSources, accounts
           shadowRadius: 10,
           elevation: 20
         }}>
-          {/* Handle */}
           <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
 
-          {/* Header */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <View>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Log Income Receipt</Text>
-              <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Record actual money received to update wallet balances.</Text>
+              {!hasNoAccounts && <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Record actual money received to update wallet balances.</Text>}
             </View>
             <TouchableOpacity onPress={onClose} style={{ padding: 4, backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', borderRadius: 12 }}>
               <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+          {hasNoAccounts ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                <MaterialIcons name="account-balance-wallet" size={40} color={theme.colors.primary} />
+              </View>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 12 }}>First, let's create a home for your money.</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 }}>
+                To track income accurately, Penny needs to know where the money is stored (e.g., GCash, Bank, or Physical Cash).
+              </Text>
+              <TouchableOpacity
+                onPress={onAddAccount}
+                style={{ backgroundColor: theme.colors.primary, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, width: '100%', alignItems: 'center', elevation: 4 }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>Add My First Wallet</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DESCRIPTION / SOURCE</Text>
+              <TextInput
+                value={logName}
+                onChangeText={setLogName}
+                placeholder="e.g. Salary Payment, Side Gig, Cash Gift"
+                placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
+                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 }}
+              />
 
-            {/* Income Description / Source Name Input */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DESCRIPTION / SOURCE</Text>
-            <TextInput
-              value={logName}
-              onChangeText={setLogName}
-              placeholder="e.g. Salary Payment, Side Gig, Cash Gift"
-              placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-              style={{
-                backgroundColor: theme.colors.background,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                fontSize: 15,
-                color: theme.colors.textPrimary,
-                marginBottom: 16
-              }}
-            />
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>AMOUNT RECEIVED</Text>
+              <AmountInput
+                value={logAmount}
+                onChangeText={setLogAmount}
+                theme={theme}
+                variant="boxed"
+                fontSize={18}
+                containerStyle={{ marginBottom: 16 }}
+                placeholder="0.00"
+              />
 
-            {/* Amount Input */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>AMOUNT RECEIVED</Text>
-            <AmountInput
-              value={logAmount}
-              onChangeText={setLogAmount}
-              theme={theme}
-              variant="boxed"
-              fontSize={18}
-              containerStyle={{ marginBottom: 16 }}
-              placeholder="0.00"
-            />
-
-            {/* Linked Wallet Selector */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT TO WALLET</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
-              {accounts.map(a => {
-                var isSel = logAccount === a.id;
-                var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
-                var brandColor = a.color || styleInfo.color;
-                return (
-                  <TouchableOpacity
-                    key={a.id}
-                    onPress={() => setLogAccount(a.id)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginRight: 8,
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
-                      borderWidth: 1,
-                      borderColor: isSel ? theme.colors.primary : theme.colors.border
-                    }}
-                  >
-                    <BrandLogo type={a.type} size={16} style={{ marginRight: 8 }} />
-                    <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '700' }}>
-                      {a.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Date Received Picker */}
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE RECEIVED</Text>
-            <DatePickerInput
-              value={logDate}
-              onChange={setLogDate}
-              theme={theme}
-              containerStyle={{ marginBottom: 20 }}
-            />
-
-            {/* Main Log Button */}
-            <TouchableOpacity
-              onPress={handleSaveLog}
-              style={{
-                backgroundColor: theme.colors.primary,
-                borderRadius: 14,
-                paddingVertical: 14,
-                alignItems: 'center',
-                shadowColor: theme.colors.primary,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.25,
-                shadowRadius: 8,
-                elevation: 4,
-                marginBottom: 8
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Log Income Transaction</Text>
-            </TouchableOpacity>
-
-            {/* Recent Logged Income Section */}
-            {recentIncomes.length > 0 && (
-              <View style={{ marginTop: 24 }}>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Recent Logged Income</Text>
-                {recentIncomes.map(function (txn) {
-                  var isEditing = editingTxnId === txn.id;
-                  var isLinked = txn.account_id && txn.account_id !== 'unlinked';
-                  var acc = isLinked ? accounts.find(a => a.id === txn.account_id) : null;
-                  var accName = acc ? acc.name : 'Physical Cash (Unlinked)';
-
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT TO WALLET</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                {accounts.map(a => {
+                  var isSel = logAccount === a.id;
+                  var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
+                  var brandColor = a.color || styleInfo.color;
                   return (
-                    <View key={txn.id} style={{ padding: 14, backgroundColor: theme.colors.background, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12 }}>
-                      {isEditing ? (
-                        <View>
-                          <TextInput
-                            value={editTxnName}
-                            onChangeText={setEditTxnName}
-                            placeholder="Description"
-                            placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-                            style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 10 }}
-                          />
-
-                          <AmountInput
-                            value={editTxnAmount}
-                            onChangeText={setEditTxnAmount}
-                            theme={theme}
-                            variant="boxed"
-                            fontSize={16}
-                            containerStyle={{ marginBottom: 10 }}
-                            placeholder="0.00"
-                          />
-
-                          <DatePickerInput
-                            value={editTxnDate}
-                            onChange={setEditTxnDate}
-                            theme={theme}
-                            containerStyle={{ marginBottom: 10 }}
-                          />
-
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT WALLET</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
-                            {accounts.map(a => {
-                              var isSel = editTxnAccount === a.id;
-                              var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
-                              var brandColor = a.color || styleInfo.color;
-                              return (
-                                <TouchableOpacity key={a.id} onPress={() => setEditTxnAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: isSel ? theme.colors.primary : theme.colors.card, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                                  <BrandLogo type={a.type} size={16} style={{ marginRight: 6 }} />
-                                  <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '600' }}>{a.name}</Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </ScrollView>
-
-                          <View style={{ flexDirection: 'row', gap: 10 }}>
-                            <TouchableOpacity onPress={function () { handleSaveTxnEdit(txn.id); }} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
-                              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>Save Changes</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={function () { setEditingTxnId(null); }} style={{ flex: 1, backgroundColor: theme.colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
-                              <Text style={{ color: theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>Cancel</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ) : (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 }}>{txn.expense_name}</Text>
-                            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.primary, marginBottom: 8 }}>{formatCurrency(txn.amount)}</Text>
-                            
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <View style={{ backgroundColor: theme.isDark ? '#374151' : '#E5E7EB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
-                                <MaterialIcons name="account-balance-wallet" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
-                                {acc ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <BrandLogo type={acc.type} size={12} style={{ marginRight: 4 }} />
-                                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textPrimary }}>{accName}</Text>
-                                  </View>
-                                ) : (
-                                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary }}>{accName}</Text>
-                                )}
-                              </View>
-                              <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{txn.date}</Text>
-                            </View>
-                          </View>
-
-                          <View style={{ flexDirection: 'row', gap: 8, paddingLeft: 12 }}>
-                            <TouchableOpacity onPress={function () { handleStartTxnEdit(txn); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="edit" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={function () { handleDeleteTxn(txn.id); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="delete-outline" size={18} color={theme.colors.error} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      )}
-                    </View>
+                    <TouchableOpacity
+                      key={a.id}
+                      onPress={() => setLogAccount(a.id)}
+                      style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}
+                    >
+                      <BrandLogo type={a.type} size={16} style={{ marginRight: 8 }} />
+                      <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '700' }}>
+                        {a.name} (₱{a.balance})
+                      </Text>
+                    </TouchableOpacity>
                   );
                 })}
-              </View>
-            )}
+              </ScrollView>
 
-            {/* Collapsible Templates Configuration Section */}
-            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 18 }} />
-            
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setShowConfigTemplates(!showConfigTemplates)}
-              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MaterialIcons name="settings" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.textSecondary }}>Manage Income Templates</Text>
-              </View>
-              <MaterialIcons name={showConfigTemplates ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={20} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE RECEIVED</Text>
+              <DatePickerInput value={logDate} onChange={setLogDate} theme={theme} containerStyle={{ marginBottom: 20 }} />
 
-            {showConfigTemplates && (
-              <View style={{ marginTop: 14 }}>
-                {incomeSources.map(function (src) {
-                  var isEditing = editingSourceId === src.id;
-                  var isLinked = src.account_id && src.account_id !== 'unlinked';
-                  var acc = isLinked ? accounts.find(a => a.id === src.account_id) : null;
-                  var accName = acc ? acc.name : 'Physical Cash (Unlinked)';
+              <TouchableOpacity
+                onPress={handleSaveLog}
+                style={{ backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', elevation: 4, marginBottom: 8 }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Log Income Transaction</Text>
+              </TouchableOpacity>
 
-                  return (
-                    <View key={src.id} style={{ padding: 14, backgroundColor: theme.colors.background, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12 }}>
-                      {isEditing ? (
-                        <View>
-                          <TextInput
-                            value={editName}
-                            onChangeText={setEditName}
-                            placeholder="Template Name"
-                            placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-                            style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 10 }}
-                          />
+              {recentIncomes.length > 0 && (
+                <View style={{ marginTop: 24 }}>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Recent Logged Income</Text>
+                  {recentIncomes.map(function (txn) {
+                    var isEditing = editingTxnId === txn.id;
+                    var isLinked = txn.account_id && txn.account_id !== 'unlinked';
+                    var acc = isLinked ? accounts.find(a => a.id === txn.account_id) : null;
+                    var accName = acc ? acc.name : 'Physical Cash (Unlinked)';
 
-                          <AmountInput
-                            value={editAmount}
-                            onChangeText={setEditAmount}
-                            theme={theme}
-                            variant="boxed"
-                            fontSize={16}
-                            containerStyle={{ marginBottom: 10 }}
-                            placeholder="0.00"
-                          />
-
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEFAULT DEPOSIT WALLET</Text>
-                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
-                            {accounts.map(a => {
-                              var isSel = editAccount === a.id;
-                              var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
-                              var brandColor = a.color || styleInfo.color;
-                              return (
-                                <TouchableOpacity key={a.id} onPress={() => setEditAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: isSel ? theme.colors.primary : theme.colors.card, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                                  <BrandLogo type={a.type} size={16} style={{ marginRight: 6 }} />
-                                  <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '600' }}>{a.name}</Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </ScrollView>
-
-                          <View style={{ flexDirection: 'row', gap: 10 }}>
-                            <TouchableOpacity onPress={function () { handleSaveEdit(src.id); }} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
-                              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>Save Changes</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={function () { setEditingSourceId(null); }} style={{ flex: 1, backgroundColor: theme.colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}>
-                              <Text style={{ color: theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>Cancel</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      ) : (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 }}>{src.name}</Text>
-                            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.primary, marginBottom: 8 }}>{formatCurrency(src.amount)}</Text>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <View style={{ backgroundColor: theme.isDark ? '#374151' : '#E5E7EB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center' }}>
-                                <MaterialIcons name="account-balance-wallet" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
-                                {acc ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <BrandLogo type={acc.type} size={12} style={{ marginRight: 4 }} />
-                                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textPrimary }}>{accName}</Text>
-                                  </View>
-                                ) : (
-                                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary }}>{accName}</Text>
-                                )}
-                              </View>
+                    return (
+                      <View key={txn.id} style={{ padding: 14, backgroundColor: theme.colors.background, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12 }}>
+                        {isEditing ? (
+                          <View>
+                            <TextInput
+                              value={editTxnName}
+                              onChangeText={setEditTxnName}
+                              placeholder="Description"
+                              placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
+                              style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 10 }}
+                            />
+                            <AmountInput value={editTxnAmount} onChangeText={setEditTxnAmount} theme={theme} variant="boxed" fontSize={16} containerStyle={{ marginBottom: 10 }} placeholder="0.00" />
+                            <DatePickerInput value={editTxnDate} onChange={setEditTxnDate} theme={theme} containerStyle={{ marginBottom: 10 }} />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT WALLET</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                              {accounts.map(a => {
+                                var isSel = editTxnAccount === a.id;
+                                var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
+                                var brandColor = a.color || styleInfo.color;
+                                return (
+                                  <TouchableOpacity key={a.id} onPress={() => setEditTxnAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: isSel ? theme.colors.primary : theme.colors.card, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
+                                    <BrandLogo type={a.type} size={16} style={{ marginRight: 6 }} />
+                                    <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '600' }}>{a.name}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </ScrollView>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              <TouchableOpacity onPress={function () { handleSaveTxnEdit(txn.id); }} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>Save Changes</Text></TouchableOpacity>
+                              <TouchableOpacity onPress={function () { setEditingTxnId(null); }} style={{ flex: 1, backgroundColor: theme.colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' }}><Text style={{ color: theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>Cancel</Text></TouchableOpacity>
                             </View>
                           </View>
-                          <View style={{ flexDirection: 'row', gap: 8, paddingLeft: 12 }}>
-                            <TouchableOpacity onPress={function () { handleStartEdit(src); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="edit" size={18} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                            {incomeSources.length > 1 && (
-                              <TouchableOpacity onPress={function () { handleDeleteSource(src.id); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}>
-                                <MaterialIcons name="delete-outline" size={18} color={theme.colors.error} />
-                              </TouchableOpacity>
-                            )}
+                        ) : (
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 }}>{txn.expense_name}</Text>
+                              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.primary, marginBottom: 8 }}>{formatCurrency(txn.amount)}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ backgroundColor: theme.isDark ? '#374151' : '#E5E7EB', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+                                  <MaterialIcons name="account-balance-wallet" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
+                                  <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textPrimary }}>{accName}</Text>
+                                </View>
+                                <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}>{txn.date}</Text>
+                              </View>
+                            </View>
+                            <View style={{ flexDirection: 'row', gap: 8, paddingLeft: 12 }}>
+                              <TouchableOpacity onPress={function () { handleStartTxnEdit(txn); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}><MaterialIcons name="edit" size={18} color={theme.colors.primary} /></TouchableOpacity>
+                              <TouchableOpacity onPress={function () { handleDeleteTxn(txn.id); }} style={{ width: 36, height: 36, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}><MaterialIcons name="delete-outline" size={18} color={theme.colors.error} /></TouchableOpacity>
+                            </View>
                           </View>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-
-                {/* Add New Template Form */}
-                <View style={{ marginTop: 8, backgroundColor: theme.colors.card, padding: 14, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border }}>
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Add New Template</Text>
-                  
-                  <TextInput
-                    value={newSourceName}
-                    onChangeText={setNewSourceName}
-                    placeholder="e.g. Salary, Side Gigs, Freelance"
-                    placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-                    style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 12 }}
-                  />
-
-                  <AmountInput
-                    value={newSourceAmount}
-                    onChangeText={setNewSourceAmount}
-                    theme={theme}
-                    variant="boxed"
-                    fontSize={15}
-                    containerStyle={{ marginBottom: 16 }}
-                    placeholder="0.00 (Default Amount)"
-                  />
-
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEFAULT WALLET (OPTIONAL)</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                    {accounts.map(a => {
-                      var isSel = newSourceAccount === a.id;
-                      var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
-                      var brandColor = a.color || styleInfo.color;
-                      return (
-                        <TouchableOpacity key={a.id} onPress={() => setNewSourceAccount(a.id)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: isSel ? theme.colors.primary : theme.colors.card, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                          <BrandLogo type={a.type} size={16} style={{ marginRight: 6 }} />
-                          <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '600' }}>{a.name}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-
-                  <TouchableOpacity onPress={handleAddSource} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center' }}>
-                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Create Template</Text>
-                  </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
-              </View>
-            )}
-          </ScrollView>
-
+              )}
+            </ScrollView>
+          )}
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
-
         </View>
       </View>
     </Modal>

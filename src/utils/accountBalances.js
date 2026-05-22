@@ -45,7 +45,6 @@ export function getStoredAccountsList(userSettings) {
 
 export function buildAccountsWithBalances(opts) {
   opts = opts || {};
-  var curMonth = opts.curMonth;
   var rawList = getStoredAccountsList(opts.userSettings);
 
   var accs = rawList.map(function (a) {
@@ -59,38 +58,34 @@ export function buildAccountsWithBalances(opts) {
     };
   });
 
-
-  (opts.oneTimeExpenses || []).forEach(function (o) {
-    if (o.account_id && o.account_id !== 'unlinked') {
-      var accO = accs.find(function (a) { return a.id === o.account_id; });
-      if (accO) accO.balance -= parseFloat(o.amount) || 0;
-    }
-  });
-
+  // Calculate LIFETIME wallet balance from history (Source of Truth)
+  // Wallets are physical containers of cash; they don't reset every month.
   (opts.userHistory || []).forEach(function (h) {
-    if (!h.account_id || h.account_id === 'unlinked') return;
+    var amt = parseFloat(h.amount) || 0;
+    var accountId = h.account_id;
 
-    if (h.expense_type === 'Recurring') {
-      // Recurring bills only affect balance in the month they are paid
-      if (curMonth && getMonthStr(h.date) !== curMonth) return;
-      var accR = accs.find(function (a) { return a.id === h.account_id; });
-      if (accR) accR.balance -= parseFloat(h.amount) || 0;
-      return;
+    // If a transaction is "unlinked", we default it to the primary Cash Wallet
+    // so that spending ALWAYS reflects in your total available money.
+    if (!accountId || accountId === 'unlinked') {
+      accountId = 'acc-cash';
     }
+
+    var acc = accs.find(function (a) { return a.id === accountId; });
+
+    // Fallback: if 'acc-cash' ID doesn't exist, use the first available wallet
+    if (!acc && accs.length > 0) {
+      acc = accs[0];
+    }
+
+    if (!acc) return;
 
     if (h.expense_type === 'Income') {
-      // Income stays in the wallet until spent, regardless of which month it was earned.
-      var accI = accs.find(function (a) { return a.id === h.account_id; });
-      if (accI) accI.balance += parseFloat(h.amount) || 0;
-      return;
-    }
-
-    if (h.expense_type === 'Transfer' && h.dest_account_id) {
-      // Transfers also persist across months
-      var amt = parseFloat(h.amount) || 0;
-      var srcAcc = accs.find(function (a) { return a.id === h.account_id; });
+      acc.balance += amt;
+    } else if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
+      acc.balance -= amt;
+    } else if (h.expense_type === 'Transfer' && h.dest_account_id) {
       var destAcc = accs.find(function (a) { return a.id === h.dest_account_id; });
-      if (srcAcc) srcAcc.balance -= amt;
+      acc.balance -= amt;
       if (destAcc) destAcc.balance += amt;
     }
   });

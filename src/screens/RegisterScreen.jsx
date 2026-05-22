@@ -49,7 +49,16 @@ const RegisterScreen = function(props) {
     var newUser = { id: newId, email: email.trim().toLowerCase(), password: password, name: name.trim(), created_at: getTodayStr() };
     mutateUser(newUser).then(function() {
       var settingsId = generateId();
-      return mutateSettings({ id: settingsId, user_id: newId, monthly_salary: 0 });
+      // Initialize with explicit empty arrays to prevent picking up global defaults
+      return mutateSettings({
+        id: settingsId,
+        user_id: newId,
+        monthly_salary: 0,
+        envelopes: [],
+        accounts: [],
+        savings: [],
+        accounts_customized: true // Flag as customized so default accounts aren't auto-injected
+      });
     }).then(function() {
       userCtx.setCurrentUser(newUser);
       navigation.replace('MainApp');

@@ -6,10 +6,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { useQuery, useMutation } from 'platform-hooks';
 import { NativeBiometric } from 'capacitor-native-biometric';
+import { Capacitor } from '@capacitor/core';
 import logoImg from '../assets/logo.png';
 
 const PIN_LENGTH = 6;
-const IS_WEB = Platform.OS === 'web';
+const IS_NATIVE = Capacitor.isNativePlatform();
+const IS_WEB = !IS_NATIVE && Platform.OS === 'web';
 
 // Animated PIN dot - Matched to Sign In design
 var PinDot = function (props) {
@@ -76,9 +78,34 @@ var PinLockScreen = function (props) {
   var [error, setError] = useState(false);
 
   var mountAnim = useRef(new Animated.Value(0)).current;
+
+  var handleBiometricAuth = async () => {
+    if (IS_WEB) return;
+    try {
+      const result = await NativeBiometric.isAvailable();
+      if (result.isAvailable && userSettings?.biometrics_enabled) {
+        const verified = await NativeBiometric.verifyIdentity({
+          reason: "Unlock Penny Budget",
+          title: "Biometric Login",
+          subtitle: "Use fingerprint or face to unlock",
+          description: "Verify your identity to access your budget data."
+        });
+        if (verified) {
+          onUnlock();
+        }
+      }
+    } catch (e) {
+      console.error("Biometric error", e);
+    }
+  };
+
   useEffect(() => {
     Animated.timing(mountAnim, { toValue: 1, duration: 400, useNativeDriver: !IS_WEB }).start();
-  }, []);
+    // Auto-trigger biometric on mount if enabled
+    if (userSettings?.biometrics_enabled) {
+      setTimeout(handleBiometricAuth, 500);
+    }
+  }, [userSettings?.biometrics_enabled]);
 
   useEffect(() => {
     if (pin.length === PIN_LENGTH) {
@@ -132,7 +159,16 @@ var PinLockScreen = function (props) {
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary }}>{num}</Text>
               </KeypadButton>
             ))}
-            <View style={{ width: 68, height: 68 }} />
+
+            {/* Biometric trigger button (Fingerprint icon) */}
+            {!IS_WEB && userSettings?.biometrics_enabled ? (
+              <TouchableOpacity onPress={handleBiometricAuth} style={keypadButtonStyle}>
+                <MaterialIcons name="fingerprint" size={32} color={theme.colors.primary} />
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 68, height: 68 }} />
+            )}
+
             <KeypadButton onPress={() => pin.length < PIN_LENGTH && setPin(p => p + '0')} style={keypadButtonStyle}>
               <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary }}>0</Text>
             </KeypadButton>

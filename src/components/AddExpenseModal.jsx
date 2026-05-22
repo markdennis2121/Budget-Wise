@@ -121,10 +121,8 @@ const AddExpenseModal = function (props) {
   var allRecurring = recurringQuery.data || [];
   var recurringExpenses = allRecurring.filter(function (r) { return r.user_id === userId; });
 
-  var oneTimeQuery = useQuery('one_time_expenses');
-  var allOneTime = oneTimeQuery.data || [];
-  var curMonth = getCurrentMonthStr();
-  var oneTimeExpenses = allOneTime.filter(function (o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
+  var historyQuery = useQuery('expense_history');
+  var userHistory = (historyQuery.data || []).filter(function (h) { return h.user_id === userId; });
 
   var accounts = props.accounts || [];
 
@@ -136,27 +134,27 @@ const AddExpenseModal = function (props) {
   var typeHelp = getExpenseHelp(expType);
   var transferNeedsWallets = expType === 'transfer' && accounts.length < 2;
 
-  // Calculate Envelope Balances (only real user envelopes)
+  // Calculate Envelope Balances - MUST match Dashboard logic (Source of Truth: History)
   var envelopes = useMemo(function () {
     var envs = rawEnvelopes;
     var balances = envs.map(e => ({ ...e, assigned: parseFloat(e.assigned) || 0, spent: 0, reserved: 0 }));
 
+    userHistory.forEach(function (h) {
+      if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
+        var env = balances.find(function (e) { return e.id === h.category || e.name === h.category; });
+        if (env) env.spent += (parseFloat(h.amount) || 0);
+      }
+    });
+
     recurringExpenses.forEach(function (r) {
-      if (r.status === 'Paid' || r.status === 'Paid in Advance') {
-        var envPaid = balances.find(function (e) { return e.id === r.category || e.name === r.category; });
-        if (envPaid) envPaid.spent += (parseFloat(r.amount) || 0);
-      } else if (r.status === 'Pending') {
+      if (r.status === 'Pending') {
         var envPending = balances.find(function (e) { return e.id === r.category || e.name === r.category; });
         if (envPending) envPending.reserved += (parseFloat(r.amount) || 0);
       }
     });
-    oneTimeExpenses.forEach(function (o) {
-      var env = balances.find(function (e) { return e.id === o.category || e.name === o.category; });
-      if (env) env.spent += (parseFloat(o.amount) || 0);
-    });
 
     return balances.map(function (e) { return { ...e, available: e.assigned - e.spent - e.reserved }; });
-  }, [rawEnvelopes, recurringExpenses, oneTimeExpenses]);
+  }, [rawEnvelopes, userHistory, recurringExpenses]);
 
   var incomeSources = useMemo(function () {
     if (userSettings && userSettings.income_sources) {
@@ -197,12 +195,16 @@ const AddExpenseModal = function (props) {
   useEffect(function () {
     if (!visible) return;
     if (accounts && accounts.length > 0) {
-      setSelectedAccount(accounts[0].id);
+      // If we currently have 'unlinked' or nothing selected, but accounts have loaded,
+      // pick the first one automatically.
+      if (!selectedAccount || selectedAccount === 'unlinked') {
+        setSelectedAccount(accounts[0].id);
+      }
     } else {
       setSelectedAccount('unlinked');
     }
     setDestAccount('');
-  }, [visible, accounts]);
+  }, [visible, accounts, selectedAccount]);
 
   var finishSave = function (savePromise, feedbackOpts) {
     feedbackOpts = feedbackOpts || {};
@@ -616,7 +618,9 @@ else if (expType === 'recurring') {
                       return (
                         <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? '#FFEDD5' : theme.colors.inputBg }}>
                           <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : brandColor }}>{acc.name}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : brandColor }}>
+                            {acc.name} (₱{acc.balance})
+                          </Text>
                         </TouchableOpacity>
                       );
                     })}

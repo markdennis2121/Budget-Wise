@@ -11,14 +11,13 @@ const initialDb = {
 
 const DB_STORAGE_KEYS = [
   'budget_tracker_db',
-  // Legacy keys from older app names/builds
   'penny_db',
-  'budget_wise_db',
   'budgetwise_db',
+  'budget_wise_db',
   'budget_app_db'
 ];
 const DB_SCHEMA_VERSION_KEY = 'budget_tracker_schema_version';
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 const STARTER_ACCOUNTS = [
   { id: 'acc-cash', name: 'Cash Wallet', starting_balance: 0, type: 'Cash', color: '#4B5563' },
@@ -144,6 +143,61 @@ const runVersionedMigrations = (db, fromVersion) => {
     version = 5;
   }
 
+  if (version < 6) {
+    // 1. Repair Savings (ensure it's a valid array of objects)
+    db.user_settings = (db.user_settings || []).map(function (setting) {
+      try {
+        let savings = setting.savings;
+        if (typeof savings === 'string') {
+          try { savings = JSON.parse(savings); } catch (e) { savings = []; }
+        }
+        if (!Array.isArray(savings)) savings = [];
+        return { ...setting, savings: savings };
+      } catch (e) { return setting; }
+    });
+
+    // 2. Legacy Balance Recovery: Move starting_balance into expense_history
+    db.user_settings = (db.user_settings || []).map(function(setting) {
+      try {
+        const userId = setting.user_id || setting.id;
+        if (setting.accounts && Array.isArray(setting.accounts)) {
+          setting.accounts = setting.accounts.map(function(acc) {
+            const sBal = parseFloat(acc.starting_balance) || 0;
+            if (sBal > 0) {
+              const hasOpening = (db.expense_history || []).some(function(h) {
+                return h.account_id === acc.id && (
+                  (h.expense_name || '').toLowerCase().includes('opening balance') ||
+                  (h.expense_name || '').toLowerCase().includes('starting balance')
+                );
+              });
+
+              if (!hasOpening) {
+                if (!db.expense_history) db.expense_history = [];
+                db.expense_history.push({
+                  id: 'mig-v6-' + Math.random().toString(36).substr(2, 9),
+                  user_id: userId,
+                  expense_name: 'Opening Balance: ' + (acc.name || 'Wallet'),
+                  amount: sBal,
+                  date: (Array.isArray(db.budget_users) ? (db.budget_users.find(u => u.id === userId) || {}).created_at : null) || new Date().toISOString().split('T')[0],
+                  expense_type: 'Income',
+                  category: 'Income',
+                  account_id: acc.id,
+                  notes: 'Auto-migrated from legacy wallet settings'
+                });
+              }
+              // Set to 0 so new balance logic doesn't double-count it
+              return { ...acc, starting_balance: 0 };
+            }
+            return acc;
+          });
+        }
+        return setting;
+      } catch (e) { return setting; }
+    });
+
+    version = 6;
+  }
+
   return db;
 };
 
@@ -216,6 +270,28 @@ const sanitizeDb = (db) => {
       return { id, name, amount: amt, account_id: src.account_id || 'unlinked' };
     });
 
+    let savings = setting.savings;
+    if (savings) {
+      try {
+        if (typeof savings === 'string') {
+          savings = JSON.parse(savings);
+        }
+      } catch (e) {
+        savings = [];
+      }
+    }
+    if (!Array.isArray(savings)) {
+      savings = [];
+    }
+    savings = savings.map((s, idx) => {
+      return {
+        id: s.id || ('sav-' + idx),
+        amount: parseFloat(s.amount) || 0,
+        source: s.source || null,
+        date: s.date || new Date().toISOString().split('T')[0]
+      };
+    });
+
     let accounts = setting.accounts;
     if (accounts) {
       try {
@@ -251,6 +327,7 @@ const sanitizeDb = (db) => {
       ...setting,
       envelopes,
       income_sources: incomeSources,
+      savings,
       accounts
     };
   });
@@ -282,7 +359,7 @@ const sanitizeDb = (db) => {
   db.one_time_expenses = db.one_time_expenses.filter(exp => {
     const name = (exp.name || '').toLowerCase();
     const isLegacyIncome = name.includes('salary') || name.includes('income') || name.includes('payday') || exp.expense_type === 'Income';
-    if (isLegacyIncome) {
+    if (isLegacyIncome && exp.user_id) {
       legacyIncomes.push({
         id: exp.id,
         user_id: exp.user_id,
@@ -303,7 +380,7 @@ const sanitizeDb = (db) => {
   db.recurring_expenses = db.recurring_expenses.filter(rec => {
     const name = (rec.name || '').toLowerCase();
     const isLegacyIncome = name.includes('salary') || name.includes('income') || name.includes('payday') || rec.expense_type === 'Income';
-    if (isLegacyIncome) {
+    if (isLegacyIncome && rec.user_id) {
       if (rec.status === 'Paid' || rec.status === 'Paid in Advance' || rec.status === 'Received') {
         legacyIncomes.push({
           id: rec.id,
@@ -365,9 +442,12 @@ const sanitizeDb = (db) => {
     if (isNaN(amt) || amt < 0) amt = 0;
     return {
       ...h,
+      id: h.id || ('tx-' + Math.random().toString(36).substr(2, 9)),
+      expense_name: h.expense_name || h.name || 'Transaction',
       amount: amt,
       expense_type: h.expense_type || 'Expense',
-      date: h.date || new Date().toISOString().split('T')[0]
+      date: h.date || new Date().toISOString().split('T')[0],
+      account_id: h.account_id || 'unlinked'
     };
   });
 

@@ -7,10 +7,12 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { NativeBiometric } from 'capacitor-native-biometric';
+import { Capacitor } from '@capacitor/core';
 import logoImg from '../assets/logo.png';
 
 const PIN_LENGTH = 6;
-const IS_WEB = Platform.OS === 'web';
+const IS_NATIVE = Capacitor.isNativePlatform();
+const IS_WEB = !IS_NATIVE && Platform.OS === 'web';
 
 // Persist the last-logged-in user across logouts so PIN/biometric targets the right account.
 const LAST_PIN_USER_KEY = 'penny_last_user_id';

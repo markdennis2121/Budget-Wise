@@ -147,6 +147,16 @@ export function deleteEnvelopeAndCleanup(params) {
     newList
   );
 
+  // Also delete all spent history tied to this envelope so money returns to Ready to Assign
+  if (params.userHistory && params.mutateDeleteHistory) {
+    var relatedHistory = params.userHistory.filter(function(h) {
+      return h.category === envelopeId && (h.expense_type === 'One-Time' || h.expense_type === 'Recurring');
+    });
+    relatedHistory.forEach(function(h) {
+      cleanup.push(params.mutateDeleteHistory({ id: h.id }));
+    });
+  }
+
   return Promise.all(cleanup).then(function () {
     if (!params.userSettings || !params.mutateUpdateSettings) return;
     return params.mutateUpdateSettings({

@@ -651,7 +651,9 @@ const DashboardScreen = function (props) {
                                 userSettings: state.userSettings,
                                 mutateUpdateSettings: state.mutateUpdateSettings,
                                 mutateUpdateRecurring: state.mutateUpdateRecurring,
-                                mutateDeleteRecurring: state.mutateDeleteRecurring
+                                mutateDeleteRecurring: state.mutateDeleteRecurring,
+                                userHistory: state.userHistory,
+                                mutateDeleteHistory: state.mutateDeleteHistory
                               }),
                               {
                                 onSaved: state.refetchAll,
@@ -721,14 +723,14 @@ const DashboardScreen = function (props) {
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />
       <SpentManagerModal visible={showSpentModal} onClose={function () { setShowSpentModal(false); }} filter={spentFilter} oneTimeExpenses={state.oneTimeExpenses} envelopes={state.envelopeBalances} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} userHistory={state.userHistory} recurringExpenses={state.recurringExpenses} />
       <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
-      <IncomeManagerModal visible={showIncomeModal} onClose={function () { setShowIncomeModal(false); }} incomeSources={state.incomeSources} accounts={state.accounts} userSettings={state.userSettings} userHistory={state.userHistory} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} readyToAssign={state.readyToAssign} totalAvailableMoney={totalAvailableMoney} envelopes={state.envelopes} envelopeBalances={state.envelopeBalances} oneTimeExpenses={state.oneTimeExpenses} />
+      <IncomeManagerModal visible={showIncomeModal} onClose={function () { setShowIncomeModal(false); }} accounts={state.accounts} userSettings={state.userSettings} userHistory={state.userHistory} theme={theme} insetsBottom={insets.bottom} onSaved={state.refetchAll} onAddAccount={() => { setShowIncomeModal(false); setShowAddAccountModal(true); }} />
       <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
       <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} />
       <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function () { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <SavingsManagerModal visible={showSavingsManagerModal} onClose={function () { setShowSavingsManagerModal(false); }} state={state} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
 
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
-      <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} userHistory={state.userHistory} />
+      <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} envelopeBalances={state.envelopeBalances} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} userHistory={state.userHistory} />
       <NotificationCenterModal visible={showNotificationCenter} onClose={function () { setShowNotificationCenter(false); }} state={state} theme={theme} insets={insets} />
 
       <Modal visible={infoModalConfig.visible} animationType="fade" transparent={true} onRequestClose={() => setInfoModalConfig({ ...infoModalConfig, visible: false })}>

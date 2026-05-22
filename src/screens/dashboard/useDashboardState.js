@@ -35,6 +35,8 @@ export function useDashboardState(userId) {
   var mutateUpdateRecurring = updateRecurring.mutate;
   var deleteRecurring = useMutation('recurring_expenses', 'delete');
   var mutateDeleteRecurring = deleteRecurring.mutate;
+  var deleteHistory = useMutation('expense_history', 'delete');
+  var mutateDeleteHistory = deleteHistory.mutate;
 
   var [showAddModal, setShowAddModal] = useState(false);
   var [showOnboarding, setShowOnboarding] = useState(false);
@@ -64,12 +66,9 @@ export function useDashboardState(userId) {
   var accounts = useMemo(function () {
     return buildAccountsWithBalances({
       userSettings: userSettings,
-      incomeSources: incomeSources,
-      oneTimeExpenses: userOneTimeAll,
-      userHistory: userHistory,
-      curMonth: curMonth
+      userHistory: userHistory
     });
-  }, [userSettings, incomeSources, userOneTimeAll, userHistory, curMonth]);
+  }, [userSettings, userHistory]);
 
   var totalAvailableMoney = useMemo(function () {
     return accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
@@ -104,6 +103,7 @@ export function useDashboardState(userId) {
     });
 
     // 1. Calculate LIFETIME spent for each envelope from history source of truth
+    // Envelopes are plans for cash; spending is permanent until the envelope is re-filled.
     userHistory.forEach(function (h) {
       var amt = parseFloat(h.amount) || 0;
       var env = envs.find(function (e) { return e.id === h.category || e.name === h.category; });
@@ -115,6 +115,7 @@ export function useDashboardState(userId) {
       }
     });
 
+    // 2. Reserved money for PENDING bills (regardless of month)
     recurringExpenses.forEach(function (r) {
       if (r.status === 'Pending') {
         var amt = parseFloat(r.amount) || 0;
@@ -129,7 +130,7 @@ export function useDashboardState(userId) {
       var spentPct = budgetThisMonth > 0 ? Math.min(100, Math.round((e.spentThisMonth / budgetThisMonth) * 100)) : (e.spentThisMonth > 0 ? 100 : 0);
       return { ...e, available, budgetThisMonth, spentPct };
     });
-  }, [envelopes, recurringExpenses, oneTimeExpenses, userHistory, curMonth]);
+  }, [envelopes, recurringExpenses, userHistory, curMonth]);
 
   var orphanPendingTotal = useMemo(function () {
     return sumBillAmounts(getOrphanPendingBills(recurringExpenses, envelopes));
@@ -164,8 +165,20 @@ export function useDashboardState(userId) {
     return arr.reduce(function (s, r) { return s + (parseFloat(r.amount) || 0); }, 0);
   }, [userSettings]);
 
-  var totalEnvelopeAvailable = envelopeBalances.reduce(function (sum, env) { return sum + (parseFloat(env.available) || 0); }, 0);
-  var readyToAssign = totalAvailableMoney - totalEnvelopeAvailable - orphanPendingTotal;
+  // Ready to Assign is the money you have in your wallets that hasn't been put into an envelope yet.
+  var readyToAssign = useMemo(function() {
+    var totalEnvelopeLiabilities = envelopeBalances.reduce(function (sum, env) {
+      // Money already assigned that is still available (not ready to re-assign)
+      return sum + (env.available > 0 ? env.available : 0);
+    }, 0);
+
+    var totalOverspending = envelopeBalances.reduce(function (sum, env) {
+      // Money spent BEYOND what was assigned (must deduct from RTI)
+      return sum + (env.available < 0 ? Math.abs(env.available) : 0);
+    }, 0);
+
+    return totalAvailableMoney - totalEnvelopeLiabilities - orphanPendingTotal - totalOverspending;
+  }, [totalAvailableMoney, envelopeBalances, orphanPendingTotal]);
 
   var refetchAll = useCallback(function () {
     settingsQuery.refetch();
@@ -178,7 +191,7 @@ export function useDashboardState(userId) {
     totalIncome, totalAssigned, readyToAssign, orphanPendingTotal, totalExpenses, upcomingBills,
     showAddModal, setShowAddModal,
     showOnboarding, setShowOnboarding,
-    mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, refetchAll,
+    mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, mutateDeleteHistory, refetchAll,
     oneTimeExpenses,
     totalSaved,
     accounts,

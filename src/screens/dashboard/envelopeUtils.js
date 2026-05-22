@@ -11,8 +11,13 @@ export function promptDeleteEnvelope(opts) {
 
   var pending = getPendingBillsForEnvelope(opts.recurringExpenses || [], targetEnv);
   var newList = (opts.envelopes || []).filter(function (e) { return e.id !== opts.envelopeId; });
-  var amt = targetEnv.available !== undefined ? targetEnv.available : (targetEnv.assigned || 0);
-  var msg = 'This will remove the "' + targetEnv.name + '" envelope. Any money currently inside it (' + formatCurrency(amt) + ') will be returned to Ready to Assign.';
+
+  // Calculate total money that will return (Assigned amount)
+  var assignedAmt = targetEnv.assigned || 0;
+
+  var msg = 'Delete "' + targetEnv.name + '" envelope?\n\n' +
+            'This will delete all spending history and transactions linked to this category. ' +
+            'The entire assigned amount (' + formatCurrency(assignedAmt) + ') will be returned to your Ready to Assign balance.';
 
   if (pending.length) {
     var fallback = newList[0];

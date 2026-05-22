@@ -70,11 +70,13 @@ const PayModal = function(props) {
     if (expense && expense.account_id && expense.account_id !== 'unlinked') {
       setSelectedAccount(expense.account_id);
     } else if (accounts && accounts.length > 0) {
-      setSelectedAccount(accounts[0].id);
+      if (!selectedAccount || selectedAccount === 'unlinked') {
+        setSelectedAccount(accounts[0].id);
+      }
     } else {
       setSelectedAccount('unlinked');
     }
-  }, [visible, accounts, expense]);
+  }, [visible, accounts, expense, selectedAccount]);
 
   var handlePay = function() {
     if (!expense) return;
@@ -239,7 +241,7 @@ const PayModal = function(props) {
                     >
                       <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
                       <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>
-                        {acc.name}
+                        {acc.name} (₱{acc.balance})
                       </Text>
                     </TouchableOpacity>
                   );

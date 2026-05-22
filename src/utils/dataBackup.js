@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Share } from 'react-native';
 import { getDatabase, persistDatabase, DB_SCHEMA_VERSION } from 'platform-hooks';
 
 var USER_DATA_TABLES = [
@@ -21,7 +21,7 @@ export function buildUserBackup(userId, user) {
   return {
     schemaVersion: DB_SCHEMA_VERSION,
     exportedAt: new Date().toISOString(),
-    app: 'Budget-Wise',
+    app: 'Penny',
     userId: userId,
     user: user
       ? { id: user.id, name: user.name, email: user.email }
@@ -118,31 +118,39 @@ export function downloadBackupFile(backup) {
   var json = JSON.stringify(backup, null, 2);
 
   // Use LOCAL date (not UTC) so the filename matches the user's timezone.
-  // e.g. exporting at 07:30 +08:00 would give 2026-05-21 in UTC but 2026-05-22 locally.
   var exportDate = backup.exportedAt ? new Date(backup.exportedAt) : new Date();
   var yyyy = exportDate.getFullYear();
   var mm = String(exportDate.getMonth() + 1).padStart(2, '0');
   var dd = String(exportDate.getDate()).padStart(2, '0');
   var stamp = yyyy + '-' + mm + '-' + dd;
-  var filename = 'budget-wise-backup-' + stamp + '.json';
+  var filename = 'penny-backup-' + stamp + '.json';
 
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  // Mobile / Native approach: Use Share dialog
+  if (Platform.OS !== 'web') {
+    return Share.share({
+      title: 'Penny Budget Backup',
+      message: json,
+    }).then(function () {
+      return { method: 'share', filename: filename };
+    });
+  }
+
+  // Web approach: use Blob/link download
+  if (typeof document !== 'undefined') {
     var blob = new Blob([json], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
     link.href = url;
     link.download = filename;
-    // Must be in the DOM for Android WebView (Capacitor) to trigger the download.
     link.style.display = 'none';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // Delay revocation so the browser has time to start the download.
     setTimeout(function () { URL.revokeObjectURL(url); }, 200);
     return Promise.resolve({ method: 'download', filename: filename });
   }
 
-  return Promise.reject(new Error('Download is available in the browser version of the app.'));
+  return Promise.reject(new Error('Export is not supported on this platform.'));
 }
 
 export function copyBackupToClipboard(backup) {
