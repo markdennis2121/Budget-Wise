@@ -50,6 +50,13 @@ const darkTheme = {
   isDark: true
 };
 
+const THEME_MAP = {
+  '#D97706': { background: '#1A1614', card: '#261F1D', border: '#3D302C' }, // Classic Penny
+  '#EAB308': { background: '#0F172A', card: '#1E293B', border: '#334155' }, // Midnight Royal
+  '#2DD4BF': { background: '#000000', card: '#121212', border: '#262626' }, // Cyber Mint
+  '#059669': { background: '#061613', card: '#0D2622', border: '#16423C' }  // Forest Serenity
+};
+
 const ThemeContext = createContext({
   theme: lightTheme,
   toggleTheme: function() {},
@@ -106,10 +113,17 @@ export const infoColor = lightTheme.colors.info;
       var baseTheme = isDark ? darkTheme : lightTheme;
       var primaryStr = Array.isArray(customPrimary) ? customPrimary[0] : customPrimary;
       var gradientArr = Array.isArray(customPrimary) ? customPrimary : [customPrimary, customPrimary];
+
+      var themedColors = {};
+      if (isDark && THEME_MAP[primaryStr]) {
+        themedColors = THEME_MAP[primaryStr];
+      }
+
       return {
         ...baseTheme,
         colors: {
           ...baseTheme.colors,
+          ...themedColors,
           primary: primaryStr,
           primaryGradient: gradientArr,
           info: primaryStr

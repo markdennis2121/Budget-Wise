@@ -30,6 +30,10 @@ const WEB_TAB_MENU_PADDING = 90;
 const PIN_LENGTH = 6;
 
 const THEME_COLORS = [
+  { name: 'Copper Penny', color: '#D97706' },
+  { name: 'Midnight Royal', color: '#EAB308' },
+  { name: 'Cyber Mint', color: '#2DD4BF' },
+  { name: 'Forest Green', color: '#059669' },
   { name: 'Penny Classic', color: '#10B981' },
   { name: 'Corporate Blue', color: '#2563EB' },
   { name: 'Rose Gold', color: '#FB7185' },
