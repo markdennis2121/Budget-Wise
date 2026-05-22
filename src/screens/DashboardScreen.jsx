@@ -56,9 +56,9 @@ const DashboardScreen = function (props) {
 
   useEffect(function() {
     Animated.stagger(150, [
-      Animated.timing(contentFade, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.timing(walletsFade, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(envelopesFade, { toValue: 1, duration: 500, useNativeDriver: true })
+      Animated.timing(contentFade, { toValue: 1, duration: 600, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(walletsFade, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(envelopesFade, { toValue: 1, duration: 500, useNativeDriver: Platform.OS !== 'web' })
     ]).start();
   }, []);
 
@@ -71,8 +71,8 @@ const DashboardScreen = function (props) {
   var onPressFab = function() {
     triggerImpactHaptic('Medium');
     Animated.sequence([
-      Animated.spring(fabScale, { toValue: 1.15, useNativeDriver: true }),
-      Animated.spring(fabScale, { toValue: 1, useNativeDriver: true })
+      Animated.spring(fabScale, { toValue: 1.15, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(fabScale, { toValue: 1, useNativeDriver: Platform.OS !== 'web' })
     ]).start();
 
     if (!hasUserEnvelopes(state.userSettings)) {

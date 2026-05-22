@@ -333,31 +333,27 @@ const AddExpenseModal = function (props) {
 
     if (expType === 'one_time') {
       var expId = generateId();
-      var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: selectedFund, account_id: selectedAccount };
-      var savePromise = mutateOneTime(newOneTime).then(function () {
-        return mutateHistory({
-          id: expId,
-          user_id: userId,
-          expense_name: expName.trim(),
-          amount: amt,
-          expense_type: 'One-Time',
-          date: expDate,
-          status: 'Spent',
-          notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName,
-          account_id: selectedAccount,
-          category: selectedFund
-        });
+      var savePromise = mutateHistory({
+        id: expId,
+        user_id: userId,
+        expense_name: expName.trim(),
+        amount: amt,
+        expense_type: 'One-Time',
+        date: expDate,
+        status: 'Spent',
+        notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName,
+        account_id: selectedAccount,
+        category: selectedFund
       });
       finishSave(savePromise, {
         message: 'Expense saved!',
         undoMessage: 'Expense saved',
         undo: function () {
-          return mutateDeleteOneTime({ id: expId }).then(function () {
-            return mutateDeleteHistory({ id: expId });
-          }).then(function () { onSaved && onSaved(); });
+          return mutateDeleteHistory({ id: expId }).then(function () { onSaved && onSaved(); });
         }
       });
-    } else if (expType === 'recurring') {
+    }
+else if (expType === 'recurring') {
       var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: selectedFund, account_id: selectedAccount };
       var recurringId = newRecurring.id;
       var recurringPromise = mutateRecurring(newRecurring).then(function () {

@@ -13,9 +13,9 @@ const SaveSuccessOverlay = function ({ visible, message, theme }) {
     ringScale.setValue(0.6);
     opacity.setValue(0);
     Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
-      Animated.spring(ringScale, { toValue: 1, friction: 6, tension: 100, useNativeDriver: true })
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(scale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(ringScale, { toValue: 1, friction: 6, tension: 100, useNativeDriver: Platform.OS !== 'web' })
     ]).start();
   }, [visible, scale, ringScale, opacity]);
 

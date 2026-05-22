@@ -27,7 +27,7 @@ const UndoToastProvider = function ({ children }) {
     Animated.timing(slide, {
       toValue: 120,
       duration: 250,
-      useNativeDriver: true
+      useNativeDriver: Platform.OS !== 'web'
     }).start(function () {
       setToast(null);
     });
@@ -48,7 +48,7 @@ const UndoToastProvider = function ({ children }) {
       toValue: 0,
       friction: 8,
       tension: 80,
-      useNativeDriver: true
+      useNativeDriver: Platform.OS !== 'web'
     }).start();
 
     timerRef.current = setTimeout(dismiss, opts.duration || UNDO_TOAST_MS);

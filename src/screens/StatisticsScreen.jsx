@@ -35,8 +35,9 @@ const StatisticsScreen = function() {
   var recurringQuery = useQuery('recurring_expenses');
   var userRecurring = (recurringQuery.data || []).filter(function(r) { return r.user_id === userId; });
 
-  var oneTimeQuery = useQuery('one_time_expenses');
-  var userOneTime = (oneTimeQuery.data || []).filter(function(o) { return o.user_id === userId; });
+  var userOneTime = useMemo(function() {
+    return userHistory.filter(function(h) { return h.expense_type === 'One-Time'; });
+  }, [userHistory]);
 
   var historyQuery = useQuery('expense_history');
   var userHistory = (historyQuery.data || []).filter(function(h) { return h.user_id === userId; });

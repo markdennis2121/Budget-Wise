@@ -2298,9 +2298,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
 
     var savePromise;
     if (exp.type === 'One-Time') {
-      savePromise = mutateUpdateOneTime({ id: exp.id, data: { name: editName.trim(), amount: amt } }).then(function () {
-        return mutateUpdateHistory({ id: exp.id, data: { expense_name: editName.trim(), amount: amt } });
-      });
+      savePromise = mutateUpdateHistory({ id: exp.id, data: { expense_name: editName.trim(), amount: amt } });
     } else {
       savePromise = mutateUpdateHistory({ id: exp.id, data: { expense_name: editName.trim(), amount: amt } });
     }
@@ -2321,9 +2319,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
     var doDelete = function () {
       var deletePromise;
       if (exp.type === 'One-Time') {
-        deletePromise = mutateDeleteOneTime({ id: exp.id }).then(function () {
-          return mutateDeleteHistory({ id: exp.id });
-        });
+        deletePromise = mutateDeleteHistory({ id: exp.id });
       } else if (exp.type === 'Recurring') {
         deletePromise = mutateDeleteHistory({ id: exp.id }).then(function () {
           if (exp.originalBillId) {
