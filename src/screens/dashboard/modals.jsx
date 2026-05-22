@@ -681,6 +681,7 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
       showUndoToast({ message: 'Account already exists!', type: 'error' });
       return;
     }
+    var walletStyle = WALLET_STYLES[type] || WALLET_STYLES.Custom;
     var newId = 'acc-' + generateId();
     var amt = parseAmount(startingBalance);
     var newAcc = {

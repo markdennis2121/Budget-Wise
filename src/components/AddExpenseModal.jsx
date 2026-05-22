@@ -335,7 +335,18 @@ const AddExpenseModal = function (props) {
       var expId = generateId();
       var newOneTime = { id: expId, user_id: userId, name: expName.trim(), amount: amt, date: expDate, category: selectedFund, account_id: selectedAccount };
       var savePromise = mutateOneTime(newOneTime).then(function () {
-        return mutateHistory({ id: expId, user_id: userId, expense_name: expName.trim(), amount: amt, expense_type: 'One-Time', date: expDate, status: 'Spent', notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName, account_id: selectedAccount });
+        return mutateHistory({
+          id: expId,
+          user_id: userId,
+          expense_name: expName.trim(),
+          amount: amt,
+          expense_type: 'One-Time',
+          date: expDate,
+          status: 'Spent',
+          notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName,
+          account_id: selectedAccount,
+          category: selectedFund
+        });
       });
       finishSave(savePromise, {
         message: 'Expense saved!',

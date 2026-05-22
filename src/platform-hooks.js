@@ -405,8 +405,10 @@ const getDb = () => {
 const saveDb = (db) => {
   try {
     localStorage.setItem('budget_tracker_db', JSON.stringify(db));
+    return true;
   } catch (e) {
     console.error('Failed to save DB', e);
+    return false;
   }
 };
 
@@ -464,10 +466,15 @@ export const useMutation = (table, type) => {
           db[table] = db[table].filter(item => item.id !== payload.id);
         }
 
-        saveDb(db);
-        notifyListeners();
-        setLoading(false);
-        resolve(payload);
+        const success = saveDb(db);
+        if (success) {
+          notifyListeners();
+          setLoading(false);
+          resolve(payload);
+        } else {
+          setLoading(false);
+          reject(new Error("Storage full or unavailable. Data not saved."));
+        }
       } catch (e) {
         setLoading(false);
         reject(e);

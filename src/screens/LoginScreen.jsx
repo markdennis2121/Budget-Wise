@@ -10,6 +10,7 @@ import { NativeBiometric } from 'capacitor-native-biometric';
 import logoImg from '../assets/logo.png';
 
 const PIN_LENGTH = 6;
+const IS_WEB = Platform.OS === 'web';
 
 // Persist the last-logged-in user across logouts so PIN/biometric targets the right account.
 const LAST_PIN_USER_KEY = 'penny_last_user_id';
@@ -72,6 +73,7 @@ const LoginScreen = function (props) {
   var hasPinAccount = allPinEntries.length > 0;
 
   var triggerModalBiometrics = async function () {
+    if (IS_WEB) return;
     try {
       var availableRes = await NativeBiometric.isAvailable();
       if (availableRes.isAvailable) {
@@ -94,7 +96,7 @@ const LoginScreen = function (props) {
   };
 
   useEffect(function () {
-    if (showPinModal && pinEntry?.biometricsEnabled) {
+    if (showPinModal && pinEntry?.biometricsEnabled && !IS_WEB) {
       var timer = setTimeout(() => {
         triggerModalBiometrics();
       }, 300);

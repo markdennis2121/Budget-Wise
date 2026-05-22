@@ -14,14 +14,20 @@ export function useDashboardState(userId) {
   var allRecurring = recurringQuery.data || [];
   var recurringExpenses = allRecurring.filter(function (r) { return r.user_id === userId; });
 
-  var oneTimeQuery = useQuery('one_time_expenses');
-  var allOneTime = oneTimeQuery.data || [];
   var curMonth = getCurrentMonthStr();
-  var oneTimeExpenses = allOneTime.filter(function (o) { return o.user_id === userId && getMonthStr(o.date) === curMonth; });
 
   var historyQuery = useQuery('expense_history');
   var allHistory = historyQuery.data || [];
   var userHistory = allHistory.filter(function (h) { return h.user_id === userId; });
+
+  // Source of Truth: All calculations now use userHistory instead of one_time_expenses table
+  var userOneTimeAll = useMemo(function() {
+    return userHistory.filter(function(h) { return h.expense_type === 'One-Time'; });
+  }, [userHistory]);
+
+  var oneTimeExpenses = useMemo(function() {
+    return userOneTimeAll.filter(function(o) { return getMonthStr(o.date) === curMonth; });
+  }, [userOneTimeAll, curMonth]);
 
   var updateSettings = useMutation('user_settings', 'update');
   var mutateUpdateSettings = updateSettings.mutate;
@@ -59,11 +65,11 @@ export function useDashboardState(userId) {
     return buildAccountsWithBalances({
       userSettings: userSettings,
       incomeSources: incomeSources,
-      oneTimeExpenses: oneTimeExpenses,
+      oneTimeExpenses: userOneTimeAll,
       userHistory: userHistory,
       curMonth: curMonth
     });
-  }, [userSettings, incomeSources, oneTimeExpenses, userHistory, curMonth]);
+  }, [userSettings, incomeSources, userOneTimeAll, userHistory, curMonth]);
 
   var totalAvailableMoney = useMemo(function () {
     return accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
@@ -71,13 +77,22 @@ export function useDashboardState(userId) {
 
   var totalIncome = useMemo(function () {
     var sum = 0;
+    var hasOlderHistory = false;
     userHistory.forEach(function (h) {
+      if (getMonthStr(h.date) < curMonth) hasOlderHistory = true;
       if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
         sum += (parseFloat(h.amount) || 0);
       }
     });
+
+    if (!hasOlderHistory) {
+      var totalSeed = accounts.reduce(function (s, a) {
+        return s + (parseFloat(a.starting_balance) || 0);
+      }, 0);
+      sum += totalSeed;
+    }
     return sum;
-  }, [userHistory, curMonth]);
+  }, [userHistory, curMonth, accounts]);
 
   var totalAssigned = useMemo(function () {
     return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
@@ -88,23 +103,15 @@ export function useDashboardState(userId) {
       return { id: e.id, name: e.name, assigned: parseFloat(e.assigned) || 0, spent: 0, reserved: 0, spentThisMonth: 0 };
     });
 
-    oneTimeExpenses.forEach(function (o) {
-      var amt = parseFloat(o.amount) || 0;
-      var env = envs.find(function (e) { return e.id === o.category || e.name === o.category; });
-      if (env) {
-        env.spent += amt;
-        if (getMonthStr(o.date) === curMonth) env.spentThisMonth += amt;
-      }
-    });
-
+    // 1. Calculate LIFETIME spent for each envelope from history source of truth
     userHistory.forEach(function (h) {
-      if (h.expense_type === 'Recurring') {
-        var amt = parseFloat(h.amount) || 0;
-        var env = envs.find(function (e) { return e.id === h.category || e.name === h.category; });
-        if (env) {
-          env.spent += amt;
-          if (getMonthStr(h.date) === curMonth) env.spentThisMonth += amt;
-        }
+      var amt = parseFloat(h.amount) || 0;
+      var env = envs.find(function (e) { return e.id === h.category || e.name === h.category; });
+      if (!env) return;
+
+      if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
+        env.spent += amt;
+        if (getMonthStr(h.date) === curMonth) env.spentThisMonth += amt;
       }
     });
 
@@ -163,9 +170,8 @@ export function useDashboardState(userId) {
   var refetchAll = useCallback(function () {
     settingsQuery.refetch();
     recurringQuery.refetch();
-    oneTimeQuery.refetch();
     historyQuery.refetch();
-  }, [settingsQuery, recurringQuery, oneTimeQuery, historyQuery]);
+  }, [settingsQuery, recurringQuery, historyQuery]);
 
   return {
     userSettings, incomeSources, envelopes, envelopeBalances,
