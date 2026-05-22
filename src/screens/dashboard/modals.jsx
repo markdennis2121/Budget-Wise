@@ -681,19 +681,35 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
       showUndoToast({ message: 'Account already exists!', type: 'error' });
       return;
     }
-    var walletStyle = WALLET_STYLES[type] || WALLET_STYLES.Custom;
     var newId = 'acc-' + generateId();
+    var amt = parseAmount(startingBalance);
     var newAcc = {
       id: newId,
       name: finalName,
       type: type,
-      starting_balance: parseAmount(startingBalance),
+      starting_balance: 0, // No longer using static seed
       color: walletStyle.color
     };
     var newList = getStoredAccountsList(userSettings).concat([newAcc]);
     if (userSettings) {
+      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+      if (amt > 0) {
+        savePromise = savePromise.then(function () {
+          return mutateInsertHistory({
+            id: 'tx-' + generateId(),
+            user_id: userId,
+            expense_name: 'Opening Balance: ' + finalName,
+            amount: amt,
+            date: getTodayStr(),
+            expense_type: 'Income',
+            category: 'Income',
+            account_id: newId,
+            notes: 'Initial wallet balance'
+          });
+        });
+      }
       runSaveWithFeedback(
-        mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } }),
+        savePromise,
         { onClose: onClose, onSaved: onSaved, setShowSuccess: setShowSaveSuccess, errorMessage: 'Could not create wallet. Please try again.' }
       );
     }
@@ -762,8 +778,8 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
             })}
           </ScrollView>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>INITIAL SEED BALANCE</Text>
-          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>How much money is currently inside this wallet today?</Text>
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>OPENING BALANCE</Text>
+          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>How much money is currently inside this wallet?</Text>
           <AmountInput value={startingBalance} onChangeText={setStartingBalance} theme={theme} containerStyle={{ marginBottom: 20 }} />
 
           <TouchableOpacity onPress={handleCreate} style={{ backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
@@ -780,7 +796,6 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var [name, setName] = useState('');
-  var [startingBalance, setStartingBalance] = useState('');
   var [addAmount, setAddAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
@@ -804,7 +819,6 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   useEffect(() => {
     if (visible && account) {
       setName(account.name);
-      setStartingBalance(account.starting_balance ? String(account.starting_balance) : '');
       setAddAmount('');
       setEditingTopUpId(null);
       setEditTopUpAmount('');
@@ -842,7 +856,6 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     if (!stageCurrentTopUpEdit()) return;
 
     var topUp = parseAmount(addAmount);
-    var newStartingBalance = parseAmount(startingBalance);
     var stagedEdits = { ...pendingTopUpEdits };
 
     var newList = getStoredAccountsList(userSettings).map(function (a) {
@@ -850,7 +863,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
         return {
           id: a.id,
           name: name.trim(),
-          starting_balance: newStartingBalance,
+          starting_balance: a.starting_balance || 0,
           type: a.type || account.type || 'Custom',
           color: a.color || account.color || '#0F766E'
         };
@@ -1020,10 +1033,6 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
             placeholder="Account Name"
             style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
           />
-
-          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>Initial Seed Balance</Text>
-          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>The balance this account started with before any tracked income/expenses.</Text>
-          <AmountInput value={startingBalance} onChangeText={setStartingBalance} theme={theme} containerStyle={{ marginBottom: 16 }} />
 
           <View style={{ backgroundColor: 'rgba(15, 118, 110, 0.08)', borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(15, 118, 110, 0.15)' }}>
             <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: 'bold', marginBottom: 2 }}>CURRENT LIVE BALANCE</Text>
