@@ -45,6 +45,7 @@ const AppContent = function() {
   var userSettings = allSettings.find(function(s) { return s.user_id === (currentUser ? currentUser.id : ''); });
 
   var [isLocked, setIsLocked] = useState(true);
+  var [isInitialLoad, setIsInitialLoad] = useState(true);
   var prevUser = useRef(currentUser);
 
   // Re-lock the app when it is moved to the background
@@ -60,6 +61,14 @@ const AppContent = function() {
     };
   }, []);
 
+  // Handle Loading and Initial Lock State
+  useEffect(() => {
+    if (!settingsQuery.loading) {
+      // Small delay to ensure UI doesn't flicker
+      setTimeout(() => setIsInitialLoad(false), 300);
+    }
+  }, [settingsQuery.loading]);
+
   // When current user changes, handle lock/unlock transition
   useEffect(() => {
     if (!currentUser) {
@@ -70,6 +79,14 @@ const AppContent = function() {
     }
     prevUser.current = currentUser;
   }, [currentUser]);
+
+  if (isInitialLoad && currentUser) {
+    return React.createElement(View, { style: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' } },
+      React.createElement(View, { style: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' } },
+        React.createElement(MaterialIcons, { name: "lock-outline", size: 40, color: "#9CA3AF" })
+      )
+    );
+  }
 
   var hasPin = userSettings && userSettings.pin_code;
 

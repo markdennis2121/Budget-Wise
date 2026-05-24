@@ -64,16 +64,31 @@ export function buildAccountsWithBalances(opts) {
     var amt = parseFloat(h.amount) || 0;
     var accountId = h.account_id;
 
-    // If a transaction is "unlinked", we default it to the primary Cash Wallet
-    // so that spending ALWAYS reflects in your total available money.
-    if (!accountId || accountId === 'unlinked') {
-      accountId = 'acc-cash';
-    }
-
     var acc = accs.find(function (a) { return a.id === accountId; });
 
-    // Fallback: if 'acc-cash' ID doesn't exist, use the first available wallet
-    if (!acc && accs.length > 0) {
+    // Senior Debugger Fix: Handle Transfers as a distinct architectural operation.
+    // This fixes the bug where withdrawals from virtual sources (like Savings)
+    // weren't being added back to the destination wallet correctly, or were
+    // incorrectly stealing from the fallback 'Cash' wallet.
+    if (h.expense_type === 'Transfer') {
+      // 1. Deduct from source if it's a real wallet
+      if (acc) {
+        acc.balance -= amt;
+      } else if ((!accountId || accountId === 'unlinked') && accs.length > 0) {
+        // Fallback for untracked source transfers
+        accs[0].balance -= amt;
+      }
+
+      // 2. Add to destination if it's a real wallet
+      if (h.dest_account_id) {
+        var d = accs.find(function (a) { return a.id === h.dest_account_id; });
+        if (d) d.balance += amt;
+      }
+      return; // Exit early: Transfer logic is self-contained.
+    }
+
+    // Fallback for unlinked non-transfer transactions
+    if (!acc && (!accountId || accountId === 'unlinked') && accs.length > 0) {
       acc = accs[0];
     }
 
@@ -89,10 +104,6 @@ export function buildAccountsWithBalances(opts) {
       } else {
         acc.balance -= amt;
       }
-    } else if (h.expense_type === 'Transfer' && h.dest_account_id) {
-      var destAcc = accs.find(function (a) { return a.id === h.dest_account_id; });
-      acc.balance -= amt;
-      if (destAcc) destAcc.balance += amt;
     }
   });
 

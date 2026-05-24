@@ -76,26 +76,41 @@ var PinLockScreen = function (props) {
 
   var [pin, setPin] = useState('');
   var [error, setError] = useState(false);
+  var isAuthenticating = useRef(false);
 
   var mountAnim = useRef(new Animated.Value(0)).current;
 
   var handleBiometricAuth = async () => {
-    if (IS_WEB) return;
+    if (IS_WEB || isAuthenticating.current) return;
     try {
+      isAuthenticating.current = true;
+
       const result = await NativeBiometric.isAvailable();
       if (result.isAvailable && userSettings?.biometrics_enabled) {
-        const verified = await NativeBiometric.verifyIdentity({
-          reason: "Unlock Penny Budget",
-          title: "Biometric Login",
-          subtitle: "Use fingerprint or face to unlock",
-          description: "Verify your identity to access your budget data."
-        });
-        if (verified) {
+        // Senior Developer Fix: NativeBiometric.verifyIdentity resolves with NOTHING (undefined) on success.
+        // Checking "if (verified)" was causing the bug because undefined is falsy.
+        // We must simply await it; if it succeeds, we unlock. If it fails, it throws.
+        try {
+          await NativeBiometric.verifyIdentity({
+            reason: "Unlock Penny Budget",
+            title: "Biometric Login",
+            subtitle: "Use fingerprint or face to unlock",
+            description: "Verify your identity to access your budget data.",
+            negativeButtonText: "Use PIN"
+          });
+
+          // If we reach here, authentication was successful
           onUnlock();
+        } catch (authError) {
+          // This block runs if the user cancels, uses wrong finger, or taps "Use PIN"
+          console.log("Biometric identity verification cancelled or failed:", authError);
         }
       }
     } catch (e) {
-      console.error("Biometric error", e);
+      console.warn("Biometric hardware access error:", e);
+    } finally {
+      // Delay resetting the flag to prevent rapid double-prompts
+      setTimeout(() => { isAuthenticating.current = false; }, 1000);
     }
   };
 
@@ -104,7 +119,7 @@ var PinLockScreen = function (props) {
 
     // Auto-trigger biometric on mount if enabled
     if (userSettings?.biometrics_enabled) {
-      setTimeout(handleBiometricAuth, 500);
+      var t = setTimeout(handleBiometricAuth, 800);
     }
 
     // Listen for AppState changes to re-trigger biometrics when user backgrounds and returns to the app
@@ -115,6 +130,7 @@ var PinLockScreen = function (props) {
     });
 
     return () => {
+      if (t) clearTimeout(t);
       subscription.remove();
     };
   }, [userSettings?.biometrics_enabled]);

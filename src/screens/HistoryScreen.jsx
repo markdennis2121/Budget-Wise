@@ -91,6 +91,7 @@ const HistoryScreen = function() {
     if (status === 'Paid') return theme.colors.primary;
     if (status === 'Paid in Advance') return theme.colors.info;
     if (status === 'Spent') return theme.colors.error;
+    if (status === 'Completed') return '#0284C7';
     return theme.colors.warning;
   };
   
@@ -189,7 +190,7 @@ const HistoryScreen = function() {
              <View style={{ alignItems: 'flex-end' }}>
                 <Text style={{ fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) }}>{(isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)}</Text>
                 {item.status ? (
-                <View style={{ backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : '#FFFBEB'))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
+                <View style={{ backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : (item.status === 'Completed' ? '#E0F2FE' : '#FFFBEB')))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
                    <Text style={{ fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' }}>{item.status}</Text>
                 </View>
                 ) : null}

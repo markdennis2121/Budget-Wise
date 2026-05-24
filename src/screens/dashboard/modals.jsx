@@ -1339,7 +1339,7 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
           expense_type: 'Transfer',
           category: sourceEnv.id,
           date: getTodayStr(),
-          status: 'Spent',
+          status: 'Completed',
           notes: `Transferred budget of ${formatCurrency(amt)} from ${sourceEnv.name} to ${destEnv.name}`
         });
       });
@@ -1488,7 +1488,7 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
         amount: amt,
         expense_type: 'Transfer',
         date: getTodayStr(),
-        status: 'Spent',
+        status: 'Completed',
         notes: timeStr + ' • Wallet transfer',
         account_id: sourceId,
         dest_account_id: destId

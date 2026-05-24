@@ -342,7 +342,7 @@ const StatisticsScreen = function() {
       userHistory.forEach(function(h) {
         if (getMonthStr(h.date) === m.key) {
           var amt = parseFloat(h.amount) || 0;
-          if (h.expense_type === 'Recurring' || h.expense_type === 'One-Time') {
+          if (h.expense_type === 'Recurring') {
             spent += amt;
           } else if (h.expense_type === 'Income') {
             income += amt;
