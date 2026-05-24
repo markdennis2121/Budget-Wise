@@ -1,5 +1,6 @@
 import { Platform, Share } from 'react-native';
 import { getDatabase, persistDatabase, DB_SCHEMA_VERSION } from 'platform-hooks';
+import { Capacitor } from '@capacitor/core';
 
 var USER_DATA_TABLES = [
   'user_settings',
@@ -116,6 +117,7 @@ export function formatBackupDate(iso) {
 
 export function downloadBackupFile(backup) {
   var json = JSON.stringify(backup, null, 2);
+  var isNative = Capacitor.isNativePlatform();
 
   // Use LOCAL date (not UTC) so the filename matches the user's timezone.
   var exportDate = backup.exportedAt ? new Date(backup.exportedAt) : new Date();
@@ -126,17 +128,23 @@ export function downloadBackupFile(backup) {
   var filename = 'penny-backup-' + stamp + '.json';
 
   // Mobile / Native approach: Use Share dialog
-  if (Platform.OS !== 'web') {
-    return Share.share({
-      title: 'Penny Budget Backup',
-      message: json,
-    }).then(function () {
+  // Audit Check: Sharing massive strings via intents can hang the UI bridge on Android.
+  if (isNative) {
+    // If the data is too large (> 500KB), we should warn or use clipboard
+    // But since we are in a Share flow, we'll try to share as a message.
+    return Promise.race([
+      Share.share({
+        title: 'Penny Budget Backup',
+        message: json,
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Share took too long to respond. This usually happens when backup data is too large for the system share sheet. Try copying to clipboard instead.')), 8000))
+    ]).then(function () {
       return { method: 'share', filename: filename };
     });
   }
 
   // Web approach: use Blob/link download
-  if (typeof document !== 'undefined') {
+  if (Platform.OS === 'web' || typeof document !== 'undefined') {
     var blob = new Blob([json], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
@@ -155,12 +163,15 @@ export function downloadBackupFile(backup) {
 
 export function copyBackupToClipboard(backup) {
   var json = JSON.stringify(backup, null, 2);
-  if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+
+  // Try navigator.clipboard first (works on web and Capacitor webviews)
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
     return navigator.clipboard.writeText(json).then(function () {
       return { method: 'clipboard' };
     });
   }
-  return Promise.reject(new Error('Clipboard not available on this device.'));
+
+  return Promise.reject(new Error('Clipboard not available on this device. Please try again or export in the web version.'));
 }
 
 export function pickBackupFile() {

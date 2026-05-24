@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Platform, Vibration, Animated, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Platform, Vibration, Animated, StyleSheet, Image, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -65,14 +65,14 @@ var KeypadButton = function (props) {
 };
 
 var PinLockScreen = function (props) {
-  var { onUnlock } = props;
+  var { onUnlock, userSettings: userSettingsProp } = props;
   var { theme } = useTheme();
   var userCtx = useUser();
   var currentUser = userCtx.currentUser;
   var insets = useSafeAreaInsets();
 
   var settingsQuery = useQuery('user_settings');
-  var userSettings = (settingsQuery.data || []).find(s => s.user_id === (currentUser?.id || ''));
+  var userSettings = userSettingsProp || (settingsQuery.data || []).find(s => s.user_id === (currentUser?.id || ''));
 
   var [pin, setPin] = useState('');
   var [error, setError] = useState(false);
@@ -101,10 +101,22 @@ var PinLockScreen = function (props) {
 
   useEffect(() => {
     Animated.timing(mountAnim, { toValue: 1, duration: 400, useNativeDriver: !IS_WEB }).start();
+
     // Auto-trigger biometric on mount if enabled
     if (userSettings?.biometrics_enabled) {
       setTimeout(handleBiometricAuth, 500);
     }
+
+    // Listen for AppState changes to re-trigger biometrics when user backgrounds and returns to the app
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && userSettings?.biometrics_enabled) {
+        handleBiometricAuth();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [userSettings?.biometrics_enabled]);
 
   useEffect(() => {

@@ -157,13 +157,15 @@ const SettingsScreen = function(props) {
         }
       })
       .catch(function (err) {
-        // Fallback for mobile if sharing fails or web if download fails
-        return copyBackupToClipboard(backup).then(function () {
-          setBackupNote('Backup copied to clipboard instead. Paste it into Notes or email to save.');
-        });
-      })
-      .catch(function (err) {
-        showAlert('Export failed', err && err.message ? err.message : 'Could not export backup.');
+        // Fallback for mobile if sharing fails (e.g. data too large for intent)
+        return copyBackupToClipboard(backup)
+          .then(function () {
+            setBackupNote('Data is too large for sharing. Backup COPIED TO CLIPBOARD instead. Paste it into an email or Note.');
+            showAlert('Backup Copied', 'Your backup data was too large for the system share menu, so we copied it to your clipboard. Please paste it somewhere safe (like a Note or Email) to keep it.');
+          })
+          .catch(function () {
+            showAlert('Export failed', err && err.message ? err.message : 'Could not export backup.');
+          });
       })
       .then(function () {
         setBackupBusy(false);
@@ -514,7 +516,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '4.4.0')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.0.0')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

@@ -21,9 +21,9 @@ export function parseUserAccountsRaw(userSettings) {
 
 /** Persisted wallet rows only — never save computed `balance` to settings. */
 export function serializeAccountsForStorage(accounts) {
-  return (accounts || []).map(function (a, idx) {
+  return (accounts || []).map(function (a) {
     return {
-      id: a.id || ('acc-' + idx),
+      id: a.id,
       name: (a.name && String(a.name).trim()) || 'Wallet',
       starting_balance: Math.max(0, parseFloat(a.starting_balance) || 0),
       type: a.type || 'Custom',
@@ -83,6 +83,12 @@ export function buildAccountsWithBalances(opts) {
       acc.balance += amt;
     } else if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
       acc.balance -= amt;
+    } else if (h.expense_type === 'Adjustment') {
+      if (h.category === 'Income') {
+        acc.balance += amt;
+      } else {
+        acc.balance -= amt;
+      }
     } else if (h.expense_type === 'Transfer' && h.dest_account_id) {
       var destAcc = accs.find(function (a) { return a.id === h.dest_account_id; });
       acc.balance -= amt;

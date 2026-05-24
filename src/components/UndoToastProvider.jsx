@@ -17,7 +17,7 @@ const UndoToastProvider = function ({ children }) {
   var insets = useSafeAreaInsets();
   var [toast, setToast] = useState(null);
   var timerRef = useRef(null);
-  var slide = useRef(new Animated.Value(120)).current;
+  var slide = useRef(new Animated.Value(-120)).current;
 
   var dismiss = useCallback(function () {
     if (timerRef.current) {
@@ -25,7 +25,7 @@ const UndoToastProvider = function ({ children }) {
       timerRef.current = null;
     }
     Animated.timing(slide, {
-      toValue: 120,
+      toValue: -120,
       duration: 250,
       useNativeDriver: Platform.OS !== 'web'
     }).start(function () {
@@ -43,7 +43,7 @@ const UndoToastProvider = function ({ children }) {
       type: opts.type || 'success' // success, error, info
     });
 
-    slide.setValue(120);
+    slide.setValue(-120);
     Animated.spring(slide, {
       toValue: 0,
       friction: 8,
@@ -72,7 +72,7 @@ const UndoToastProvider = function ({ children }) {
     dismiss();
   };
 
-  var bottom = Platform.OS === 'web' ? 90 : TAB_MENU_HEIGHT + insets.bottom + 12;
+  var topSpace = Platform.OS === 'web' ? 20 : insets.top + 10;
 
   // Type styling
   var getIcon = () => {
@@ -97,7 +97,7 @@ const UndoToastProvider = function ({ children }) {
             position: 'absolute',
             left: 16,
             right: 16,
-            bottom: bottom,
+            top: topSpace,
             transform: [{ translateY: slide }],
             zIndex: 10000,
             elevation: 10000

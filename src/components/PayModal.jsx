@@ -7,7 +7,7 @@ import { formatCurrency, isWithin5Days, isOverdue, getTodayStr, generateId } fro
 import SaveSuccessOverlay from './SaveSuccessOverlay';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { triggerImpactHaptic, triggerErrorHaptic, showUndoToast } from '../utils/feedback';
-import { validateEnvelopeForSpend } from '../utils/envelopeGuards';
+import { validateEnvelopeForSpend, validateSpendOperation } from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
 
 const WALLET_STYLES = {
@@ -80,17 +80,20 @@ const PayModal = function(props) {
 
   var handlePay = function() {
     if (!expense) return;
-    var spendCheck = validateEnvelopeForSpend(userSettings, expense.category);
+    var amt = parseFloat(expense.amount) || 0;
+
+    var spendCheck = validateSpendOperation({
+      amount: amt,
+      categoryId: expense.category,
+      envelopeBalances: props.envelopeBalances,
+      accountId: selectedAccount,
+      accounts: accounts,
+      isRecurringPayment: true
+    });
+
     if (!spendCheck.ok) {
       triggerErrorHaptic();
       setErrorMsg(spendCheck.message);
-      return;
-    }
-    var amt = parseFloat(expense.amount) || 0;
-    var acc = accounts.find(a => a.id === selectedAccount);
-    if (acc && acc.balance < amt) {
-      triggerErrorHaptic();
-      setErrorMsg(`Insufficient funds in ${acc.name}. Balance: ₱${acc.balance.toFixed(2)}`);
       return;
     }
     setErrorMsg('');
@@ -98,6 +101,7 @@ const PayModal = function(props) {
     var isPaidInAdvance = isWithin5Days(expense.due_date) && !isOverdue(expense.due_date);
     var newStatus = isPaidInAdvance ? 'Paid in Advance' : 'Paid';
     
+    var acc = accounts.find(a => a.id === selectedAccount);
     var accName = acc ? acc.name : 'Wallet';
 
     var historyId = generateId();
@@ -148,8 +152,16 @@ const PayModal = function(props) {
   
   if (!expense) return null;
   var isPaidInAdvance = isWithin5Days(expense.due_date) && !isOverdue(expense.due_date);
-  var payBlocked = validateEnvelopeForSpend(userSettings, expense.category);
-  var cannotPay = !payBlocked.ok;
+
+  var payValidation = validateSpendOperation({
+    amount: parseFloat(expense.amount) || 0,
+    categoryId: expense.category,
+    envelopeBalances: props.envelopeBalances,
+    accountId: selectedAccount,
+    accounts: accounts,
+    isRecurringPayment: true
+  });
+  var cannotPay = !payValidation.ok;
   
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
@@ -253,7 +265,7 @@ const PayModal = function(props) {
           {cannotPay ? (
             <View style={{ backgroundColor: theme.isDark ? '#451a03' : '#FEF3C7', borderRadius: 10, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: '#F59E0B' }}>
               <Text style={{ color: '#B45309', fontSize: 13, textAlign: 'center', lineHeight: 20, fontWeight: '600' }}>
-                {payBlocked.message}
+                {payValidation.message}
               </Text>
             </View>
           ) : null}

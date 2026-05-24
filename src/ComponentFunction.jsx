@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, StatusBar, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StatusBar, ScrollView, TouchableOpacity, AppState } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -47,6 +47,19 @@ const AppContent = function() {
   var [isLocked, setIsLocked] = useState(true);
   var prevUser = useRef(currentUser);
 
+  // Re-lock the app when it is moved to the background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setIsLocked(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // When current user changes, handle lock/unlock transition
   useEffect(() => {
     if (!currentUser) {
@@ -61,7 +74,10 @@ const AppContent = function() {
   var hasPin = userSettings && userSettings.pin_code;
 
   if (currentUser && hasPin && isLocked) {
-    return React.createElement(PinLockScreen, { onUnlock: () => setIsLocked(false) });
+    return React.createElement(PinLockScreen, {
+      onUnlock: () => setIsLocked(false),
+      userSettings: userSettings
+    });
   }
 
   return React.createElement(UndoToastProvider, {},

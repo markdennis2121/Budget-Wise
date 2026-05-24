@@ -10,7 +10,7 @@ import PayModal from '../components/PayModal';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { findEnvelopeForCategory } from '../utils/envelopeBudget';
-import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateEnvelopeForSpend } from '../utils/envelopeGuards';
+import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateEnvelopeForSpend, computeEnvelopeBalances, validateSpendOperation } from '../utils/envelopeGuards';
 import { formatCurrency, formatDate, isWithin5Days, isOverdue, getCurrentMonthStr } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
@@ -79,7 +79,11 @@ const RecurringScreen = function(props) {
     }
     return [];
   }, [userSettings]);
-  
+
+  var envelopeBalances = useMemo(function () {
+    return computeEnvelopeBalances(envelopes, userHistory, recurringExpenses, curMonth);
+  }, [envelopes, userHistory, recurringExpenses, curMonth]);
+
   var payModalState = useState(false);
   var showPayModal = payModalState[0]; var setShowPayModal = payModalState[1];
   var selectedExpenseState = useState(null);
@@ -117,7 +121,14 @@ const RecurringScreen = function(props) {
   }, [recurringExpenses, filter]);
   
   var handlePayPress = function(expense) {
-    var payCheck = validateEnvelopeForSpend(userSettings, expense.category);
+    var amt = parseFloat(expense.amount) || 0;
+    var payCheck = validateSpendOperation({
+      amount: amt,
+      categoryId: expense.category,
+      envelopeBalances: envelopeBalances,
+      isRecurringPayment: true
+    });
+
     if (!payCheck.ok) {
       if (Platform.OS === 'web') {
         window.alert(payCheck.message);
@@ -296,7 +307,8 @@ const RecurringScreen = function(props) {
       insetsBottom: insets.bottom,
       theme: theme,
       accounts: accounts,
-      userSettings: userSettings
+      userSettings: userSettings,
+      envelopeBalances: envelopeBalances
     }),
     React.createElement(AddExpenseModal, { testID: 'AddExpenseModal-2', visible: showAdd,
       onClose: function() { setShowAdd(false); },

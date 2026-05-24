@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from 'platform-hooks';
 import { getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue } from '../../utils/helpers';
 import { getOrphanPendingBills, sumBillAmounts } from '../../utils/envelopeBudget';
-import { parseUserEnvelopes } from '../../utils/envelopeGuards';
+import { parseUserEnvelopes, computeEnvelopeBalances } from '../../utils/envelopeGuards';
 import { buildAccountsWithBalances } from '../../utils/accountBalances';
 
 export function useDashboardState(userId) {
@@ -76,60 +76,27 @@ export function useDashboardState(userId) {
 
   var totalIncome = useMemo(function () {
     var sum = 0;
-    var hasOlderHistory = false;
     userHistory.forEach(function (h) {
-      if (getMonthStr(h.date) < curMonth) hasOlderHistory = true;
-      if (h.expense_type === 'Income' && getMonthStr(h.date) === curMonth) {
-        sum += (parseFloat(h.amount) || 0);
+      if (getMonthStr(h.date) === curMonth) {
+        var amt = parseFloat(h.amount) || 0;
+        if (h.expense_type === 'Income') {
+          sum += amt;
+        } else if (h.expense_type === 'Adjustment') {
+          // Add corrections to income, subtract balance reductions from income
+          if (h.category === 'Income') sum += amt;
+          if (h.category === 'Adjustment') sum -= amt;
+        }
       }
     });
-
-    if (!hasOlderHistory) {
-      var totalSeed = accounts.reduce(function (s, a) {
-        return s + (parseFloat(a.starting_balance) || 0);
-      }, 0);
-      sum += totalSeed;
-    }
     return sum;
-  }, [userHistory, curMonth, accounts]);
+  }, [userHistory, curMonth]);
 
   var totalAssigned = useMemo(function () {
     return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
   }, [envelopes]);
 
   var envelopeBalances = useMemo(function () {
-    var envs = envelopes.map(function (e) {
-      return { id: e.id, name: e.name, assigned: parseFloat(e.assigned) || 0, spent: 0, reserved: 0, spentThisMonth: 0 };
-    });
-
-    // 1. Calculate LIFETIME spent for each envelope from history source of truth
-    // Envelopes are plans for cash; spending is permanent until the envelope is re-filled.
-    userHistory.forEach(function (h) {
-      var amt = parseFloat(h.amount) || 0;
-      var env = envs.find(function (e) { return e.id === h.category || e.name === h.category; });
-      if (!env) return;
-
-      if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
-        env.spent += amt;
-        if (getMonthStr(h.date) === curMonth) env.spentThisMonth += amt;
-      }
-    });
-
-    // 2. Reserved money for PENDING bills (regardless of month)
-    recurringExpenses.forEach(function (r) {
-      if (r.status === 'Pending') {
-        var amt = parseFloat(r.amount) || 0;
-        var env = envs.find(function (e) { return e.id === r.category || e.name === r.category; });
-        if (env) env.reserved += amt;
-      }
-    });
-
-    return envs.map(function (e) {
-      var available = e.assigned - e.spent - e.reserved;
-      var budgetThisMonth = available + e.spentThisMonth;
-      var spentPct = budgetThisMonth > 0 ? Math.min(100, Math.round((e.spentThisMonth / budgetThisMonth) * 100)) : (e.spentThisMonth > 0 ? 100 : 0);
-      return { ...e, available, budgetThisMonth, spentPct };
-    });
+    return computeEnvelopeBalances(envelopes, userHistory, recurringExpenses, curMonth);
   }, [envelopes, recurringExpenses, userHistory, curMonth]);
 
   var orphanPendingTotal = useMemo(function () {
@@ -169,12 +136,17 @@ export function useDashboardState(userId) {
   var readyToAssign = useMemo(function() {
     var totalEnvelopeLiabilities = envelopeBalances.reduce(function (sum, env) {
       // Money already assigned that is still available (not ready to re-assign)
-      return sum + (env.available > 0 ? env.available : 0);
+      // FIX: Liabilities should be calculated based on (assigned - spent), not (available).
+      // If we use (available), then reserved bills correctly reduce available balance,
+      // but INCORRECTLY reduce liabilities, which makes RTI increase.
+      var netEnveloped = (parseFloat(env.assigned) || 0) - (parseFloat(env.spent) || 0);
+      return sum + (netEnveloped > 0 ? netEnveloped : 0);
     }, 0);
 
     var totalOverspending = envelopeBalances.reduce(function (sum, env) {
-      // Money spent BEYOND what was assigned (must deduct from RTI)
-      return sum + (env.available < 0 ? Math.abs(env.available) : 0);
+      // FIX: Overspending is when spent > assigned.
+      var netEnveloped = (parseFloat(env.assigned) || 0) - (parseFloat(env.spent) || 0);
+      return sum + (netEnveloped < 0 ? Math.abs(netEnveloped) : 0);
     }, 0);
 
     return totalAvailableMoney - totalEnvelopeLiabilities - orphanPendingTotal - totalOverspending;

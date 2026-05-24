@@ -228,8 +228,8 @@ const sanitizeDb = (db) => {
     }
     
     // Repair envelopes values
-    envelopes = envelopes.map((e, idx) => {
-      const id = e.id || ('env-' + idx);
+    envelopes = envelopes.map((e) => {
+      const id = e.id;
       const name = e.name || 'Category';
       let assigned = parseFloat(e.assigned);
       if (isNaN(assigned) || assigned < 0) assigned = 0;
@@ -245,7 +245,7 @@ const sanitizeDb = (db) => {
         goal_date: e.goal_date || null,
         icon: e.icon || null
       };
-    });
+    }).filter(e => !!e.id); // STRICT: Must have ID
 
     let incomeSources = setting.income_sources;
     if (incomeSources) {
@@ -262,13 +262,13 @@ const sanitizeDb = (db) => {
     }
 
     // Repair income sources
-    incomeSources = incomeSources.map((src, idx) => {
-      const id = src.id || ('inc-' + idx);
+    incomeSources = incomeSources.map((src) => {
+      const id = src.id;
       const name = src.name || 'Income Source';
       let amt = parseFloat(src.amount);
       if (isNaN(amt) || amt < 0) amt = 0;
       return { id, name, amount: amt, account_id: src.account_id || 'unlinked' };
-    });
+    }).filter(src => !!src.id);
 
     let savings = setting.savings;
     if (savings) {
@@ -283,14 +283,14 @@ const sanitizeDb = (db) => {
     if (!Array.isArray(savings)) {
       savings = [];
     }
-    savings = savings.map((s, idx) => {
+    savings = savings.map((s) => {
       return {
-        id: s.id || ('sav-' + idx),
+        id: s.id,
         amount: parseFloat(s.amount) || 0,
         source: s.source || null,
         date: s.date || new Date().toISOString().split('T')[0]
       };
-    });
+    }).filter(s => !!s.id);
 
     let accounts = setting.accounts;
     if (accounts) {
@@ -306,10 +306,9 @@ const sanitizeDb = (db) => {
       accounts = null;
     }
     if (accounts) {
-      accounts = accounts.map((acc, idx) => {
-        const id = acc.id || ('acc-' + idx);
+      accounts = accounts.map((acc) => {
+        const id = acc.id;
         const name = acc.name || 'Wallet';
-        // Map startingBalance (legacy) to starting_balance
         let sBal = acc.starting_balance !== undefined ? acc.starting_balance : acc.startingBalance;
         let starting_balance = parseFloat(sBal);
         if (isNaN(starting_balance) || starting_balance < 0) starting_balance = 0;
@@ -320,7 +319,7 @@ const sanitizeDb = (db) => {
           type: acc.type || 'Custom',
           color: acc.color || '#0F766E'
         };
-      });
+      }).filter(acc => !!acc.id);
     }
 
     return {
@@ -334,9 +333,9 @@ const sanitizeDb = (db) => {
 
   // Sanitize budget_users
   db.budget_users = db.budget_users
-    .filter(user => user && typeof user === 'object')
-    .map((user, idx) => {
-      const id = user.id || ('usr-' + idx);
+    .filter(user => user && typeof user === 'object' && !!user.id)
+    .map((user) => {
+      const id = user.id;
       const email = (user.email || '').toString().trim().toLowerCase();
       const name = (user.name || '').toString().trim() || 'User';
       const password = (user.password || '').toString();
@@ -357,8 +356,8 @@ const sanitizeDb = (db) => {
 
   // Filter out incomes from one_time_expenses
   db.one_time_expenses = db.one_time_expenses.filter(exp => {
-    const name = (exp.name || '').toLowerCase();
-    const isLegacyIncome = name.includes('salary') || name.includes('income') || name.includes('payday') || exp.expense_type === 'Income';
+    // Only migrate if it explicitly has expense_type: 'Income'
+    const isLegacyIncome = exp.expense_type === 'Income';
     if (isLegacyIncome && exp.user_id) {
       legacyIncomes.push({
         id: exp.id,
@@ -378,8 +377,7 @@ const sanitizeDb = (db) => {
 
   // Filter out incomes from recurring_expenses
   db.recurring_expenses = db.recurring_expenses.filter(rec => {
-    const name = (rec.name || '').toLowerCase();
-    const isLegacyIncome = name.includes('salary') || name.includes('income') || name.includes('payday') || rec.expense_type === 'Income';
+    const isLegacyIncome = rec.expense_type === 'Income';
     if (isLegacyIncome && rec.user_id) {
       if (rec.status === 'Paid' || rec.status === 'Paid in Advance' || rec.status === 'Received') {
         legacyIncomes.push({
@@ -442,14 +440,14 @@ const sanitizeDb = (db) => {
     if (isNaN(amt) || amt < 0) amt = 0;
     return {
       ...h,
-      id: h.id || ('tx-' + Math.random().toString(36).substr(2, 9)),
+      id: h.id,
       expense_name: h.expense_name || h.name || 'Transaction',
       amount: amt,
       expense_type: h.expense_type || 'Expense',
       date: h.date || new Date().toISOString().split('T')[0],
       account_id: h.account_id || 'unlinked'
     };
-  });
+  }).filter(h => !!h.id);
 
   return db;
 };

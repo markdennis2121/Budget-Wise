@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image, Animated, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -34,6 +34,7 @@ import {
   AddEnvelopeModal,
   EditEnvelopeModal,
   TransferEnvelopeModal,
+  TransferWalletModal,
   SavingsManagerModal,
   AddAccountModal,
   EditAccountModal,
@@ -94,6 +95,7 @@ const DashboardScreen = function (props) {
   var [showNotificationCenter, setShowNotificationCenter] = useState(false);
   var [hasViewedAlerts, setHasViewedAlerts] = useState(false);
   var [showTransferEnvModal, setShowTransferEnvModal] = useState(false);
+  var [showTransferWalletModal, setShowTransferWalletModal] = useState(false);
   var [insightIndex, setInsightIndex] = useState(0);
   var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
   var [showQuickAddModal, setShowQuickAddModal] = useState(false);
@@ -107,13 +109,7 @@ const DashboardScreen = function (props) {
   var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
   var totalAvailableMoney = state.accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
-  var unlinkedIncome = state.incomeSources.reduce(function (sum, src) {
-    if (!src.account_id || src.account_id === 'unlinked') {
-      return sum + (parseFloat(src.amount) || 0);
-    }
-    return sum;
-  }, 0);
-  var totalActualMoney = totalAvailableMoney + unlinkedIncome;
+  var totalActualMoney = totalAvailableMoney;
   var rtaColor = state.readyToAssign === 0 ? '#10B981' : (state.readyToAssign > 0 ? theme.colors.primary : theme.colors.error);
   var hasNoAccounts = state.accounts.length === 0;
   var hasNoEnvelopes = state.envelopeBalances.length === 0;
@@ -132,33 +128,63 @@ const DashboardScreen = function (props) {
 
   var handleTotalMoneyInfo = function () {
     var accountsList = state.accounts.map(a => ({ name: a.name, amount: a.balance }));
-    if (unlinkedIncome > 0) {
-      accountsList.push({ name: 'Unlinked Income', amount: unlinkedIncome });
-    }
     setInfoModalConfig({
       visible: true,
       title: 'Total Current Money',
       content: (
         <View>
           <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 20 }}>
-            This is the exact sum of all the money in your linked wallets and banks right now, plus any expected base income not yet assigned to a wallet.
+            This is the exact sum of all the money in your linked wallets and bank accounts right now.
           </Text>
           <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: theme.colors.border }}>
-            {accountsList.map((acc, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: idx === accountsList.length - 1 ? 0 : 12 }}>
+            {accountsList.map((acc) => (
+              <View key={acc.name} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                 <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' }}>{acc.name}</Text>
                 <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: 'bold' }}>{formatCurrency(acc.amount)}</Text>
               </View>
             ))}
-            <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 14 }} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 16, color: theme.colors.primary, fontWeight: 'bold' }}>Total</Text>
-              <Text style={{ fontSize: 16, color: theme.colors.primary, fontWeight: 'bold' }}>{formatCurrency(totalActualMoney)}</Text>
-            </View>
           </View>
         </View>
       )
     });
+  };
+
+  var handleTransferWalletPress = function () {
+    triggerImpactHaptic('Light');
+    if (state.accounts.length < 2) {
+      var msg = "Add another wallet or bank account so you can move money between them.";
+      if (Platform.OS === 'web') {
+        if (window.confirm("Add Another Account?\n\n" + msg)) {
+          setShowAddAccountModal(true);
+        }
+      } else {
+        Alert.alert("Add Another Account?", msg, [
+          { text: "Cancel", style: "cancel" },
+          { text: "Add Wallet", onPress: function() { setShowAddAccountModal(true); } }
+        ]);
+      }
+      return;
+    }
+    setShowTransferWalletModal(true);
+  };
+
+  var handleTransferEnvPress = function () {
+    triggerImpactHaptic('Light');
+    if (state.envelopes.length < 2) {
+      var msg = "Add another envelope so you can move budget between your categories.";
+      if (Platform.OS === 'web') {
+        if (window.confirm("Add Another Envelope?\n\n" + msg)) {
+          setShowAddEnvModal(true);
+        }
+      } else {
+        Alert.alert("Add Another Envelope?", msg, [
+          { text: "Cancel", style: "cancel" },
+          { text: "Add Envelope", onPress: function() { setShowAddEnvModal(true); } }
+        ]);
+      }
+      return;
+    }
+    setShowTransferEnvModal(true);
   };
 
   var handleReadyToAssignInfo = function () {
@@ -514,10 +540,16 @@ const DashboardScreen = function (props) {
                 <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 6 }}>Wallets & Accounts</Text>
                 <MaterialIcons name="info-outline" size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowAddAccountModal(true); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add Account</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 14 }}>
+                <TouchableOpacity onPress={handleTransferWalletPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowAddAccountModal(true); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
+                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {hasNoAccounts ? (
@@ -595,7 +627,7 @@ const DashboardScreen = function (props) {
           >
             <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Envelopes</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setShowTransferEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+              <TouchableOpacity onPress={handleTransferEnvPress} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
                 <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
                 <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
               </TouchableOpacity>
@@ -721,12 +753,44 @@ const DashboardScreen = function (props) {
 
       <AddExpenseModal visible={state.showAddModal} onClose={() => state.setShowAddModal(false)} onSaved={state.refetchAll} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} envelopes={state.envelopeBalances} accounts={state.accounts} />
       <OnboardingModal visible={state.showOnboarding} onClose={() => { state.setShowOnboarding(false); state.refetchAll(); }} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} />
-      <SpentManagerModal visible={showSpentModal} onClose={function () { setShowSpentModal(false); }} filter={spentFilter} oneTimeExpenses={state.oneTimeExpenses} envelopes={state.envelopeBalances} userId={userId} theme={theme} insetsTop={insets.top} insetsBottom={insets.bottom} onSaved={state.refetchAll} userHistory={state.userHistory} recurringExpenses={state.recurringExpenses} />
+      <SpentManagerModal
+        visible={showSpentModal}
+        onClose={function () { setShowSpentModal(false); }}
+        filter={spentFilter}
+        oneTimeExpenses={state.oneTimeExpenses}
+        envelopes={state.envelopeBalances}
+        userId={userId}
+        theme={theme}
+        insetsTop={insets.top}
+        insetsBottom={insets.bottom}
+        onSaved={state.refetchAll}
+        userHistory={state.userHistory}
+        recurringExpenses={state.recurringExpenses}
+        accounts={state.accounts}
+      />
       <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
-      <IncomeManagerModal visible={showIncomeModal} onClose={function () { setShowIncomeModal(false); }} accounts={state.accounts} userSettings={state.userSettings} userHistory={state.userHistory} theme={theme} insetsBottom={insets.bottom} onSaved={state.refetchAll} onAddAccount={() => { setShowIncomeModal(false); setShowAddAccountModal(true); }} />
+      <IncomeManagerModal
+        visible={showIncomeModal}
+        onClose={function () { setShowIncomeModal(false); }}
+        accounts={state.accounts}
+        userSettings={state.userSettings}
+        userHistory={state.userHistory}
+        theme={theme}
+        insetsBottom={insets.bottom}
+        onSaved={state.refetchAll}
+        onAddAccount={() => { setShowIncomeModal(false); setShowAddAccountModal(true); }}
+        readyToAssign={state.readyToAssign}
+        totalAvailableMoney={state.totalAvailableMoney}
+        envelopes={state.envelopes}
+        envelopeBalances={state.envelopeBalances}
+        oneTimeExpenses={state.oneTimeExpenses}
+        incomeSources={state.incomeSources}
+        mutateUpdateSettings={state.mutateUpdateSettings}
+      />
       <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
       <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} />
       <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function () { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
+      <TransferWalletModal visible={showTransferWalletModal} onClose={function () { setShowTransferWalletModal(false); }} accounts={state.accounts} userHistory={state.userHistory} onSaved={state.refetchAll} theme={theme} insetsBottom={insets.bottom} userId={userId} />
       <SavingsManagerModal visible={showSavingsManagerModal} onClose={function () { setShowSavingsManagerModal(false); }} state={state} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
 
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />

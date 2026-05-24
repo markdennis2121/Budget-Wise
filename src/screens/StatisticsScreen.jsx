@@ -71,7 +71,10 @@ const StatisticsScreen = function() {
   }, [userSettings]);
 
   var incomeHistory = useMemo(function() {
-    return userHistory.filter(function(h) { return h.expense_type === 'Income' && getMonthStr(h.date) === curMonth; });
+    return userHistory.filter(function(h) {
+      return (h.expense_type === 'Income' || h.expense_type === 'Adjustment') &&
+             getMonthStr(h.date) === curMonth;
+    });
   }, [userHistory, curMonth]);
 
   var incomeReceivedBySource = useMemo(function() {
@@ -83,11 +86,10 @@ const StatisticsScreen = function() {
 
     return Object.keys(received).map(function(key) {
       var src = incomeSources.find(function(s) { return s.id === key; });
-      var name = 'Unknown Source';
+      var name = 'Extra Income';
       if (src) name = src.name;
-      else if (key === 'unlinked') name = 'Unlinked Source';
-      else if (key === 'Income') name = 'Other Income';
-      
+      else if (key === 'Income') name = 'Manual Deposit';
+
       return {
         id: key,
         name: name,
@@ -114,20 +116,15 @@ const StatisticsScreen = function() {
   }, [accounts, incomeHistory]);
 
   var totalMonthlyIncome = useMemo(function() {
-    var sum = incomeHistory.reduce(function(s, h) {
-      return s + (parseFloat(h.amount) || 0);
+    return incomeHistory.reduce(function(s, h) {
+      var amt = parseFloat(h.amount) || 0;
+      // If it's a "Reduce Funds" adjustment, subtract it from total income
+      if (h.expense_type === 'Adjustment' && h.category === 'Adjustment') {
+        return s - amt;
+      }
+      return s + amt;
     }, 0);
-
-    // Sync with Dashboard logic: Include starting balances if this is the first tracked month
-    var hasOlderHistory = userHistory.some(function(h) { return getMonthStr(h.date) < curMonth; });
-    if (!hasOlderHistory) {
-      var totalSeed = accounts.reduce(function(s, a) {
-        return s + (parseFloat(a.starting_balance) || 0);
-      }, 0);
-      sum += totalSeed;
-    }
-    return sum;
-  }, [incomeHistory, userHistory, curMonth, accounts]);
+  }, [incomeHistory]);
 
   var totalIncomeThisMonth = totalMonthlyIncome;
   var incomeSourceTotal = useMemo(function() {
@@ -169,7 +166,9 @@ const StatisticsScreen = function() {
     });
   }, [userHistory, userOneTime, envelopes, curMonth, recurringByName]);
 
-  var totalMonthSpent = envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
+  var totalMonthSpent = useMemo(function() {
+    return envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
+  }, [envelopeSpending]);
   var maxEnvSpent = envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1;
   var savings = totalMonthlyIncome - totalMonthSpent;
   var savingsRate = totalMonthlyIncome > 0 ? Math.round((savings / totalMonthlyIncome) * 100) : 0;
@@ -331,21 +330,25 @@ const StatisticsScreen = function() {
     return last6Months.map(function(m) {
       var spent = 0;
       var income = 0;
-      
+
       // 1. Sum one-time expenses from userOneTime
       userOneTime.forEach(function(o) {
         if (getMonthStr(o.date) === m.key) {
           spent += parseFloat(o.amount) || 0;
         }
       });
-      
+
       // 2. Sum paid recurring bills and extra incomes from history
       userHistory.forEach(function(h) {
         if (getMonthStr(h.date) === m.key) {
-          if (h.expense_type === 'Recurring') {
-            spent += parseFloat(h.amount) || 0;
+          var amt = parseFloat(h.amount) || 0;
+          if (h.expense_type === 'Recurring' || h.expense_type === 'One-Time') {
+            spent += amt;
           } else if (h.expense_type === 'Income') {
-            income += parseFloat(h.amount) || 0;
+            income += amt;
+          } else if (h.expense_type === 'Adjustment') {
+            if (h.category === 'Income') income += amt;
+            if (h.category === 'Adjustment') income -= amt; // Subtract from income trend
           }
         }
       });
@@ -590,7 +593,7 @@ const StatisticsScreen = function() {
                   var isAnySelected = selectedEnvIndex !== null;
                   var pct = maxEnvSpent > 0 ? Math.round((env.spent / maxEnvSpent) * 100) : 0;
                   var sharePct = totalMonthSpent > 0 ? Math.round((env.spent / totalMonthSpent) * 100) : 0;
-                  
+
                   return React.createElement(TouchableOpacity, {
                     key: i,
                     onPress: function() { setSelectedEnvIndex(isSelected ? null : i); },
