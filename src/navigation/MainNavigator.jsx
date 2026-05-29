@@ -54,7 +54,7 @@ const TabNavigator = function() {
         headerShown: false,
         tabBarStyle: { 
           position: 'absolute', 
-          bottom: Platform.OS === 'ios' ? insets.bottom + 8 : 16, 
+          bottom: Math.max(insets.bottom, 16),
           left: 16, 
           right: 16, 
           height: 60, 
@@ -135,10 +135,10 @@ const MainNavigator = function() {
     screenOptions: { headerShown: false }, 
     initialRouteName: initialRoute 
   },
-    React.createElement(Stack.Screen, { testID: 'Screen-5', name: 'Login', component: LoginScreen }),
-    React.createElement(Stack.Screen, { testID: 'Screen-6', name: 'Register', component: RegisterScreen }),
-    React.createElement(Stack.Screen, { name: 'ForgotPassword', component: ForgotPasswordScreen }),
-    React.createElement(Stack.Screen, { testID: 'Screen-7', name: 'MainApp', component: TabNavigator })
+    React.createElement(Stack.Screen, { testID: 'Screen-5', name: 'Login', component: LoginScreen, options: { gestureEnabled: false } }),
+    React.createElement(Stack.Screen, { testID: 'Screen-6', name: 'Register', component: RegisterScreen, options: { gestureEnabled: false } }),
+    React.createElement(Stack.Screen, { name: 'ForgotPassword', component: ForgotPasswordScreen, options: { gestureEnabled: false } }),
+    React.createElement(Stack.Screen, { testID: 'Screen-7', name: 'MainApp', component: TabNavigator, options: { gestureEnabled: false } })
   );
 };
 

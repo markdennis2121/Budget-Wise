@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, ScrollView, Platform, TouchableOpacity, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,11 +10,13 @@ import { buildMonthlyInsight, getLast6Months, MONTH_LABELS } from '../utils/mont
 import { buildEnvelopeSpendingForMonth } from '../utils/envelopeBudget';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
 import { parseUserEnvelopes } from '../utils/envelopeGuards';
+import { triggerImpactHaptic } from '../utils/feedback';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const WEB_TAB_MENU_PADDING = 90;
 
-const StatisticsScreen = function() {
+const StatisticsScreen = function(props) {
+  var navigation = props.navigation;
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var userCtx = useUser();
@@ -154,12 +156,36 @@ const StatisticsScreen = function() {
   }, [totalMonthSpent]);
 
   // Privacy State: Persist visibility
-  var [balancesVisible] = useState(function() {
+  var [balancesVisible, setBalancesVisible] = useState(function() {
     try {
       var saved = localStorage.getItem('penny_balances_visible');
       return saved !== null ? JSON.parse(saved) : true;
     } catch (e) { return true; }
   });
+
+  // Listener to sync visibility when switching tabs or reopening
+  useEffect(function() {
+    var syncVisibility = function() {
+      try {
+        var saved = localStorage.getItem('penny_balances_visible');
+        var val = saved !== null ? JSON.parse(saved) : true;
+        setBalancesVisible(val);
+      } catch (e) {}
+    };
+
+    var unsubscribe = navigation ? navigation.addListener('focus', syncVisibility) : null;
+    return unsubscribe;
+  }, [navigation]);
+
+  var toggleBalances = function() {
+    triggerImpactHaptic('Medium');
+    var newVal = !balancesVisible;
+    setBalancesVisible(newVal);
+    try {
+      localStorage.setItem('penny_balances_visible', JSON.stringify(newVal));
+    } catch (e) {}
+  };
+
   var maskAmount = function(amt) {
     return balancesVisible ? formatCurrency(amt) : '••••••';
   };
@@ -338,6 +364,8 @@ const StatisticsScreen = function() {
     });
   }, [monthlyTotals, curMonth, envelopeSpending]);
 
+  var [showInsight, setShowInsight] = useState(true);
+
   var incomeBySourceWithPercent = useMemo(function() {
     return incomeReceivedBySource.map(function(src) {
       return {
@@ -353,26 +381,43 @@ const StatisticsScreen = function() {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Header */}
       <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 28, paddingHorizontal: 20 }}>
-        <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Statistics</Text>
-        <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
-          Insights for {MONTH_LABELS[new Date().getMonth()] || ''} {new Date().getFullYear()}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Statistics</Text>
+            <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+              Insights for {MONTH_LABELS[new Date().getMonth()] || ''} {new Date().getFullYear()}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={toggleBalances}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MaterialIcons name={balancesVisible ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: scrollBottomPadding }}>
 
         {/* Insight Card */}
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: monthlyInsight.color + '33', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-            <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: monthlyInsight.color + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-              <MaterialIcons name={monthlyInsight.icon} size={22} color={monthlyInsight.color} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6 }}>{monthlyInsight.title}</Text>
-              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 }}>{monthlyInsight.text}</Text>
+        {showInsight && (
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: monthlyInsight.color + '33', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: monthlyInsight.color + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <MaterialIcons name={monthlyInsight.icon} size={22} color={monthlyInsight.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 6, flex: 1 }}>{monthlyInsight.title}</Text>
+                  <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowInsight(false); }} style={{ padding: 4 }}>
+                    <MaterialIcons name="close" size={18} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20, paddingRight: 8 }}>{monthlyInsight.text}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
 
         {/* ── Professional Summary Grid ── */}
         <View style={{ flexDirection: 'row', marginBottom: 20, gap: 10 }}>

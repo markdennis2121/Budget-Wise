@@ -18,6 +18,7 @@ import {
   validateSpendOperation
 } from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
+import { getEnvelopeIcon } from '../screens/dashboard/envelopeUtils';
 
 const WALLET_STYLES = {
   GCash: { color: '#1E3A8A', name: 'GCash', logo: 'account-balance-wallet' },
@@ -84,6 +85,7 @@ const AddExpenseModal = function (props) {
   var [selectedFund, setSelectedFund] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
+  var [showHint, setShowHint] = useState(true);
 
   var insertRecurring = useMutation('recurring_expenses', 'insert');
   var mutateRecurring = insertRecurring.mutate;
@@ -298,32 +300,60 @@ const AddExpenseModal = function (props) {
         }}>
           <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>{typeHelp.modalTitle}</Text>
-              <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 3 }}>Record financial activity</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.textPrimary, letterSpacing: -0.5 }}>{typeHelp.modalTitle}</Text>
+              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Record financial activity</Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ backgroundColor: theme.colors.background, padding: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border }}>
+              <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: theme.isDark ? 'rgba(0,0,0,0.2)' : theme.colors.background, borderRadius: 16, padding: 6, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border }}>
               <TouchableOpacity
                 onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('one_time'); }}
                 disabled={rawEnvelopes.length === 0}
-                style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent',
+                  opacity: rawEnvelopes.length === 0 ? 0.45 : 1,
+                  shadowColor: expType === 'one_time' ? theme.colors.primary : 'transparent',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: expType === 'one_time' ? 3 : 0
+                }}
               >
-                <MaterialIcons name="shopping-cart" size={16} color={expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
-                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
+                <MaterialIcons name="shopping-cart" size={18} color={expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('recurring'); }}
                 disabled={rawEnvelopes.length === 0}
-                style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 10, alignItems: 'center', backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent', opacity: rawEnvelopes.length === 0 ? 0.45 : 1 }}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent',
+                  opacity: rawEnvelopes.length === 0 ? 0.45 : 1,
+                  shadowColor: expType === 'recurring' ? theme.colors.primary : 'transparent',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: expType === 'recurring' ? 3 : 0
+                }}
               >
-                <MaterialIcons name="event-repeat" size={16} color={expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginBottom: 2 }} />
-                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: '700', fontSize: 11 }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
+                <MaterialIcons name="event-repeat" size={18} color={expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
               </TouchableOpacity>
             </View>
 
@@ -336,12 +366,17 @@ const AddExpenseModal = function (props) {
               </View>
             ) : null}
 
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                <MaterialIcons name={typeHelp.icon} size={20} color={theme.colors.primary} />
+            {showHint && (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : theme.colors.background, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <MaterialIcons name={typeHelp.icon} size={20} color={theme.colors.primary} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20, paddingRight: 8 }}>{typeHelp.hint}</Text>
+                <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowHint(false); }} style={{ padding: 4 }}>
+                  <MaterialIcons name="close" size={16} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 }}>{typeHelp.hint}</Text>
-            </View>
+            )}
 
             {spendBlocked ? (
               <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 8, marginBottom: 8 }}>
@@ -366,31 +401,14 @@ const AddExpenseModal = function (props) {
               </View>
             ) : null}
 
-            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>
               {typeHelp.nameLabel.toUpperCase()}
             </Text>
-            <TextInput value={expName} onChangeText={setExpName} placeholder={typeHelp.namePlaceholder} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: expType === 'one_time' ? 12 : 16 }} />
+            <TextInput value={expName} onChangeText={setExpName} placeholder={typeHelp.namePlaceholder} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 16, fontSize: 16, color: theme.colors.textPrimary, marginBottom: 20 }} />
 
-            {expType === 'one_time' && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-                <TouchableOpacity onPress={() => { setExpName('Morning Coffee'); setExpAmount('150'); }} style={{ backgroundColor: 'rgba(77, 150, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginRight: 8, borderWidth: 1, borderColor: 'rgba(77, 150, 255, 0.3)' }}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>☕ Coffee ₱150</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setExpName('Lunch'); setExpAmount('300'); }} style={{ backgroundColor: 'rgba(77, 150, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginRight: 8, borderWidth: 1, borderColor: 'rgba(77, 150, 255, 0.3)' }}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>🍔 Lunch ₱300</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setExpName('Transport'); setExpAmount('100'); }} style={{ backgroundColor: 'rgba(77, 150, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginRight: 8, borderWidth: 1, borderColor: 'rgba(77, 150, 255, 0.3)' }}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>🚕 Transport ₱100</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => { setExpName('Groceries'); setExpAmount('1000'); }} style={{ backgroundColor: 'rgba(77, 150, 255, 0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, marginRight: 8, borderWidth: 1, borderColor: 'rgba(77, 150, 255, 0.3)' }}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>🛒 Groceries ₱1k</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary }}>AMOUNT</Text>
-              <Text style={{ fontSize: 11, color: theme.colors.primary }}>You can do math (e.g. 150+45)</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>AMOUNT</Text>
+              <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>Supports math (e.g. 150+45)</Text>
             </View>
             <AmountInput
               value={expAmount}
@@ -398,75 +416,147 @@ const AddExpenseModal = function (props) {
               theme={theme}
               variant="boxed"
               allowExpression={true}
-              fontSize={18}
-              containerStyle={{ marginBottom: 16 }}
+              fontSize={20}
+              containerStyle={{ marginBottom: 20 }}
               placeholder="0.00"
             />
 
             {expType === 'one_time' ? (
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 }}>DATE</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE</Text>
                 <DatePickerInput value={expDate} onChange={setExpDate} placeholder="Select date" />
               </View>
             ) : (
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 }}>DUE DATE</Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DUE DATE</Text>
                 <DatePickerInput value={dueDate} onChange={setDueDate} placeholder="Select due date" />
               </View>
             )}
 
             <View style={{ marginTop: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Which envelope pays for this?</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>WHICH ENVELOPE PAYS FOR THIS?</Text>
+                {rawEnvelopes.length > 3 && <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Scroll →</Text>}
+              </View>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: 20 }}>
                 {optionsList.map(opt => {
                   var isSelected = selectedFund === opt.id;
-                  var availStr = ` (Avail: ${opt.available})`;
                   var previewAmt = parseAmount(expAmount);
                   if (expAmount && /[+\-*/]/.test(expAmount)) {
                     var ev = evaluateAmountExpression(expAmount);
                     if (!isNaN(ev)) previewAmt = ev;
                   }
                   var isExceeded = opt.available < previewAmt;
+                  var icon = getEnvelopeIcon(opt.name);
+
                   return (
-                    <TouchableOpacity key={opt.id} onPress={() => setSelectedFund(opt.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border), backgroundColor: isSelected ? '#FFEDD5' : (isExceeded ? '#FEF2F2' : theme.colors.inputBg), alignItems: 'center' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.textPrimary) }}>{opt.name}{availStr}</Text>
+                    <TouchableOpacity
+                      key={opt.id}
+                      onPress={() => { triggerImpactHaptic('Light'); setSelectedFund(opt.id); }}
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderRadius: 16,
+                        borderWidth: 2,
+                        borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border),
+                        backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : (isExceeded ? (theme.isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2') : theme.colors.background),
+                        alignItems: 'center',
+                        marginRight: 10,
+                        flexDirection: 'row',
+                        minWidth: 140,
+                        shadowColor: isSelected ? theme.colors.primary : '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: isSelected ? 0.2 : 0.05,
+                        shadowRadius: 4,
+                        elevation: isSelected ? 3 : 1
+                      }}
+                    >
+                      <View style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        backgroundColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border + '40'),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 10
+                      }}>
+                        <MaterialIcons name={icon} size={18} color={isSelected ? '#FFFFFF' : (isExceeded ? '#FFFFFF' : theme.colors.textSecondary)} />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textPrimary) }} numberOfLines={1}>
+                          {opt.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textSecondary), fontWeight: '700', marginTop: 1 }}>
+                          ₱{opt.available.toLocaleString()}
+                        </Text>
+                      </View>
+                      {isExceeded && (
+                        <MaterialIcons name="warning" size={16} color={theme.colors.error} style={{ marginLeft: 8 }} />
+                      )}
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
 
             {accounts.length > 0 && (
-              <View style={{ marginTop: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Paid with (wallet)</Text>
+              <View style={{ marginTop: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>PAID WITH (WALLET)</Text>
+                  {accounts.length > 2 && <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Scroll →</Text>}
+                </View>
 
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: 20 }}>
                   {accounts.map(acc => {
                     var isSelected = selectedAccount === acc.id;
                     var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                     var brandColor = acc.color || styleInfo.color;
-
-                    // Senior Developer Fix: Ensure contrast in Dark Mode
-                    // If the brand color is too dark (like GoTyme #111827) and we are in dark mode,
-                    // we use textPrimary so it's visible against the dark background.
                     var displayColor = brandColor;
-                    if (theme.isDark) {
-                      if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
-                        displayColor = theme.colors.textPrimary;
-                      }
+                    if (theme.isDark && (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E')) {
+                      displayColor = theme.colors.textPrimary;
                     }
 
                     return (
-                      <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? (theme.isDark ? 'rgba(255,237,213,0.2)' : '#FFEDD5') : theme.colors.inputBg }}>
-                        <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : displayColor }}>
-                          {acc.name} (₱{acc.balance})
-                        </Text>
+                      <TouchableOpacity
+                        key={acc.id}
+                        onPress={() => { triggerImpactHaptic('Light'); setSelectedAccount(acc.id); }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 16,
+                          paddingVertical: 12,
+                          borderRadius: 16,
+                          borderWidth: 2,
+                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : theme.colors.background,
+                          marginRight: 10,
+                          minWidth: 150,
+                          shadowColor: isSelected ? theme.colors.primary : '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: isSelected ? 0.2 : 0.05,
+                          shadowRadius: 4,
+                          elevation: isSelected ? 3 : 1
+                        }}
+                      >
+                        <View style={{ marginRight: 10 }}>
+                          <BrandLogo type={acc.type} size={24} />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: isSelected ? theme.colors.primary : displayColor }} numberOfLines={1}>
+                            {acc.name}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, fontWeight: '600', marginTop: 1 }}>
+                            ₱{acc.balance.toLocaleString()}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <MaterialIcons name="check-circle" size={14} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+                        )}
                       </TouchableOpacity>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
             )}
 

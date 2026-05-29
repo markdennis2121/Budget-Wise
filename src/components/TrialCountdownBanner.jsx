@@ -11,13 +11,14 @@ const TrialCountdownBanner = function ({ theme, compact }) {
   var days = getTrialDaysRemaining();
   var label = getTrialCountdownLabel();
   var colors = theme && theme.colors ? theme.colors : {};
-  var urgent = days <= 7;
+
+  // Only show the banner if there are 5 days or less remaining
+  if (days > 5 || days <= 0) return null;
+
   var isStealthDark = theme.isDark && colors.primary === '#111827';
   var safePrimary = isStealthDark ? '#E5E7EB' : (colors.primary || '#0F766E');
-  var accent = urgent ? (colors.warning || '#F59E0B') : safePrimary;
-  var bg = urgent ? 'rgba(245, 158, 11, 0.12)' : 'rgba(15, 118, 110, 0.1)';
-
-  if (days <= 0) return null;
+  var accent = colors.error || '#EF4444';
+  var bg = 'rgba(239, 68, 68, 0.12)';
 
   return (
     <View
@@ -26,23 +27,21 @@ const TrialCountdownBanner = function ({ theme, compact }) {
         alignItems: 'center',
         backgroundColor: bg,
         borderRadius: compact ? 10 : 12,
-        paddingVertical: compact ? 8 : 10,
-        paddingHorizontal: compact ? 10 : 12,
+        paddingVertical: compact ? 10 : 14,
+        paddingHorizontal: compact ? 12 : 16,
         marginBottom: compact ? 0 : 16,
         borderWidth: 1,
-        borderColor: accent + '33'
+        borderColor: accent + '44'
       }}
     >
-      <MaterialIcons name="schedule" size={compact ? 16 : 18} color={accent} style={{ marginRight: 8 }} />
+      <MaterialIcons name="report-problem" size={compact ? 20 : 24} color={accent} style={{ marginRight: 10 }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: compact ? 12 : 13, fontWeight: 'bold', color: colors.textPrimary }}>
-          {label}
+        <Text style={{ fontSize: compact ? 13 : 14, fontWeight: 'bold', color: colors.textPrimary }}>
+          {label.toUpperCase()}
         </Text>
-        {!compact ? (
-          <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-            Beta access ends {formatDate(BETA_EXPIRATION_DATE)}. Export a backup in Settings.
-          </Text>
-        ) : null}
+        <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, lineHeight: 16 }}>
+          Your beta access ends on {formatDate(BETA_EXPIRATION_DATE)}. Contact the developer to get the lifetime version.
+        </Text>
       </View>
     </View>
   );

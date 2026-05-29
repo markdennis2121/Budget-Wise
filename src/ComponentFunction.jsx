@@ -13,6 +13,18 @@ import PinLockScreen from './screens/PinLockScreen';
 import { scheduleDailyReminder } from './utils/notifications';
 import { BETA_EXPIRATION_DATE, isTrialExpired } from './utils/trial';
 import UndoToastProvider from './components/UndoToastProvider';
+import { useTheme } from './contexts/ThemeContext';
+
+const ThemeAwareStatusBar = function() {
+  var themeCtx = useTheme();
+  var isDark = themeCtx.theme.isDark;
+  return React.createElement(StatusBar, {
+    testID: 'StatusBar-1',
+    barStyle: isDark ? 'light-content' : 'dark-content',
+    backgroundColor: 'transparent',
+    translucent: true
+  });
+};
 
 const TrialExpiredScreen = function() {
   return React.createElement(View, {
@@ -31,7 +43,7 @@ const TrialExpiredScreen = function() {
       }, 'Beta Trial Expired'),
       React.createElement(Text, {
         style: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 22 }
-      }, 'Thank you for testing the Personal Budget Tracker app! This beta testing build expired on ' + formatDate(BETA_EXPIRATION_DATE) + '. Please contact the developer for a newer version or standard update.')
+      }, 'Thank you for testing Penny! This beta build expired on ' + formatDate(BETA_EXPIRATION_DATE) + '. Please contact the developer to get the lifetime version of the application.')
     )
   );
 };
@@ -206,10 +218,12 @@ const ComponentFunction = function() {
     React.createElement(ThemeProvider, { testID: 'ThemeProvider-1' },
       React.createElement(SafeAreaProvider, { style: { flex: 1 } },
         React.createElement(View, { testID: 'View-88', style: { flex: 1, width: '100%', height: '100%' } },
-          React.createElement(StatusBar, { testID: 'StatusBar-1', barStyle: 'light-content', backgroundColor: primaryColor }),
-          !termsAccepted
-            ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
-            : React.createElement(AppContent)
+          React.createElement(ThemeAwareStatusBar),
+          isTrialExpired()
+            ? React.createElement(TrialExpiredScreen)
+            : !termsAccepted
+              ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
+              : React.createElement(AppContent)
         )
       )
     )

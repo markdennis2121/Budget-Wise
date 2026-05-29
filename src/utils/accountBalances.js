@@ -1,5 +1,39 @@
 import { getMonthStr } from './helpers';
-import { DEFAULT_ACCOUNTS } from '../screens/dashboard/constants';
+import { DEFAULT_ACCOUNTS, WALLET_STYLES } from '../screens/dashboard/constants';
+
+/**
+ * Senior Debugger & Mobile Engineer: Automatically migrates "Custom" accounts
+ * to official bank types if the user named them after a supported bank.
+ */
+function migrateAccountType(acc) {
+  if (!acc || !acc.name) return acc;
+
+  var name = acc.name.toLowerCase().trim();
+  var currentType = acc.type || 'Custom';
+
+  // Only attempt migration if it's currently a Custom type or doesn't match official style
+  // or if we just want to ensure it's always up to date.
+
+  // List of official types from WALLET_STYLES (excluding 'Custom' and 'Cash')
+  var officialTypes = Object.keys(WALLET_STYLES).filter(t => t !== 'Custom' && t !== 'Cash');
+
+  for (var i = 0; i < officialTypes.length; i++) {
+    var type = officialTypes[i];
+    var officialInfo = WALLET_STYLES[type];
+
+    // Check if the user name matches the official type key or the official display name
+    if (name === type.toLowerCase() || name === officialInfo.name.toLowerCase() || name.includes(type.toLowerCase())) {
+       return {
+         ...acc,
+         type: type,
+         // Only override color if it was the default custom teal or missing
+         color: (acc.color === '#0F766E' || !acc.color) ? officialInfo.color : acc.color
+       };
+    }
+  }
+
+  return acc;
+}
 
 export function parseUserAccountsRaw(userSettings) {
   if (!userSettings || userSettings.accounts == null) {
@@ -22,13 +56,16 @@ export function parseUserAccountsRaw(userSettings) {
 /** Persisted wallet rows only — never save computed `balance` to settings. */
 export function serializeAccountsForStorage(accounts) {
   return (accounts || []).map(function (a) {
-    return {
+    var base = {
       id: a.id,
       name: (a.name && String(a.name).trim()) || 'Wallet',
       starting_balance: Math.max(0, parseFloat(a.starting_balance) || 0),
       type: a.type || 'Custom',
       color: a.color || '#0F766E'
     };
+
+    // Senior Developer: Apply auto-detection migration
+    return migrateAccountType(base);
   });
 }
 

@@ -15,16 +15,12 @@ import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
 import {
-  buildUserBackup,
-  restoreUserBackup,
-  downloadBackupFile,
-  downloadReportFile,
-  copyBackupToClipboard,
-  pickBackupFile,
-  parseBackupJson,
-  formatBackupDate,
-  summarizeBackup
+  downloadCsvFile,
+  generateCsvReport,
+  downloadFile
 } from '../utils/dataBackup';
+import { parseUserEnvelopes } from '../utils/envelopeGuards';
+import { getStoredAccountsList } from '../utils/accountBalances';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
 const SCROLL_EXTRA_PADDING = 16;
@@ -60,7 +56,7 @@ const SettingsScreen = function(props) {
   var currentUser = userCtx.currentUser;
   var userId = currentUser ? currentUser.id : '';
   var insets = useSafeAreaInsets();
-  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
+  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + 16);
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
   var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
@@ -70,6 +66,9 @@ const SettingsScreen = function(props) {
   var [showPinSaved, setShowPinSaved] = useState(false);
   var [backupBusy, setBackupBusy] = useState(false);
   var [backupNote, setBackupNote] = useState('');
+  var [lastExportUrl, setLastExportUrl] = useState(null);
+  var [lastExportFilename, setLastExportFilename] = useState('');
+  var [lastExportData, setLastExportData] = useState(null);
   var [showAppTour, setShowAppTour] = useState(false);
 
   var updateSettings = useMutation('user_settings', 'update');
@@ -94,7 +93,6 @@ const SettingsScreen = function(props) {
       Platform.OS === 'web' ? window.alert('PIN must be 6 digits') : Alert.alert('Error', 'PIN must be 6 digits');
       return;
     }
-    // Block if another account already uses this PIN
     var duplicate = allSettings.find(function (s) {
       return s.pin_code === newPin && s.user_id !== userId;
     });
@@ -144,51 +142,37 @@ const SettingsScreen = function(props) {
   var historyQuery = useQuery('expense_history');
   var userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
 
-  var handleExportReport = function () {
+  var handleExportExcel = function () {
     if (!userId) {
       showAlert('Error', 'Sign in to export your data.');
       return;
     }
     setBackupBusy(true);
     setBackupNote('');
-    downloadReportFile(userId, currentUser, userHistory)
-      .then(function (result) {
-        setBackupNote('Summary report shared successfully.');
-      })
-      .catch(function (err) {
-        showAlert('Export failed', 'Could not export financial summary.');
-      })
-      .then(function () {
-        setBackupBusy(false);
-      });
-  };
 
-  var handleExportBackup = function () {
-    if (!userId) {
-      showAlert('Error', 'Sign in to export your data.');
-      return;
-    }
-    setBackupBusy(true);
-    setBackupNote('');
-    var backup = buildUserBackup(userId, currentUser);
-    downloadBackupFile(backup)
+    var envs = parseUserEnvelopes(userSettings);
+    var accs = getStoredAccountsList(userSettings);
+
+    downloadCsvFile(userHistory, envs, accs)
       .then(function (result) {
-        if (result.method === 'share') {
-          setBackupNote('Backup shared successfully.');
+        setLastExportData({ content: generateCsvReport(userHistory, envs, accs), type: 'text/csv' });
+        if (result.method === 'download') {
+          setBackupNote('Excel file (.csv) generated and download started!');
+          if (result.url) {
+            setLastExportUrl(result.url);
+            setLastExportFilename(result.filename);
+          }
+        } else if (result.method === 'share') {
+          setBackupNote('Export ready! Select "Save to Files" or an app to save your spreadsheet.');
+        } else if (result.method === 'clipboard') {
+          setBackupNote('History copied to clipboard! You can now paste it directly into Excel or Google Sheets.');
+          showAlert('Copied to Clipboard', 'Your transaction history was copied because direct file export is limited on this device.');
         } else {
-          setBackupNote('Saved ' + (result.filename || 'backup file') + ' to your device.');
+          setBackupNote('Excel file (.csv) ready.');
         }
       })
       .catch(function (err) {
-        // Fallback for mobile if sharing fails (e.g. data too large for intent)
-        return copyBackupToClipboard(backup)
-          .then(function () {
-            setBackupNote('Data is too large for sharing. Backup COPIED TO CLIPBOARD instead. Paste it into an email or Note.');
-            showAlert('Backup Copied', 'Your backup data was too large for the system share menu, so we copied it to your clipboard. Please paste it somewhere safe (like a Note or Email) to keep it.');
-          })
-          .catch(function () {
-            showAlert('Export failed', err && err.message ? err.message : 'Could not export backup.');
-          });
+        showAlert('Export failed', 'Could not export financial data.');
       })
       .then(function () {
         setBackupBusy(false);
@@ -201,7 +185,6 @@ const SettingsScreen = function(props) {
       var db = getDatabase();
       if (!db) return;
 
-      // Force clean numeric fields
       if (db.user_settings) {
         db.user_settings = db.user_settings.map(s => ({
           ...s,
@@ -242,88 +225,6 @@ const SettingsScreen = function(props) {
     }
   };
 
-  var handleImportBackup = function () {
-    if (!userId) {
-      showAlert('Error', 'Sign in to restore a backup.');
-      return;
-    }
-    setBackupBusy(true);
-    pickBackupFile()
-      .then(function (text) {
-        processBackupText(text);
-      })
-      .catch(function (err) {
-        setBackupBusy(false);
-        if (err && err.message === 'MOBILE_INPUT_REQUIRED') {
-          // Senior Designer Fix: If file picking isn't easy on mobile,
-          // allow a direct text paste.
-          if (Platform.OS === 'web') {
-            var val = window.prompt('Paste your backup JSON here:');
-            if (val) processBackupText(val);
-          } else {
-             Alert.alert(
-               'Restore Data',
-               'To restore on mobile, copy the backup code and paste it here.',
-               [
-                 { text: 'Cancel', style: 'cancel' },
-                 { text: 'Paste & Restore', onPress: async () => {
-                    try {
-                      var clip = await navigator.clipboard.readText();
-                      if (clip) processBackupText(clip);
-                      else showAlert('Empty', 'Clipboard is empty.');
-                    } catch(e) { showAlert('Error', 'Could not read clipboard.'); }
-                 }}
-               ]
-             );
-          }
-          return;
-        }
-        if (err && err.message === 'No file selected.') return;
-        showAlert('Import failed', err && err.message ? err.message : 'Could not read backup file.');
-      });
-  };
-
-  var processBackupText = function(text) {
-    try {
-      var payload = parseBackupJson(text);
-      var summary = summarizeBackup(payload);
-      var exportedLabel = formatBackupDate(payload.exportedAt);
-      var fromUser = payload.user && payload.user.email ? payload.user.email : 'another account';
-      var msg =
-        'Restore backup from ' + exportedLabel + ' (' + fromUser + ')?\n\n' +
-        'This replaces your current envelopes, wallets, bills, and history (' +
-        summary.total + ' records) for this account. This cannot be undone.';
-
-      var runRestore = function () {
-        setBackupBusy(true);
-        restoreUserBackup(userId, payload)
-          .then(function () {
-            setBackupNote('Backup restored successfully.');
-            refetch();
-            showAlert('Restored', 'Your budget data was restored from the backup file.');
-          })
-          .catch(function (err) {
-            showAlert('Restore failed', err && err.message ? err.message : 'Could not restore backup.');
-          })
-          .then(function () {
-            setBackupBusy(false);
-          });
-      };
-
-      if (Platform.OS === 'web') {
-        if (window.confirm(msg)) runRestore();
-      } else {
-        Alert.alert('Restore backup?', msg, [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Restore', style: 'destructive', onPress: runRestore }
-        ]);
-      }
-    } catch(e) {
-      setBackupBusy(false);
-      showAlert('Error', 'Invalid backup data. Please make sure you copied the full code.');
-    }
-  };
-
   var handleLogout = function() {
     var msg = 'Are you sure you want to sign out?';
     if (Platform.OS === 'web') {
@@ -337,9 +238,7 @@ const SettingsScreen = function(props) {
   };
   
   var handleToggleBiometrics = async () => {
-    // Check if we are in a real native app environment
     var isNative = Capacitor.isNativePlatform();
-
     if (!isNative && Platform.OS === 'web') {
       showAlert('Not Supported', 'Biometrics are only available on the mobile app.');
       return;
@@ -350,7 +249,6 @@ const SettingsScreen = function(props) {
         showAlert('Not Available', 'Biometric authentication is not supported or set up on this device.');
         return;
       }
-
       if (userSettings) {
         mutateUpdate({
           id: userSettings.id,
@@ -370,6 +268,7 @@ const SettingsScreen = function(props) {
       mutateUpdateSettings: mutateUpdate
     }),
     React.createElement(SaveSuccessOverlay, { visible: showPinSaved, theme: theme, message: 'PIN saved!' }),
+
     React.createElement(View, { testID: 'View-72', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }, componentId: 'settings-header' },
       React.createElement(Text, { testID: 'Text-91', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Settings'),
       React.createElement(Text, { testID: 'Text-92', style: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 } }, currentUser ? currentUser.email : '')
@@ -403,7 +302,7 @@ const SettingsScreen = function(props) {
           ),
           userSettings?.pin_code ?
             React.createElement(TouchableOpacity, { onPress: handleRemovePin, style: { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEF2F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
-              React.createElement(Text, { style: { color: theme.colors.error, fontWeight: 'bold', fontSize: 13 } }, 'Remove PIN')
+              React.createElement(Text, { color: theme.colors.error, fontWeight: 'bold', fontSize: 13 } , 'Remove PIN')
             )
           :
             React.createElement(TouchableOpacity, { onPress: () => setPinMode(!pinMode), style: { backgroundColor: theme.colors.info, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
@@ -520,55 +419,53 @@ const SettingsScreen = function(props) {
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'data-backup-card' },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 } },
           React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.12)', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { name: 'cloud-off', size: 22, color: '#3B82F6' })
+            React.createElement(MaterialIcons, { name: 'file-download', size: 22, color: '#3B82F6' })
           ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Your data on this device')
+          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Data Export')
         ),
         React.createElement(View, { style: { backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' } },
           React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-start' } },
             React.createElement(MaterialIcons, { name: 'info-outline', size: 18, color: '#3B82F6', style: { marginRight: 10, marginTop: 1 } }),
             React.createElement(Text, { style: { flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 } },
-              'Penny stores your budgets, bills, and transactions locally on this phone or browser. We do not upload them to a cloud server. Export a backup regularly — uninstalling the app or clearing browser data will permanently delete your records.'
+              'Penny stores your data locally. Use the button below to export your complete transaction history to an Excel-ready CSV file for your own records.'
             )
           )
         ),
         backupNote ? React.createElement(Text, { style: { fontSize: 12, color: theme.colors.primary, marginBottom: 12, lineHeight: 18 } }, backupNote) : null,
-        React.createElement(TouchableOpacity, {
-          onPress: handleExportReport,
-          disabled: backupBusy,
-          style: { backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+        lastExportUrl || lastExportData ? React.createElement(TouchableOpacity, {
+          onPress: function() {
+            if (Platform.OS === 'web' && lastExportUrl) {
+              var link = document.createElement('a');
+              link.href = lastExportUrl;
+              link.download = lastExportFilename;
+              link.click();
+            } else if (lastExportData) {
+              downloadFile(lastExportData.content, lastExportData.type);
+            }
+          },
+          style: { backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5', borderRadius: 12, paddingVertical: 10, alignItems: 'center', marginBottom: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.primary }
         },
-          backupBusy
-            ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
-            : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-                React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
-                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Download Financial Summary (.txt)')
-              )
-        ),
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+            React.createElement(MaterialIcons, { name: 'description', size: 18, color: theme.colors.primary, style: { marginRight: 8 } }),
+            React.createElement(Text, { style: { color: theme.colors.primary, fontSize: 13, fontWeight: 'bold' } },
+              Platform.OS === 'web' ? 'Download ' + lastExportFilename : 'Share Spreadsheet Again'
+            )
+          )
+        ) : null,
         React.createElement(TouchableOpacity, {
-          onPress: handleExportBackup,
+          onPress: handleExportExcel,
           disabled: backupBusy,
           style: { backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
         },
           backupBusy
             ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
             : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-                React.createElement(MaterialIcons, { name: 'file-download', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
-                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export backup (JSON)')
+                React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
+                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)')
               )
         ),
-        React.createElement(TouchableOpacity, {
-          onPress: handleImportBackup,
-          disabled: backupBusy,
-          style: { backgroundColor: theme.colors.background, borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
-        },
-          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-            React.createElement(MaterialIcons, { name: 'file-upload', size: 20, color: theme.colors.textPrimary, style: { marginRight: 8 } }),
-            React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15, fontWeight: '600' } }, 'Restore from backup')
-          )
-        ),
         React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
-          'Keep backup files private. Restore only replaces data for your signed-in account.'
+          'Your data is private and stays on this device.'
         )
       ),
 
@@ -582,7 +479,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.0.7')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.2.0')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

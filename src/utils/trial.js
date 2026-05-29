@@ -1,5 +1,5 @@
 /** Beta build expiration (inclusive through end of this calendar day). */
-export var BETA_EXPIRATION_DATE = '2026-08-01';
+export var BETA_EXPIRATION_DATE = '2026-06-30';
 
 export function isTrialExpired(now) {
   var ref = now ? new Date(now) : new Date();
