@@ -18,6 +18,7 @@ import {
   buildUserBackup,
   restoreUserBackup,
   downloadBackupFile,
+  downloadReportFile,
   copyBackupToClipboard,
   pickBackupFile,
   parseBackupJson,
@@ -140,6 +141,28 @@ const SettingsScreen = function(props) {
     }
   };
 
+  var historyQuery = useQuery('expense_history');
+  var userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
+
+  var handleExportReport = function () {
+    if (!userId) {
+      showAlert('Error', 'Sign in to export your data.');
+      return;
+    }
+    setBackupBusy(true);
+    setBackupNote('');
+    downloadReportFile(userId, currentUser, userHistory)
+      .then(function (result) {
+        setBackupNote('Summary report shared successfully.');
+      })
+      .catch(function (err) {
+        showAlert('Export failed', 'Could not export financial summary.');
+      })
+      .then(function () {
+        setBackupBusy(false);
+      });
+  };
+
   var handleExportBackup = function () {
     if (!userId) {
       showAlert('Error', 'Sign in to export your data.');
@@ -227,45 +250,78 @@ const SettingsScreen = function(props) {
     setBackupBusy(true);
     pickBackupFile()
       .then(function (text) {
-        var payload = parseBackupJson(text);
-        var summary = summarizeBackup(payload);
-        var exportedLabel = formatBackupDate(payload.exportedAt);
-        var fromUser = payload.user && payload.user.email ? payload.user.email : 'another account';
-        var msg =
-          'Restore backup from ' + exportedLabel + ' (' + fromUser + ')?\n\n' +
-          'This replaces your current envelopes, wallets, bills, and history (' +
-          summary.total + ' records) for this account. This cannot be undone.';
-
-        var runRestore = function () {
-          restoreUserBackup(userId, payload)
-            .then(function () {
-              setBackupNote('Backup restored successfully.');
-              refetch();
-              showAlert('Restored', 'Your budget data was restored from the backup file.');
-            })
-            .catch(function (err) {
-              showAlert('Restore failed', err && err.message ? err.message : 'Could not restore backup.');
-            })
-            .then(function () {
-              setBackupBusy(false);
-            });
-        };
-
-        setBackupBusy(false);
-        if (Platform.OS === 'web') {
-          if (window.confirm(msg)) runRestore();
-        } else {
-          Alert.alert('Restore backup?', msg, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Restore', style: 'destructive', onPress: runRestore }
-          ]);
-        }
+        processBackupText(text);
       })
       .catch(function (err) {
         setBackupBusy(false);
+        if (err && err.message === 'MOBILE_INPUT_REQUIRED') {
+          // Senior Designer Fix: If file picking isn't easy on mobile,
+          // allow a direct text paste.
+          if (Platform.OS === 'web') {
+            var val = window.prompt('Paste your backup JSON here:');
+            if (val) processBackupText(val);
+          } else {
+             Alert.alert(
+               'Restore Data',
+               'To restore on mobile, copy the backup code and paste it here.',
+               [
+                 { text: 'Cancel', style: 'cancel' },
+                 { text: 'Paste & Restore', onPress: async () => {
+                    try {
+                      var clip = await navigator.clipboard.readText();
+                      if (clip) processBackupText(clip);
+                      else showAlert('Empty', 'Clipboard is empty.');
+                    } catch(e) { showAlert('Error', 'Could not read clipboard.'); }
+                 }}
+               ]
+             );
+          }
+          return;
+        }
         if (err && err.message === 'No file selected.') return;
         showAlert('Import failed', err && err.message ? err.message : 'Could not read backup file.');
       });
+  };
+
+  var processBackupText = function(text) {
+    try {
+      var payload = parseBackupJson(text);
+      var summary = summarizeBackup(payload);
+      var exportedLabel = formatBackupDate(payload.exportedAt);
+      var fromUser = payload.user && payload.user.email ? payload.user.email : 'another account';
+      var msg =
+        'Restore backup from ' + exportedLabel + ' (' + fromUser + ')?\n\n' +
+        'This replaces your current envelopes, wallets, bills, and history (' +
+        summary.total + ' records) for this account. This cannot be undone.';
+
+      var runRestore = function () {
+        setBackupBusy(true);
+        restoreUserBackup(userId, payload)
+          .then(function () {
+            setBackupNote('Backup restored successfully.');
+            refetch();
+            showAlert('Restored', 'Your budget data was restored from the backup file.');
+          })
+          .catch(function (err) {
+            showAlert('Restore failed', err && err.message ? err.message : 'Could not restore backup.');
+          })
+          .then(function () {
+            setBackupBusy(false);
+          });
+      };
+
+      if (Platform.OS === 'web') {
+        if (window.confirm(msg)) runRestore();
+      } else {
+        Alert.alert('Restore backup?', msg, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Restore', style: 'destructive', onPress: runRestore }
+        ]);
+      }
+    } catch(e) {
+      setBackupBusy(false);
+      showAlert('Error', 'Invalid backup data. Please make sure you copied the full code.');
+    }
   };
 
   var handleLogout = function() {
@@ -332,8 +388,6 @@ const SettingsScreen = function(props) {
           )
         )
       ) : null,
-
-      React.createElement(TrialCountdownBanner, { theme: theme }),
 
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
@@ -480,6 +534,18 @@ const SettingsScreen = function(props) {
         ),
         backupNote ? React.createElement(Text, { style: { fontSize: 12, color: theme.colors.primary, marginBottom: 12, lineHeight: 18 } }, backupNote) : null,
         React.createElement(TouchableOpacity, {
+          onPress: handleExportReport,
+          disabled: backupBusy,
+          style: { backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+        },
+          backupBusy
+            ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
+            : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+                React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
+                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Download Financial Summary (.txt)')
+              )
+        ),
+        React.createElement(TouchableOpacity, {
           onPress: handleExportBackup,
           disabled: backupBusy,
           style: { backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
@@ -516,7 +582,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.0.5')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.0.7')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

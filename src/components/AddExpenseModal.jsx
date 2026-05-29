@@ -35,6 +35,8 @@ const WALLET_STYLES = {
   SeaBank: { color: '#F97316', name: 'SeaBank', logo: 'credit-card' },
   Tonik: { color: '#DB2777', name: 'Tonik Bank', logo: 'savings' },
   PayPal: { color: '#2563EB', name: 'PayPal', logo: 'payment' },
+  Landbank: { color: '#4CAF50', name: 'Landbank', logo: 'account-balance' },
+  Vybe: { color: '#7C3AED', name: 'Vybe', logo: 'account-balance-wallet' },
   Cash: { color: '#4B5563', name: 'Cash Wallet', logo: 'money' },
   Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
 };
@@ -415,7 +417,7 @@ const AddExpenseModal = function (props) {
 
             <View style={{ marginTop: 16 }}>
               <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Which envelope pays for this?</Text>
-              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8, lineHeight: 16 }}>This is your budget category — not your bank wallet.</Text>
+
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {optionsList.map(opt => {
                   var isSelected = selectedFund === opt.id;
@@ -438,16 +440,27 @@ const AddExpenseModal = function (props) {
             {accounts.length > 0 && (
               <View style={{ marginTop: 16 }}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 4 }}>Paid with (wallet)</Text>
-                <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8, lineHeight: 16 }}>The actual account you used — GCash, bank, cash, etc.</Text>
+
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                   {accounts.map(acc => {
                     var isSelected = selectedAccount === acc.id;
                     var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                     var brandColor = acc.color || styleInfo.color;
+
+                    // Senior Developer Fix: Ensure contrast in Dark Mode
+                    // If the brand color is too dark (like GoTyme #111827) and we are in dark mode,
+                    // we use textPrimary so it's visible against the dark background.
+                    var displayColor = brandColor;
+                    if (theme.isDark) {
+                      if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                        displayColor = theme.colors.textPrimary;
+                      }
+                    }
+
                     return (
-                      <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? '#FFEDD5' : theme.colors.inputBg }}>
+                      <TouchableOpacity key={acc.id} onPress={() => setSelectedAccount(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border, backgroundColor: isSelected ? (theme.isDark ? 'rgba(255,237,213,0.2)' : '#FFEDD5') : theme.colors.inputBg }}>
                         <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                        <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : brandColor }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? theme.colors.primary : displayColor }}>
                           {acc.name} (₱{acc.balance})
                         </Text>
                       </TouchableOpacity>

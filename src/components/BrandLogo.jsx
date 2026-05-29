@@ -13,9 +13,11 @@ import mayaImg from '../assets/wallet logos/maya.webp';
 import paypalImg from '../assets/wallet logos/paypal.webp';
 import wiseImg from '../assets/wallet logos/wise.webp';
 import metrobankImg from '../assets/wallet logos/metrobank.png';
-import pnbImg from '../assets/wallet logos/pnb.webp';
+import pnbImg from '../assets/wallet logos/pnb.png';
 import rcbcImg from '../assets/wallet logos/rcbc.jpg';
 import securityBankImg from '../assets/wallet logos/securitybank.jpg';
+import landbankImg from '../assets/wallet logos/landbank.png';
+import vybeImg from '../assets/wallet logos/vybe.jpg';
 
 const BrandLogo = function({ type, size = 24, style }) {
   const containerStyle = {
@@ -61,7 +63,11 @@ const BrandLogo = function({ type, size = 24, style }) {
       return renderImage(rcbcImg);
     case 'SecurityBank':
       return renderImage(securityBankImg);
-      
+    case 'Landbank':
+      return renderImage(landbankImg);
+    case 'Vybe':
+      return renderImage(vybeImg);
+
     // Fallbacks for logos that don't have images yet
     case 'SeaBank':
       return (

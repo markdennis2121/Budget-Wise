@@ -183,10 +183,6 @@ const TermsAndConditionsScreen = function(props) {
 };
 
 const ComponentFunction = function() {
-  var isExpired = useMemo(function() {
-    return isTrialExpired();
-  }, []);
-
   var [termsAccepted, setTermsAccepted] = useState(function() {
     try {
       return localStorage.getItem('penny_terms_accepted') === 'true';
@@ -211,11 +207,9 @@ const ComponentFunction = function() {
       React.createElement(SafeAreaProvider, { style: { flex: 1 } },
         React.createElement(View, { testID: 'View-88', style: { flex: 1, width: '100%', height: '100%' } },
           React.createElement(StatusBar, { testID: 'StatusBar-1', barStyle: 'light-content', backgroundColor: primaryColor }),
-          isExpired 
-            ? React.createElement(TrialExpiredScreen) 
-            : !termsAccepted 
-              ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
-              : React.createElement(AppContent)
+          !termsAccepted
+            ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
+            : React.createElement(AppContent)
         )
       )
     )

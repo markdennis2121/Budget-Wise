@@ -31,6 +31,8 @@ export const WALLET_STYLES = {
   SeaBank: { color: '#F97316', name: 'SeaBank', logo: 'credit-card' },
   Tonik: { color: '#DB2777', name: 'Tonik Bank', logo: 'savings' },
   PayPal: { color: '#2563EB', name: 'PayPal', logo: 'payment' },
+  Landbank: { color: '#4CAF50', name: 'Landbank', logo: 'account-balance' },
+  Vybe: { color: '#7C3AED', name: 'Vybe', logo: 'account-balance-wallet' },
   Cash: { color: '#4B5563', name: 'Cash Wallet', logo: 'money' },
   Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
 };

@@ -177,20 +177,41 @@ const HistoryScreen = function() {
       renderItem: function(itemData) {
         var item = itemData.item;
         var isIncome = item.type === 'Income';
+        var isTransfer = item.type === 'Transfer';
+        var isAdjustment = item.type === 'Adjustment';
+
+        // Senior Designer Choice: Semantic Fixed Colors for Transaction Types
+        var typeColor = '#DC2626'; // Default Red for Spent
+        var typeBg = '#FEE2E2';
+
+        if (isIncome) {
+          typeColor = '#16A34A'; // Green for Deposit
+          typeBg = '#DCFCE7';
+        } else if (isTransfer) {
+          typeColor = '#2563EB'; // Blue for Transfer
+          typeBg = '#DBEAFE';
+        } else if (isAdjustment) {
+          typeColor = theme.colors.textSecondary;
+          typeBg = theme.colors.border;
+        } else if (item.type === 'Recurring') {
+          // Keep recurring distinct but still "Spent" if not specified otherwise
+          typeColor = '#DC2626';
+          typeBg = '#FEE2E2';
+        }
 
         return (
           <View key={item.id} style={{ backgroundColor: theme.colors.card, borderRadius: 12, padding: 14, marginBottom: 10, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
-             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isIncome ? '#FED7AA' : (item.type === 'Transfer' ? '#E0F2FE' : (item.type === 'Recurring' ? '#FFFBEB' : '#EDE9FE')), alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                <MaterialIcons name={getTypeIcon(item.type)} size={20} color={isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : (item.type === 'Recurring' ? theme.colors.warning : '#7C3AED'))} />
+             <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: typeBg, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                <MaterialIcons name={getTypeIcon(item.type)} size={20} color={typeColor} />
              </View>
              <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{item.name}</Text>
                 <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(item.date) + (item.notes ? ' • ' + item.notes : '') + ' • ' + item.type}</Text>
              </View>
              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 15, fontWeight: 'bold', color: isIncome ? theme.colors.primary : (item.type === 'Transfer' ? '#0284C7' : theme.colors.error) }}>{(isIncome ? '+' : (item.type === 'Transfer' ? '⇄ ' : '-')) + formatCurrency(item.amount)}</Text>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: typeColor }}>{(isIncome ? '+' : (isTransfer ? '⇄ ' : (isAdjustment ? '± ' : '-'))) + formatCurrency(item.amount)}</Text>
                 {item.status ? (
-                <View style={{ backgroundColor: item.status === 'Received' ? '#FED7AA' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#FED7AA' : (item.status === 'Paid in Advance' ? '#EFF6FF' : (item.status === 'Completed' ? '#E0F2FE' : '#FFFBEB')))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
+                <View style={{ backgroundColor: item.status === 'Received' ? '#DCFCE7' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#DCFCE7' : (item.status === 'Paid in Advance' ? '#DBEAFE' : (item.status === 'Completed' ? '#DBEAFE' : '#FEF3C7')))), borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
                    <Text style={{ fontSize: 11, color: getStatusColor(item.status), fontWeight: '600' }}>{item.status}</Text>
                 </View>
                 ) : null}

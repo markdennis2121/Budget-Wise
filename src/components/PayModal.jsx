@@ -20,6 +20,8 @@ const WALLET_STYLES = {
   SeaBank: { color: '#F97316', name: 'SeaBank', logo: 'credit-card' },
   Tonik: { color: '#DB2777', name: 'Tonik Bank', logo: 'savings' },
   PayPal: { color: '#2563EB', name: 'PayPal', logo: 'payment' },
+  Landbank: { color: '#4CAF50', name: 'Landbank', logo: 'account-balance' },
+  Vybe: { color: '#7C3AED', name: 'Vybe', logo: 'account-balance-wallet' },
   Cash: { color: '#4B5563', name: 'Cash Wallet', logo: 'money' },
   Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
 };
@@ -235,6 +237,14 @@ const PayModal = function(props) {
                   var isSelected = selectedAccount === acc.id;
                   var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                   var brandColor = acc.color || styleInfo.color;
+
+                  var displayColor = brandColor;
+                  if (theme.isDark && !isSelected) {
+                    if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                      displayColor = theme.colors.textPrimary;
+                    }
+                  }
+
                   return (
                     <TouchableOpacity 
                       key={acc.id} 
@@ -252,7 +262,7 @@ const PayModal = function(props) {
                       }}
                     >
                       <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : brandColor }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isSelected ? primaryColor : displayColor }}>
                         {acc.name} (₱{acc.balance})
                       </Text>
                     </TouchableOpacity>

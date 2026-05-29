@@ -503,15 +503,32 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>SOURCE</Text>
-          <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
             { (accountsList || []).map(function(a){
+              var isSelected = selectedSource === a.id;
               return (
-                React.createElement(TouchableOpacity, { key: a.id, onPress: function() { setSelectedSource(a.id); }, style: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, marginRight: 8, borderWidth: 1, borderColor: selectedSource === a.id ? theme.colors.primary : theme.colors.border, backgroundColor: selectedSource === a.id ? (theme.colors.primary + '22') : theme.colors.background } },
-                  React.createElement(Text, { style: { color: selectedSource === a.id ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '700' } }, a.name)
-                )
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={function() { setSelectedSource(a.id); }}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: isSelected ? (theme.colors.primary + '22') : theme.colors.background,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    minWidth: '30%',
+                    flexGrow: 1
+                  }}
+                >
+                  <BrandLogo type={a.type} size={14} style={{ marginRight: 6 }} />
+                  <Text style={{ color: isSelected ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '700', fontSize: 13 }}>{a.name}</Text>
+                </TouchableOpacity>
               );
             }) }
-          </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
           <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: 8 }} />
@@ -547,7 +564,7 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   );
 };
 
-const NotificationCenterModal = function ({ visible, onClose, state, theme, insets }) {
+const NotificationCenterModal = function ({ visible, onClose, state, theme, insets, smartInsights = [] }) {
   var handleTestNotification = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -648,6 +665,30 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
                 </View>
               </View>
             </View>
+
+            {/* Smart Insights Section */}
+            {smartInsights.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Penny Smart Insights</Text>
+                {smartInsights.map((insight, idx) => (
+                  <View key={idx} style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: insight.color + '22'
+                  }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: insight.color + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <MaterialIcons name={insight.icon} size={18} color={insight.color} />
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textPrimary, lineHeight: 18 }}>{insight.text}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Upcoming Alerts List */}
             <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 12 }}>Scheduled Bill Reminders</Text>
@@ -802,28 +843,54 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
             </>
           )}
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>WALLET / BANK TYPE</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-            {Object.keys(WALLET_STYLES).map(t => {
-              var isSelected = type === t;
-              return (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => {
-                    setType(t);
-                    if (t !== 'Custom') {
-                      setName(WALLET_STYLES[t]?.name || t);
-                    } else {
-                      setName('');
+          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 12 }}>WALLET / BANK TYPE</Text>
+          <View style={{ maxHeight: 200, marginBottom: 20 }}>
+            <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {Object.keys(WALLET_STYLES).map(t => {
+                  var isSelected = type === t;
+                  var styleInfo = WALLET_STYLES[t] || {};
+                  var brandColor = styleInfo.color;
+
+                  var displayColor = brandColor;
+                  if (theme.isDark && !isSelected) {
+                    if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                      displayColor = theme.colors.textPrimary;
                     }
-                  }}
-                  style={{ marginRight: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSelected ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border }}
-                >
-                  <Text style={{ color: isSelected ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{t}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                  }
+
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => {
+                        setType(t);
+                        if (t !== 'Custom') {
+                          setName(WALLET_STYLES[t]?.name || t);
+                        } else {
+                          setName('');
+                        }
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
+                        borderWidth: 1,
+                        borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                        minWidth: '30%',
+                        flexGrow: 1
+                      }}
+                    >
+                      <BrandLogo type={t} size={18} style={{ marginRight: 8 }} />
+                      <Text style={{ color: isSelected ? '#FFFFFF' : displayColor, fontSize: 12, fontWeight: '700' }}>{t}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>OPENING BALANCE</Text>
           <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>How much money is currently inside this wallet?</Text>
@@ -1390,28 +1457,28 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
           ) : null}
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>FROM ENVELOPE (SOURCE)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
             {envelopes.map(e => {
               var isSel = sourceId === e.id;
               return (
-                <TouchableOpacity key={e.id} onPress={() => setSourceId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 6 }}>
+                <TouchableOpacity key={e.id} onPress={() => setSourceId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
                   <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>TO ENVELOPE (DESTINATION)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
             {envelopes.map(e => {
               var isSel = destId === e.id;
               return (
-                <TouchableOpacity key={e.id} onPress={() => setDestId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 6 }}>
+                <TouchableOpacity key={e.id} onPress={() => setDestId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
                   <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT TO TRANSFER</Text>
           <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={22} containerStyle={{ marginBottom: 20 }} />
@@ -1540,34 +1607,80 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
           ) : null}
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>MOVE FROM (SOURCE)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {accounts.map(acc => {
               var isSel = sourceId === acc.id;
               var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
               var brandColor = acc.color || styleInfo.color;
+
+              var displayColor = brandColor;
+              if (theme.isDark && !isSel) {
+                if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                  displayColor = theme.colors.textPrimary;
+                }
+              }
+
               return (
-                <TouchableOpacity key={acc.id} onPress={() => setSourceId(acc.id)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity
+                  key={acc.id}
+                  onPress={() => setSourceId(acc.id)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
+                    borderWidth: 1,
+                    borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    minWidth: '45%',
+                    flexGrow: 1
+                  }}
+                >
                   <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
+                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>MOVE TO (DESTINATION)</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
             {accounts.map(acc => {
               var isSel = destId === acc.id;
               var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
               var brandColor = acc.color || styleInfo.color;
+
+              var displayColor = brandColor;
+              if (theme.isDark && !isSel) {
+                if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                  displayColor = theme.colors.textPrimary;
+                }
+              }
+
               return (
-                <TouchableOpacity key={acc.id} onPress={() => setDestId(acc.id)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border, marginRight: 8, flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity
+                  key={acc.id}
+                  onPress={() => setDestId(acc.id)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
+                    borderWidth: 1,
+                    borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    minWidth: '45%',
+                    flexGrow: 1
+                  }}
+                >
                   <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
+                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+          </View>
 
           <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>AMOUNT TO MOVE</Text>
           <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={22} containerStyle={{ marginBottom: 24 }} />
@@ -1961,25 +2074,44 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
               />
 
               <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT TO WALLET</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                 {accounts.map(a => {
                   var isSel = logAccount === a.id;
                   var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
                   var brandColor = a.color || styleInfo.color;
+
+                  var displayColor = brandColor;
+                  if (theme.isDark && !isSel) {
+                    if (brandColor === '#111827' || brandColor === '#1E3A8A' || brandColor === '#002E6E') {
+                      displayColor = theme.colors.textPrimary;
+                    }
+                  }
+
                   return (
                     <TouchableOpacity
                       key={a.id}
                       onPress={() => setLogAccount(a.id)}
-                      style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
+                        borderWidth: 1,
+                        borderColor: isSel ? theme.colors.primary : theme.colors.border,
+                        minWidth: '45%',
+                        flexGrow: 1
+                      }}
                     >
                       <BrandLogo type={a.type} size={16} style={{ marginRight: 8 }} />
-                      <Text style={{ color: isSel ? '#FFFFFF' : brandColor, fontSize: 13, fontWeight: '700' }}>
+                      <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>
                         {a.name} (₱{a.balance})
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+              </View>
 
               <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE RECEIVED</Text>
               <DatePickerInput value={logDate} onChange={setLogDate} theme={theme} containerStyle={{ marginBottom: 20 }} />
@@ -2237,7 +2369,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
                         React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, formatDate(exp.date) + (env ? ' • Env: ' + env.name : ''))
                       ),
                       React.createElement(View, { style: { alignItems: 'flex-end' } },
-                        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: theme.colors.error, marginBottom: 6 } }, '-' + formatCurrency(exp.amount)),
+                        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: '#DC2626', marginBottom: 6 } }, '-' + formatCurrency(exp.amount)),
                         React.createElement(View, { style: { flexDirection: 'row', gap: 8 } },
                           React.createElement(TouchableOpacity, { onPress: function () { handleStartEdit(exp); }, style: { padding: 4, backgroundColor: '#FFEDD5', borderRadius: 6 } },
                             React.createElement(MaterialIcons, { name: 'edit', size: 16, color: theme.colors.primary })
@@ -2272,8 +2404,6 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
   var mutateInsertHistory = insertHistory.mutate;
   var deleteHistory = useMutation('expense_history', 'delete');
   var mutateDeleteHistory = deleteHistory.mutate;
-  var historyQuery = useQuery('expense_history');
-  var allHistory = historyQuery.data || [];
 
   useEffect(() => {
     if (visible) {
@@ -2286,10 +2416,6 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
   }, [visible]);
 
   if (!envelope) return null;
-
-  var envelopeHistory = allHistory.filter(function (h) {
-    return h.expense_type === 'Budget Assignment' && h.category === envelope.id && h.user_id === userId;
-  }).sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
 
   var currentAssigned = parseFloat(envelope.assigned) || 0;
   var currentAvailable = parseFloat(envelope.available) !== undefined ? parseFloat(envelope.available) : currentAssigned;
@@ -2451,36 +2577,6 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
             )}
           </TouchableOpacity>
 
-          {/* Assignment History Log */}
-          {envelopeHistory.length > 0 ? (
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialIcons name="history" size={14} color={theme.colors.textSecondary} />
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Assignment History</Text>
-              </View>
-              <ScrollView style={{ maxHeight: 160 }} showsVerticalScrollIndicator={false}>
-                {envelopeHistory.map(function (h) {
-                  var isAdd = h.expense_name && h.expense_name.includes('Added');
-                  return (
-                    <View key={h.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: isAdd ? '#D1FAE5' : '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name={isAdd ? 'arrow-downward' : 'arrow-upward'} size={14} color={isAdd ? '#059669' : '#DC2626'} />
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary }}>{isAdd ? 'Funds Added' : 'Funds Reduced'}</Text>
-                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>{formatDate(h.date)}</Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: isAdd ? '#059669' : '#DC2626' }}>
-                        {isAdd ? '+' : '-'}{formatCurrency(parseFloat(h.amount) || 0)}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          ) : null}
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Budget updated!" />
         </View>
       </View>
