@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, Platform } from 'react-native';
+import { scale, normalize } from '../utils/responsive';
 import {
   sanitizeAmountDigits,
   formatAmountWithCommas,
@@ -18,8 +19,8 @@ const AmountInput = function ({
   autoFocus = false,
   containerStyle,
   inputStyle,
-  prefixSize = 22,
-  fontSize = 24,
+  prefixSize = normalize(22),
+  fontSize = normalize(24),
   allowNegative = false,
   allowExpression = false,
   formatOnBlur = true,
@@ -59,17 +60,17 @@ const AmountInput = function ({
         backgroundColor: colors.inputBg || colors.background || '#F9FAFB',
         borderWidth: 1,
         borderColor: colors.border || '#E5E7EB',
-        borderRadius: variant === 'compact' ? 8 : 10,
-        paddingHorizontal: variant === 'compact' ? 8 : 12,
-        minHeight: variant === 'compact' ? 40 : 44
+        borderRadius: variant === 'compact' ? scale(8) : scale(10),
+        paddingHorizontal: variant === 'compact' ? scale(8) : scale(12),
+        minHeight: variant === 'compact' ? scale(40) : scale(44)
       }
     : {
         flexDirection: 'row',
         alignItems: 'flex-end',
         borderBottomWidth: 1.5,
         borderBottomColor: colors.border || '#E5E7EB',
-        paddingBottom: 8,
-        minHeight: 52
+        paddingBottom: scale(8),
+        minHeight: scale(52)
       };
 
   return (

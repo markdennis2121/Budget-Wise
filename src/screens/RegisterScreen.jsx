@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { generateId, getTodayStr } from '../utils/helpers';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 import logoImg from '../assets/logo.png';
 
 const RegisterScreen = function(props) {
@@ -72,101 +73,105 @@ const RegisterScreen = function(props) {
   return React.createElement(KeyboardAvoidingWrapper, { testID: 'KeyboardAvoidingView-2', behavior: Platform.OS === 'ios' ? 'padding' : 'height',
     style: { flex: 1, backgroundColor: theme.colors.background }
   },
-    React.createElement(ScrollView, { testID: 'ScrollView-5', contentContainerStyle: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }
+    React.createElement(ScrollView, { testID: 'ScrollView-5', contentContainerStyle: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: moderateScale(24), paddingTop: insets.top + moderateScale(20), paddingBottom: insets.bottom + moderateScale(40) }
     },
-      React.createElement(View, { testID: 'View-9', style: { alignItems: 'center', marginBottom: 32 }, componentId: 'register-logo' },
+      React.createElement(View, { testID: 'View-9', style: { alignItems: 'center', marginBottom: moderateScale(32) }, componentId: 'register-logo' },
         React.createElement(Image, { 
           source: logoImg, 
-          style: { width: 100, height: 100, borderRadius: 24, resizeMode: 'contain', marginBottom: 12 } 
+          style: { width: scale(100), height: scale(100), borderRadius: scale(24), resizeMode: 'contain', marginBottom: moderateScale(12) }
         }),
         React.createElement(Text, { 
-          style: { fontSize: 26, fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 1.2, marginBottom: 4 } 
-        }, 'Penny'),
-        React.createElement(Text, { testID: 'Text-17', style: { fontSize: 14, color: theme.colors.textSecondary } }, 'Join Penny Today!')
+          style: { fontSize: normalize(26), fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 1.2, marginBottom: moderateScale(4) }
+        }, 'Penny')
+
       ),
-      React.createElement(View, { testID: 'View-11', style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'register-card' },
-        errorMsg ? React.createElement(View, { testID: 'View-12', style: { backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12, marginBottom: 16 } },
-          React.createElement(Text, { testID: 'Text-18', style: { color: theme.colors.error, fontSize: 14 } }, errorMsg)
+      React.createElement(View, { testID: 'View-11', style: { backgroundColor: theme.colors.card, borderRadius: scale(16), padding: moderateScale(24), shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'register-card' },
+        errorMsg ? React.createElement(View, { testID: 'View-12', style: { backgroundColor: '#FEF2F2', borderRadius: scale(8), padding: moderateScale(12), marginBottom: moderateScale(16) } },
+          React.createElement(Text, { testID: 'Text-18', style: { color: theme.colors.error, fontSize: normalize(14) } }, errorMsg)
         ) : null,
-        React.createElement(Text, { testID: 'Text-19', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'FULL NAME'),
-        React.createElement(TextInput, { testID: 'TextInput-3', value: name, onChangeText: setName, placeholder: 'John Doe',
+        React.createElement(Text, { testID: 'Text-19', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'FULL NAME'),
+        React.createElement(TextInput, { testID: 'TextInput-3', value: name, onChangeText: setName, placeholder: '',
+
           autoCapitalize: 'words',
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(16) },
           componentId: 'register-name-input'
         }),
-        React.createElement(Text, { testID: 'Text-20', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'EMAIL'),
-        React.createElement(TextInput, { testID: 'TextInput-4', value: email, onChangeText: setEmail, placeholder: 'your@email.com',
+        React.createElement(Text, { testID: 'Text-20', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'EMAIL'),
+        React.createElement(TextInput, { testID: 'TextInput-4', value: email, onChangeText: setEmail, placeholder: '',
+
           keyboardType: 'email-address', autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(16) },
           componentId: 'register-email-input'
         }),
-        React.createElement(Text, { testID: 'Text-21', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'PASSWORD'),
-        React.createElement(TextInput, { testID: 'TextInput-5', value: password, onChangeText: setPassword, placeholder: '••••••••',
+        React.createElement(Text, { testID: 'Text-21', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'PASSWORD'),
+        React.createElement(TextInput, { testID: 'TextInput-5', value: password, onChangeText: setPassword, placeholder: '',
+
           secureTextEntry: true, autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(16) },
           componentId: 'register-pass-input'
         }),
-        React.createElement(Text, { testID: 'Text-22', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'CONFIRM PASSWORD'),
-        React.createElement(TextInput, { testID: 'TextInput-6', value: confirmPassword, onChangeText: setConfirmPassword, placeholder: '••••••••',
+        React.createElement(Text, { testID: 'Text-22', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'CONFIRM PASSWORD'),
+        React.createElement(TextInput, { testID: 'TextInput-6', value: confirmPassword, onChangeText: setConfirmPassword, placeholder: '',
+
           secureTextEntry: true, autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 24 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(24) },
           componentId: 'register-confirm-pass-input'
         }),
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
-          <TouchableOpacity activeOpacity={0.8} onPress={() => setAgreeTerms(!agreeTerms)} style={{ width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: agreeTerms ? theme.colors.primary : theme.colors.border, backgroundColor: agreeTerms ? theme.colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-            {agreeTerms && <MaterialIcons name="check" size={14} color="#FFFFFF" />}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(24) }}>
+          <TouchableOpacity activeOpacity={0.8} onPress={() => setAgreeTerms(!agreeTerms)} style={{ width: scale(20), height: scale(20), borderRadius: scale(6), borderWidth: 2, borderColor: agreeTerms ? theme.colors.primary : theme.colors.border, backgroundColor: agreeTerms ? theme.colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(10) }}>
+            {agreeTerms && <MaterialIcons name="check" size={scale(14)} color="#FFFFFF" />}
           </TouchableOpacity>
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, flex: 1 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, flex: 1 }}>
             I agree to the <Text onPress={function(e) { if(e && e.stopPropagation) e.stopPropagation(); setShowTermsModal(true); }} style={{ color: theme.colors.primary, fontWeight: 'bold' }}>Terms & Conditions</Text>
           </Text>
         </View>,
 
         <Modal visible={showTermsModal} animationType="slide" transparent={true} onRequestClose={() => setShowTermsModal(false)}>
           <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Terms & Privacy Policy</Text>
-                <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ padding: 4, backgroundColor: theme.colors.background, borderRadius: 12 }}>
-                  <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+            <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: scale(24), borderTopRightRadius: scale(24), padding: moderateScale(24), paddingBottom: insets.bottom + moderateScale(24) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(16) }}>
+                <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>Terms & Privacy Policy</Text>
+                <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ padding: moderateScale(4), backgroundColor: theme.colors.background, borderRadius: scale(12) }}>
+                  <MaterialIcons name="close" size={scale(20)} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={{ maxHeight: 300 }}>
-                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>1. 100% Offline App</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+              <ScrollView style={{ maxHeight: scale(300) }}>
+                <Text style={{ fontSize: normalize(15), color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: moderateScale(8) }}>1. 100% Offline App</Text>
+                <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, marginBottom: moderateScale(16), lineHeight: normalize(22) }}>
                   Penny is a fully offline application. We do not collect, transmit, or store your financial data on any external servers. All information remains locally on your device.
                 </Text>
                 
-                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>2. Data Responsibility</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+                <Text style={{ fontSize: normalize(15), color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: moderateScale(8) }}>2. Data Responsibility</Text>
+                <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, marginBottom: moderateScale(16), lineHeight: normalize(22) }}>
                   Because your data is strictly local, you are solely responsible for it. If you uninstall the app or lose your device without a personal backup, your data will be permanently lost. We cannot recover lost data.
                 </Text>
                 
-                <Text style={{ fontSize: 15, color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: 8 }}>3. Not Financial Advice</Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, marginBottom: 16, lineHeight: 22 }}>
+                <Text style={{ fontSize: normalize(15), color: theme.colors.textPrimary, fontWeight: 'bold', marginBottom: moderateScale(8) }}>3. Not Financial Advice</Text>
+                <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, marginBottom: moderateScale(16), lineHeight: normalize(22) }}>
                   This application is a budgeting utility, not professional financial advice. You agree to use it at your own discretion.
                 </Text>
               </ScrollView>
               
-              <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ marginTop: 16, backgroundColor: theme.colors.primary, borderRadius: 12, padding: 14, alignItems: 'center' }}>
-                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Close</Text>
+              <TouchableOpacity onPress={() => setShowTermsModal(false)} style={{ marginTop: moderateScale(16), backgroundColor: theme.colors.primary, borderRadius: scale(12), padding: moderateScale(14), alignItems: 'center' }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(15) }}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
         </Modal>,
 
         React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-9', onPress: handleRegister, disabled: isLoading,
-          style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+          style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center' },
           componentId: 'register-submit-btn'
         },
           isLoading ? React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-2', color: '#FFFFFF' }) :
-          React.createElement(Text, { testID: 'Text-23', style: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' } }, 'Create Account')
+          React.createElement(Text, { testID: 'Text-23', style: { color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' } }, 'Create Account')
         ),
         React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-10', onPress: function() { navigation.goBack(); },
-          style: { marginTop: 16, alignItems: 'center' },
+          style: { marginTop: moderateScale(16), alignItems: 'center' },
           componentId: 'go-login-btn'
         },
-          React.createElement(Text, { testID: 'Text-24', style: { color: theme.colors.textSecondary, fontSize: 14 } },
+          React.createElement(Text, { testID: 'Text-24', style: { color: theme.colors.textSecondary, fontSize: normalize(14) } },
             'Already have an account? ',
             React.createElement(Text, { testID: 'Text-25', style: { color: theme.colors.primary, fontWeight: '600' } }, 'Sign In')
           )
@@ -177,3 +182,4 @@ const RegisterScreen = function(props) {
 };
 
 export default RegisterScreen;
+

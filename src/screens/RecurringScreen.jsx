@@ -14,6 +14,7 @@ import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateEnvelopeForSpend, 
 import { formatCurrency, formatDate, isWithin5Days, isOverdue, getCurrentMonthStr } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 import emptyRecurringImg from '../assets/empty_recurring.png';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
@@ -207,20 +208,20 @@ const RecurringScreen = function(props) {
   
   return React.createElement(View, { testID: 'View-48', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'recurring-screen' },
     React.createElement(SaveSuccessOverlay, { visible: showSaveSuccess, theme: theme, message: successMessage }),
-    React.createElement(View, { testID: 'View-49', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 20, paddingHorizontal: 20 }, componentId: 'recurring-header' },
+    React.createElement(View, { testID: 'View-49', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(20), paddingHorizontal: moderateScale(20) }, componentId: 'recurring-header' },
       React.createElement(Text, { testID: 'Text-67', style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Recurring Expenses'),
       React.createElement(Text, { testID: 'Text-68', style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, String(recurringExpenses.length) + ' total bills')
     ),
-    React.createElement(ScrollView, { testID: 'ScrollView-8', horizontal: true, style: { flexGrow: 'initial', backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, showsHorizontalScrollIndicator: false, contentContainerStyle: { paddingHorizontal: 16, paddingVertical: 12 } },
+    React.createElement(ScrollView, { testID: 'ScrollView-8', horizontal: true, style: { flexGrow: 'initial', backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, showsHorizontalScrollIndicator: false, contentContainerStyle: { paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(12) } },
       filters.map(function(f) {
         var count = f === 'All' ? recurringExpenses.length : recurringExpenses.filter(r => r.status === f).length;
         return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-18', key: f, onPress: function() { setFilter(f); },
-          style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: filter === f ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: filter === f ? theme.colors.primary : '#FED7AA' },
+          style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(8), borderRadius: scale(20), marginRight: moderateScale(8), backgroundColor: filter === f ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: filter === f ? theme.colors.primary : '#FED7AA' },
           componentId: 'filter-' + f
         },
-          React.createElement(Text, { testID: 'Text-69', style: { color: filter === f ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 13, fontWeight: '600' } }, f),
-          count > 0 ? React.createElement(View, { style: { marginLeft: 6, backgroundColor: filter === f ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 } },
-            React.createElement(Text, { style: { color: filter === f ? '#FFFFFF' : theme.colors.primary, fontSize: 11, fontWeight: 'bold' } }, String(count))
+          React.createElement(Text, { testID: 'Text-69', style: { color: filter === f ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(13), fontWeight: '600' } }, f),
+          count > 0 ? React.createElement(View, { style: { marginLeft: moderateScale(6), backgroundColor: filter === f ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: scale(10), paddingHorizontal: moderateScale(6), paddingVertical: moderateScale(2) } },
+            React.createElement(Text, { style: { color: filter === f ? '#FFFFFF' : theme.colors.primary, fontSize: normalize(11), fontWeight: 'bold' } }, String(count))
           ) : null
         );
       })
@@ -229,52 +230,52 @@ const RecurringScreen = function(props) {
       React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-4', size: 'large', color: theme.colors.primary })
     ) :
     React.createElement(ScrollView, { testID: 'ScrollView-9', style: { flex: 1 },
-      contentContainerStyle: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: scrollBottomPadding }
+      contentContainerStyle: { paddingTop: moderateScale(16), paddingHorizontal: moderateScale(16), paddingBottom: scrollBottomPadding }
     },
-      filtered.length === 0 ? React.createElement(View, { testID: 'View-51', style: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 30 }, componentId: 'recurring-empty' },
-        React.createElement(Text, { style: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' } }, "You're all caught up! 🎉"),
-        React.createElement(Text, { testID: 'Text-70', style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 } }, "No recurring bills to worry about. If you have monthly subscriptions or rent, tap the + button to keep track of them effortlessly.")
+      filtered.length === 0 ? React.createElement(View, { testID: 'View-51', style: { alignItems: 'center', paddingTop: moderateScale(40), paddingHorizontal: moderateScale(30) }, componentId: 'recurring-empty' },
+        React.createElement(Text, { style: { fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(8), textAlign: 'center' } }, "You're all caught up! 🎉"),
+        React.createElement(Text, { testID: 'Text-70', style: { fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: normalize(22) } }, "No recurring bills to worry about. If you have monthly subscriptions or rent, tap the + button to keep track of them effortlessly.")
       ) :
       [...filtered.slice(0, visibleCount).map(function(expense, idx) {
         var overdue = isOverdue(expense.due_date) && expense.status === 'Pending';
         var upcoming = isWithin5Days(expense.due_date) && !overdue && expense.status === 'Pending';
         var missingEnvelope = expense.status === 'Pending' && !findEnvelopeForCategory(envelopes, expense.category);
         return React.createElement(View, { testID: 'View-52', key: expense.id,
-          style: { backgroundColor: theme.colors.card, borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, borderLeftWidth: overdue ? 4 : (upcoming ? 4 : 0), borderLeftColor: overdue ? theme.colors.error : theme.colors.warning },
+          style: { backgroundColor: theme.colors.card, borderRadius: scale(14), padding: moderateScale(16), marginBottom: moderateScale(12), shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, borderLeftWidth: overdue ? scale(4) : (upcoming ? scale(4) : 0), borderLeftColor: overdue ? theme.colors.error : theme.colors.warning },
           componentId: 'recurring-item-' + idx
         },
           React.createElement(View, { testID: 'View-53', style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' } },
-            React.createElement(View, { testID: 'View-54', style: { flex: 1, marginRight: 12 } },
-              React.createElement(Text, { testID: 'Text-72', style: { fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary } }, expense.name),
-              React.createElement(Text, { testID: 'Text-73', style: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 3 } }, 'Due: ' + formatDate(expense.due_date)),
-              overdue ? React.createElement(Text, { testID: 'Text-74', style: { fontSize: 12, color: theme.colors.error, marginTop: 2 } }, '⚠ OVERDUE') : null,
-              upcoming ? React.createElement(Text, { testID: 'Text-75', style: { fontSize: 12, color: theme.colors.warning, marginTop: 2 } }, '⏰ Due soon') : null,
-              missingEnvelope ? React.createElement(Text, { style: { fontSize: 12, color: theme.colors.error, marginTop: 2 } }, '⚠ Envelope missing — edit or delete this bill') : null
+            React.createElement(View, { testID: 'View-54', style: { flex: 1, marginRight: moderateScale(12) } },
+              React.createElement(Text, { testID: 'Text-72', style: { fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary } }, expense.name),
+              React.createElement(Text, { testID: 'Text-73', style: { fontSize: normalize(13), color: theme.colors.textSecondary, marginTop: 3 } }, 'Due: ' + formatDate(expense.due_date)),
+              overdue ? React.createElement(Text, { testID: 'Text-74', style: { fontSize: normalize(12), color: theme.colors.error, marginTop: 2 } }, '⚠ OVERDUE') : null,
+              upcoming ? React.createElement(Text, { testID: 'Text-75', style: { fontSize: normalize(12), color: theme.colors.warning, marginTop: 2 } }, '⏰ Due soon') : null,
+              missingEnvelope ? React.createElement(Text, { testID: 'Text-76', style: { fontSize: normalize(12), color: theme.colors.error, marginTop: 2 } }, '⚠ Envelope missing — edit or delete this bill') : null
             ),
             React.createElement(View, { testID: 'View-55', style: { alignItems: 'flex-end' } },
-              React.createElement(Text, { testID: 'Text-76', style: { fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary } }, formatCurrency(expense.amount)),
-              React.createElement(View, { testID: 'View-56', style: { backgroundColor: getStatusBg(expense.status), borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: 6 } },
-                React.createElement(Text, { testID: 'Text-77', style: { fontSize: 11, color: getStatusColor(expense.status), fontWeight: '600' } }, expense.status)
+              React.createElement(Text, { testID: 'Text-77', style: { fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary } }, formatCurrency(expense.amount)),
+              React.createElement(View, { testID: 'View-56', style: { backgroundColor: getStatusBg(expense.status), borderRadius: scale(20), paddingHorizontal: moderateScale(10), paddingVertical: moderateScale(4), marginTop: 6 } },
+                React.createElement(Text, { testID: 'Text-78', style: { fontSize: normalize(11), color: getStatusColor(expense.status), fontWeight: '600' } }, expense.status)
               )
             )
           ),
-          React.createElement(View, { testID: 'View-57', style: { flexDirection: 'row', marginTop: 14, gap: 8 } },
+          React.createElement(View, { testID: 'View-57', style: { flexDirection: 'row', marginTop: moderateScale(14), gap: moderateScale(8) } },
             expense.status === 'Pending' ? React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-19', onPress: function() { triggerImpactHaptic('Light'); handlePayPress(expense); },
-              style: { flex: 1, backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+              style: { flex: 1, backgroundColor: theme.colors.primary, borderRadius: scale(10), paddingVertical: moderateScale(10), alignItems: 'center' },
               componentId: 'pay-btn-' + idx
             },
-              React.createElement(Text, { testID: 'Text-78', style: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' } }, '💰 Pay Now')
+              React.createElement(Text, { testID: 'Text-79', style: { color: '#FFFFFF', fontSize: normalize(14), fontWeight: '600' } }, '💰 Pay Now')
             ) : React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-20', onPress: function() { handleResetStatus(expense); },
-              style: { flex: 1, backgroundColor: theme.colors.background, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
+              style: { flex: 1, backgroundColor: theme.colors.background, borderRadius: scale(10), paddingVertical: moderateScale(10), alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
               componentId: 'reset-btn-' + idx
             },
-              React.createElement(Text, { testID: 'Text-79', style: { color: theme.colors.textSecondary, fontSize: 14, fontWeight: '600' } }, '↩ Reset')
+              React.createElement(Text, { testID: 'Text-80', style: { color: theme.colors.textSecondary, fontSize: normalize(14), fontWeight: '600' } }, '↩ Reset')
             ),
             React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-21', onPress: function() { handleDelete(expense); },
-              style: { width: 42, height: 42, borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
+              style: { width: scale(42), height: scale(42), borderRadius: scale(10), backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
               componentId: 'delete-recurring-' + idx
             },
-              React.createElement(MaterialIcons, { testID: 'MaterialIcons-10', name: 'delete-outline', size: 20, color: theme.colors.error })
+              React.createElement(MaterialIcons, { testID: 'MaterialIcons-10', name: 'delete-outline', size: scale(20), color: theme.colors.error })
             )
           )
         );
@@ -282,8 +283,8 @@ const RecurringScreen = function(props) {
       visibleCount < filtered.length ? React.createElement(TouchableOpacity, {
         key: 'see-more-btn',
         onPress: () => setVisibleCount(visibleCount + 5),
-        style: { alignItems: 'center', paddingVertical: 16 }
-      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold' } }, "See More (" + (filtered.length - visibleCount) + " hidden)")) : null]
+        style: { alignItems: 'center', paddingVertical: moderateScale(16) }
+      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold', fontSize: normalize(14) } }, "See More (" + (filtered.length - visibleCount) + " hidden)")) : null]
     ),
     React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-22', onPress: function() {
         triggerImpactHaptic('Medium');
@@ -293,10 +294,10 @@ const RecurringScreen = function(props) {
         }
         setShowAdd(true);
       },
-      style: { position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+      style: { position: 'absolute', right: scale(20), bottom: fabBottom, width: scale(56), height: scale(56), borderRadius: scale(28), backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
       componentId: 'recurring-fab'
     },
-      React.createElement(MaterialIcons, { testID: 'MaterialIcons-11', name: 'add', size: 28, color: '#FFFFFF' })
+      React.createElement(MaterialIcons, { testID: 'MaterialIcons-11', name: 'add', size: scale(28), color: '#FFFFFF' })
     ),
     React.createElement(PayModal, { testID: 'PayModal-1', visible: showPayModal,
       expense: selectedExpense,

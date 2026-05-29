@@ -9,6 +9,17 @@
 -dontusemixedcaseclassnames
 -overloadaggressively
 
+# 6. Prevent Decompilation hints
+-dontpreverify
+-optimizationpasses 5
+-useuniqueclassmembernames
+-flattenpackagehierarchy ''
+
+# 7. Aggressive Obfuscation
+-overloadaggressively
+-repackageclasses ''
+-allowaccessmodification
+
 # 2. Capacitor Bridge Protection (MANDATORY)
 # We must keep Capacitor-specific bridge classes to prevent JS-to-Native crashes
 -keep class com.getcapacitor.** { *; }

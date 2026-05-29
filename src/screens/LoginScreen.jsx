@@ -5,6 +5,7 @@ import { useQuery } from 'platform-hooks';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 import KeyboardAvoidingWrapper from '../components/KeyboardAvoidingWrapper';
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
@@ -163,73 +164,75 @@ const LoginScreen = function (props) {
   },
     React.createElement(ScrollView, {
       testID: 'ScrollView-4',
-      contentContainerStyle: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 40 }
+      contentContainerStyle: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: moderateScale(24), paddingTop: insets.top + moderateScale(20), paddingBottom: insets.bottom + moderateScale(40) }
     },
       // Logo + mascot
-      React.createElement(View, { testID: 'View-5', style: { alignItems: 'center', marginBottom: 32 }, componentId: 'login-logo' },
+      React.createElement(View, { testID: 'View-5', style: { alignItems: 'center', marginBottom: moderateScale(32) }, componentId: 'login-logo' },
         React.createElement(Image, { 
           source: logoImg, 
-          style: { width: 100, height: 100, borderRadius: 24, resizeMode: 'contain', marginBottom: 12 } 
+          style: { width: scale(100), height: scale(100), borderRadius: scale(24), resizeMode: 'contain', marginBottom: moderateScale(12) }
         }),
         React.createElement(Text, { 
-          style: { fontSize: 26, fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 1.2 } 
+          style: { fontSize: normalize(26), fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 1.2 }
         }, 'Penny')
       ),
 
       // Login card
-      React.createElement(View, { testID: 'View-7', style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'login-card' },
-        React.createElement(Text, { testID: 'Text-10', style: { fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 24 } }, 'Sign In'),
-        successMsg ? React.createElement(View, { style: { backgroundColor: '#E6F4EA', borderRadius: 8, padding: 12, marginBottom: 16 } },
-          React.createElement(Text, { style: { color: '#065F46', fontSize: 14 } }, successMsg)
+      React.createElement(View, { testID: 'View-7', style: { backgroundColor: theme.colors.card, borderRadius: scale(16), padding: moderateScale(24), shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 }, componentId: 'login-card' },
+        React.createElement(Text, { testID: 'Text-10', style: { fontSize: normalize(22), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(24) } }, 'Sign In'),
+        successMsg ? React.createElement(View, { style: { backgroundColor: '#E6F4EA', borderRadius: scale(8), padding: moderateScale(12), marginBottom: moderateScale(16) } },
+          React.createElement(Text, { style: { color: '#065F46', fontSize: normalize(14) } }, successMsg)
         ) : null,
-        errorMsg ? React.createElement(View, { testID: 'View-8', style: { backgroundColor: '#FEF2F2', borderRadius: 8, padding: 12, marginBottom: 16 } },
-          React.createElement(Text, { testID: 'Text-11', style: { color: theme.colors.error, fontSize: 14 } }, errorMsg)
+        errorMsg ? React.createElement(View, { testID: 'View-8', style: { backgroundColor: '#FEF2F2', borderRadius: scale(8), padding: moderateScale(12), marginBottom: moderateScale(16) } },
+          React.createElement(Text, { testID: 'Text-11', style: { color: theme.colors.error, fontSize: normalize(14) } }, errorMsg)
         ) : null,
-        React.createElement(Text, { testID: 'Text-12', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'EMAIL'),
+        React.createElement(Text, { testID: 'Text-12', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'EMAIL'),
         React.createElement(TextInput, {
-          testID: 'TextInput-1', value: email, onChangeText: setEmail, placeholder: 'your@email.com',
+          testID: 'TextInput-1', value: email, onChangeText: setEmail, placeholder: '',
+
           keyboardType: 'email-address', autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(16) },
           componentId: 'login-email-input'
         }),
-        React.createElement(Text, { testID: 'Text-13', style: { fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 6 } }, 'PASSWORD'),
+        React.createElement(Text, { testID: 'Text-13', style: { fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'PASSWORD'),
         React.createElement(TextInput, {
-          testID: 'TextInput-2', value: password, onChangeText: setPassword, placeholder: '••••••••',
+          testID: 'TextInput-2', value: password, onChangeText: setPassword, placeholder: '',
+
           secureTextEntry: true, autoCapitalize: 'none', autoCorrect: false,
-          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 14, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 12 },
+          style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(10), padding: moderateScale(14), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(12) },
           componentId: 'login-password-input'
         }),
         React.createElement(TouchableOpacity, {
           onPress: function () { navigation.navigate('ForgotPassword'); },
-          style: { alignSelf: 'flex-end', marginBottom: 20 },
+          style: { alignSelf: 'flex-end', marginBottom: moderateScale(20) },
           componentId: 'forgot-password-btn'
         },
-          React.createElement(Text, { style: { color: theme.colors.primary, fontSize: 13, fontWeight: '600' } }, 'Forgot password?')
+          React.createElement(Text, { style: { color: theme.colors.primary, fontSize: normalize(13), fontWeight: '600' } }, 'Forgot password?')
         ),
         React.createElement(TouchableOpacity, {
           testID: 'TouchableOpacity-7', onPress: handleLogin, disabled: isLoading,
-          style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+          style: { backgroundColor: isLoading ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center' },
           componentId: 'login-submit-btn'
         },
           isLoading ? React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-1', color: '#FFFFFF' }) :
-            React.createElement(Text, { testID: 'Text-14', style: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' } }, 'Sign In')
+            React.createElement(Text, { testID: 'Text-14', style: { color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' } }, 'Sign In')
         ),
 
         // PIN option — show if ANY account has a PIN set
         hasPinAccount ? React.createElement(TouchableOpacity, {
           onPress: function () { setShowPinModal(true); setPin(''); setPinError(false); },
-          style: { marginTop: 16, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+          style: { marginTop: moderateScale(16), borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(12), padding: moderateScale(14), alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
           componentId: 'login-pin-btn'
         },
-          React.createElement(MaterialIcons, { name: 'dialpad', size: 20, color: theme.colors.primary }),
-          React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: '700', fontSize: 14, marginLeft: 8 } }, 'Sign in with PIN')
+          React.createElement(MaterialIcons, { name: 'dialpad', size: scale(20), color: theme.colors.primary }),
+          React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: '700', fontSize: normalize(14), marginLeft: 8 } }, 'Sign in with PIN')
         ) : null,
 
         React.createElement(TouchableOpacity, {
           testID: 'TouchableOpacity-8', onPress: function () { navigation.navigate('Register'); },
-          style: { marginTop: 16, alignItems: 'center' }, componentId: 'go-register-btn'
+          style: { marginTop: moderateScale(16), alignItems: 'center' }, componentId: 'go-register-btn'
         },
-          React.createElement(Text, { testID: 'Text-15', style: { color: theme.colors.textSecondary, fontSize: 14 } },
+          React.createElement(Text, { testID: 'Text-15', style: { color: theme.colors.textSecondary, fontSize: normalize(14) } },
             "Don't have an account? ",
             React.createElement(Text, { testID: 'Text-16', style: { color: theme.colors.primary, fontWeight: '600' } }, 'Sign Up')
           )
@@ -240,52 +243,52 @@ const LoginScreen = function (props) {
     // PIN Modal overlay
     React.createElement(Modal, { visible: showPinModal, animationType: 'slide', transparent: true, onRequestClose: handleClosePinModal },
       React.createElement(View, { style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' } },
-        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingTop: 20, paddingBottom: insets.bottom + 32, paddingHorizontal: 32, alignItems: 'center' } },
+        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderTopLeftRadius: scale(28), borderTopRightRadius: scale(28), paddingTop: moderateScale(20), paddingBottom: insets.bottom + moderateScale(32), paddingHorizontal: moderateScale(32), alignItems: 'center' } },
 
           // Handle bar
-          React.createElement(View, { style: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, marginBottom: 24 } }),
+          React.createElement(View, { style: { width: scale(40), height: scale(4), borderRadius: scale(2), backgroundColor: theme.colors.border, marginBottom: moderateScale(24) } }),
 
-          React.createElement(Text, { style: { fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 } }, 'Enter your PIN'),
-          React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 24 } }, 'Each account\'s PIN is unique'),
+          React.createElement(Text, { style: { fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(24) } }, 'Enter your PIN'),
+
 
           // PIN dots
-          React.createElement(View, { style: { flexDirection: 'row', gap: 10, marginBottom: 8 } },
+          React.createElement(View, { style: { flexDirection: 'row', gap: scale(10), marginBottom: moderateScale(8) } },
             Array.from({ length: PIN_LENGTH }).map(function (_, i) {
-              return React.createElement(View, { key: i, style: { width: 13, height: 13, borderRadius: 7, backgroundColor: i < pin.length ? theme.colors.primary : 'transparent', borderWidth: 2, borderColor: pinError ? theme.colors.error : (i < pin.length ? theme.colors.primary : theme.colors.border) } });
+              return React.createElement(View, { key: i, style: { width: scale(13), height: scale(13), borderRadius: scale(7), backgroundColor: i < pin.length ? theme.colors.primary : 'transparent', borderWidth: 2, borderColor: pinError ? theme.colors.error : (i < pin.length ? theme.colors.primary : theme.colors.border) } });
             })
           ),
           pinError
-            ? React.createElement(Text, { style: { color: theme.colors.error, fontSize: 13, fontWeight: '600', marginBottom: 16 } }, 'Incorrect PIN')
-            : React.createElement(View, { style: { height: 26 } }),
+            ? React.createElement(Text, { style: { color: theme.colors.error, fontSize: normalize(13), fontWeight: '600', marginBottom: moderateScale(16) } }, 'Incorrect PIN')
+            : React.createElement(View, { style: { height: scale(26) } }),
 
           // Dial pad
-          React.createElement(View, { style: { width: 240, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 } },
+          React.createElement(View, { style: { width: scale(240), flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: moderateScale(12) } },
             [1, 2, 3, 4, 5, 6, 7, 8, 9].map(function (num) {
               return React.createElement(TouchableOpacity, {
                 key: num, onPress: function () { handlePinPress(num.toString()); },
-                style: { width: 68, height: 68, borderRadius: 34, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
+                style: { width: scale(68), height: scale(68), borderRadius: scale(34), backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
               },
-                React.createElement(Text, { style: { fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary } }, num)
+                React.createElement(Text, { style: { fontSize: normalize(24), fontWeight: 'bold', color: theme.colors.textPrimary } }, num)
               );
             }),
             pinEntry?.biometricsEnabled
               ? React.createElement(TouchableOpacity, {
                 onPress: triggerModalBiometrics,
-                style: { width: 68, height: 68, borderRadius: 34, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
+                style: { width: scale(68), height: scale(68), borderRadius: scale(34), backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
               },
-                React.createElement(MaterialIcons, { name: 'fingerprint', size: 28, color: theme.colors.primary })
+                React.createElement(MaterialIcons, { name: 'fingerprint', size: scale(28), color: theme.colors.primary })
               )
-              : React.createElement(TouchableOpacity, { onPress: handleClosePinModal, style: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' } },
-                React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, fontWeight: '600', textAlign: 'center' } }, 'Cancel')
+              : React.createElement(TouchableOpacity, { onPress: handleClosePinModal, style: { width: scale(68), height: scale(68), alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Text, { style: { fontSize: normalize(12), color: theme.colors.textSecondary, fontWeight: '600', textAlign: 'center' } }, 'Cancel')
               ),
             React.createElement(TouchableOpacity, {
               onPress: function () { handlePinPress('0'); },
-              style: { width: 68, height: 68, borderRadius: 34, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
+              style: { width: scale(68), height: scale(68), borderRadius: scale(34), backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }
             },
-              React.createElement(Text, { style: { fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary } }, '0')
+              React.createElement(Text, { style: { fontSize: normalize(24), fontWeight: 'bold', color: theme.colors.textPrimary } }, '0')
             ),
-            React.createElement(TouchableOpacity, { onPress: handleBackspace, style: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' } },
-              React.createElement(MaterialIcons, { name: 'backspace', size: 24, color: theme.colors.textSecondary })
+            React.createElement(TouchableOpacity, { onPress: handleBackspace, style: { width: scale(68), height: scale(68), alignItems: 'center', justifyContent: 'center' } },
+              React.createElement(MaterialIcons, { name: 'backspace', size: scale(24), color: theme.colors.textSecondary })
             )
           )
         )

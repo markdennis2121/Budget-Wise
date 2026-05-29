@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, Image, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { triggerSuccessHaptic } from '../utils/feedback';
@@ -120,15 +121,15 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
           flex: 1,
           justifyContent: 'center',
           backgroundColor: 'rgba(0,0,0,0.65)',
-          paddingHorizontal: 20,
-          paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 12
+          paddingHorizontal: moderateScale(20),
+          paddingTop: insets.top + moderateScale(12),
+          paddingBottom: insets.bottom + moderateScale(12)
         }}
       >
         <View
           style={{
             backgroundColor: theme.colors.card,
-            borderRadius: 24,
+            borderRadius: scale(24),
             maxHeight: '92%',
             overflow: 'hidden',
             shadowColor: '#000',
@@ -143,12 +144,12 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingTop: 16,
-              paddingBottom: 8
+              paddingHorizontal: moderateScale(20),
+              paddingTop: moderateScale(16),
+              paddingBottom: moderateScale(8)
             }}
           >
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>
+            <Text style={{ fontSize: normalize(12), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>
               {'STEP ' + (step + 1) + ' OF ' + steps.length}
             </Text>
             <TouchableOpacity
@@ -156,43 +157,43 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityLabel="Skip tour"
             >
-              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textSecondary }}>Skip</Text>
+              <Text style={{ fontSize: normalize(14), fontWeight: '600', color: theme.colors.textSecondary }}>Skip</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView
-            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 8, alignItems: 'center' }}
+            contentContainerStyle={{ paddingHorizontal: moderateScale(24), paddingBottom: moderateScale(8), alignItems: 'center' }}
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
             {current.showLogo ? (
               <Image
                 source={logoImg}
-                style={{ width: 72, height: 72, borderRadius: 18, marginBottom: 16 }}
+                style={{ width: scale(72), height: scale(72), borderRadius: scale(18), marginBottom: moderateScale(16) }}
                 resizeMode="contain"
               />
             ) : (
               <View
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 36,
+                  width: scale(72),
+                  height: scale(72),
+                  borderRadius: scale(36),
                   backgroundColor: current.accent || '#FFEDD5',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginBottom: 16
+                  marginBottom: moderateScale(16)
                 }}
               >
-                <MaterialIcons name={current.icon} size={36} color={theme.colors.primary} />
+                <MaterialIcons name={current.icon} size={scale(36)} color={theme.colors.primary} />
               </View>
             )}
 
             <Text
               style={{
-                fontSize: 22,
+                fontSize: normalize(22),
                 fontWeight: 'bold',
                 color: theme.colors.textPrimary,
-                marginBottom: 6,
+                marginBottom: moderateScale(6),
                 textAlign: 'center'
               }}
             >
@@ -202,11 +203,11 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             {current.subtitle ? (
               <Text
                 style={{
-                  fontSize: 14,
+                  fontSize: normalize(14),
                   fontWeight: '600',
                   color: theme.colors.primary,
                   textAlign: 'center',
-                  marginBottom: 14
+                  marginBottom: moderateScale(14)
                 }}
               >
                 {current.subtitle}
@@ -216,11 +217,11 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             {current.body ? (
               <Text
                 style={{
-                  fontSize: 15,
+                  fontSize: normalize(15),
                   color: theme.colors.textSecondary,
                   textAlign: 'center',
-                  lineHeight: 23,
-                  marginBottom: 8
+                  lineHeight: normalize(23),
+                  marginBottom: moderateScale(8)
                 }}
               >
                 {current.body}
@@ -228,36 +229,36 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             ) : null}
 
             {current.bullets ? (
-              <View style={{ width: '100%', marginTop: 8, marginBottom: 4 }}>
+              <View style={{ width: '100%', marginTop: moderateScale(8), marginBottom: moderateScale(4) }}>
                 {current.bullets.map(function (item, idx) {
                   return (
                     <View
                       key={idx}
                       style={{
                         flexDirection: 'row',
-                        alignItems: 'flex-start',
+                        alignItems: 'center',
                         backgroundColor: theme.colors.background,
-                        borderRadius: 12,
-                        padding: 14,
-                        marginBottom: 10,
+                        borderRadius: scale(12),
+                        padding: moderateScale(14),
+                        marginBottom: moderateScale(10),
                         borderWidth: 1,
                         borderColor: theme.colors.border
                       }}
                     >
                       <View
                         style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
+                          width: scale(32),
+                          height: scale(32),
+                          borderRadius: scale(16),
                           backgroundColor: theme.colors.primary + '18',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          marginRight: 12
+                          marginRight: moderateScale(12)
                         }}
                       >
-                        <MaterialIcons name={item.icon} size={18} color={theme.colors.primary} />
+                        <MaterialIcons name={item.icon} size={scale(18)} color={theme.colors.primary} />
                       </View>
-                      <Text style={{ flex: 1, fontSize: 14, color: theme.colors.textPrimary, lineHeight: 21 }}>
+                      <Text style={{ flex: 1, fontSize: normalize(14), color: theme.colors.textPrimary, lineHeight: normalize(21) }}>
                         {item.text}
                       </Text>
                     </View>
@@ -267,7 +268,7 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             ) : null}
 
             {current.checklist ? (
-              <View style={{ width: '100%', marginTop: 8 }}>
+              <View style={{ width: '100%', marginTop: moderateScale(8) }}>
                 {current.checklist.map(function (item, idx) {
                   return (
                     <View
@@ -275,16 +276,16 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        paddingVertical: 10,
+                        paddingVertical: moderateScale(10),
                         borderBottomWidth: idx < current.checklist.length - 1 ? 1 : 0,
                         borderBottomColor: theme.colors.border
                       }}
                     >
-                      <MaterialIcons name={item.icon} size={22} color={theme.colors.primary} style={{ marginRight: 12 }} />
-                      <Text style={{ flex: 1, fontSize: 14, color: theme.colors.textPrimary, lineHeight: 20 }}>
+                      <MaterialIcons name={item.icon} size={scale(22)} color={theme.colors.primary} style={{ marginRight: 12 }} />
+                      <Text style={{ flex: 1, fontSize: normalize(14), color: theme.colors.textPrimary, lineHeight: normalize(20) }}>
                         {item.text}
                       </Text>
-                      <MaterialIcons name="chevron-right" size={20} color={theme.colors.textSecondary} />
+                      <MaterialIcons name="chevron-right" size={scale(20)} color={theme.colors.textSecondary} />
                     </View>
                   );
                 })}
@@ -292,16 +293,16 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             ) : null}
           </ScrollView>
 
-          <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 20 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 18 }}>
+          <View style={{ paddingHorizontal: moderateScale(24), paddingTop: moderateScale(12), paddingBottom: moderateScale(20) }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: scale(8), marginBottom: moderateScale(18) }}>
               {steps.map(function (_, idx) {
                 return (
                   <View
                     key={idx}
                     style={{
-                      width: step === idx ? 22 : 8,
-                      height: 8,
-                      borderRadius: 4,
+                      width: step === idx ? scale(22) : scale(8),
+                      height: scale(8),
+                      borderRadius: scale(4),
                       backgroundColor: step === idx ? theme.colors.primary : theme.colors.border
                     }}
                   />
@@ -309,22 +310,22 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
               })}
             </View>
 
-            <View style={{ flexDirection: 'row', width: '100%', gap: 12 }}>
+            <View style={{ flexDirection: 'row', width: '100%', gap: moderateScale(12) }}>
               {step > 0 ? (
                 <TouchableOpacity
                   onPress={goBack}
                   style={{
                     flex: 1,
                     backgroundColor: theme.colors.background,
-                    borderRadius: 14,
-                    paddingVertical: 14,
+                    borderRadius: scale(14),
+                    paddingVertical: moderateScale(14),
                     alignItems: 'center',
                     borderWidth: 1,
                     borderColor: theme.colors.border,
-                    minHeight: 48
+                    minHeight: scale(48)
                   }}
                 >
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 16, fontWeight: 'bold' }}>Back</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(16), fontWeight: 'bold' }}>Back</Text>
                 </TouchableOpacity>
               ) : null}
 
@@ -334,10 +335,10 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
                 style={{
                   flex: step > 0 ? 2 : 1,
                   backgroundColor: theme.colors.primary,
-                  borderRadius: 14,
-                  paddingVertical: 14,
+                  borderRadius: scale(14),
+                  paddingVertical: moderateScale(14),
                   alignItems: 'center',
-                  minHeight: 48,
+                  minHeight: scale(48),
                   opacity: finishing ? 0.7 : 1,
                   shadowColor: theme.colors.primary,
                   shadowOffset: { width: 0, height: 4 },
@@ -346,7 +347,7 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
                   elevation: 4
                 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>
                   {finishing ? 'Saving…' : isLast ? "Let's go!" : 'Next'}
                 </Text>
               </TouchableOpacity>

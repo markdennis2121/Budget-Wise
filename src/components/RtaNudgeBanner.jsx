@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { formatCurrency } from '../utils/helpers';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 
 /**
  * Ready-to-Assign guidance: unassigned cash, overspent, or orphan pending bills.
@@ -57,9 +58,9 @@ const RtaNudgeBanner = function ({ theme, readyToAssign, orphanPendingTotal, onP
       {...wrapperProps}
       style={{
         backgroundColor: config.bg,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 16,
+        borderRadius: scale(14),
+        padding: moderateScale(14),
+        marginBottom: moderateScale(16),
         borderWidth: 1,
         borderColor: config.border + '44',
         flexDirection: 'row',
@@ -68,28 +69,28 @@ const RtaNudgeBanner = function ({ theme, readyToAssign, orphanPendingTotal, onP
     >
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: scale(40),
+          height: scale(40),
+          borderRadius: scale(20),
           backgroundColor: config.border + '22',
           alignItems: 'center',
           justifyContent: 'center',
-          marginRight: 12
+          marginRight: moderateScale(12)
         }}
       >
-        <MaterialIcons name={config.icon} size={22} color={config.border} />
+        <MaterialIcons name={config.icon} size={scale(22)} color={config.border} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 2 }}>
+        <Text style={{ fontSize: normalize(14), fontWeight: 'bold', color: colors.textPrimary, marginBottom: 2 }}>
           {config.title}
         </Text>
-        <Text style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 18 }}>
+        <Text style={{ fontSize: normalize(12), color: colors.textSecondary, lineHeight: normalize(18) }}>
           {config.message}
         </Text>
         {config.cta ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-            <Text style={{ fontSize: 12, fontWeight: 'bold', color: config.border }}>{config.cta}</Text>
-            <MaterialIcons name="chevron-right" size={16} color={config.border} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: moderateScale(6) }}>
+            <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: config.border }}>{config.cta}</Text>
+            <MaterialIcons name="chevron-right" size={scale(16)} color={config.border} />
           </View>
         ) : null}
       </View>

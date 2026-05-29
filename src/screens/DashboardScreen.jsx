@@ -17,6 +17,7 @@ import { hasUserEnvelopes, showEnvelopeRequiredAlert } from '../utils/envelopeGu
 import logoImg from '../assets/logo.png';
 import { formatCurrency } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
+import { scale, moderateScale, SCREEN_WIDTH } from '../utils/responsive';
 import {
   TAB_MENU_HEIGHT,
   SCROLL_EXTRA_PADDING,
@@ -481,31 +482,31 @@ const DashboardScreen = function (props) {
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding + FAB_SCROLL_BOTTOM_EXTRA }}>
 
         {/* Header Block (Floating Card Style) */}
-        <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 20, paddingBottom: 10 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Image source={logoImg} style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: theme.colors.border }} />
+        <View style={{ paddingTop: insets.top + moderateScale(16), paddingHorizontal: moderateScale(20), paddingBottom: moderateScale(10) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) }}>
+              <Image source={logoImg} style={{ width: scale(44), height: scale(44), borderRadius: scale(22), borderWidth: 1, borderColor: theme.colors.border }} />
               <View>
                 <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>PENNY BUDGETING</Text>
                 <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{greeting}, {userName}!</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10) }}>
             <TouchableOpacity
               onPress={function () { triggerImpactHaptic('Light'); state.setShowOnboarding(true); }}
               accessibilityLabel="Open app tour"
-              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: scale(44), height: scale(44), borderRadius: scale(22), backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
             >
-              <MaterialIcons name="help-outline" size={22} color={theme.colors.textSecondary} />
+              <MaterialIcons name="help-outline" size={scale(22)} color={theme.colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
-              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: scale(44), height: scale(44), borderRadius: scale(22), backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
             >
-              <MaterialIcons name="notifications-active" size={22} color={theme.colors.primary} />
+              <MaterialIcons name="notifications-active" size={scale(22)} color={theme.colors.primary} />
               {hasNewAlerts && (
-                <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: theme.colors.error, borderRadius: 10, minWidth: 20, height: 20, paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: 'bold' }}>
+                <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: theme.colors.error, borderRadius: scale(10), minWidth: scale(20), height: scale(20), paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: scale(9), fontWeight: 'bold' }}>
                     {(currentAlertCount - lastSeenAlertCount) > 0 ? (currentAlertCount - lastSeenAlertCount) : '!'}
                   </Text>
                 </View>
@@ -516,10 +517,10 @@ const DashboardScreen = function (props) {
 
           <View style={{
             backgroundColor: theme.colors.primary,
-            borderRadius: 24,
-            padding: 24,
+            borderRadius: scale(24),
+            padding: moderateScale(24),
             flexDirection: 'column',
-            gap: 18,
+            gap: moderateScale(18),
             shadowColor: theme.colors.primary,
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.25,
@@ -528,22 +529,22 @@ const DashboardScreen = function (props) {
             overflow: 'hidden'
           }}>
             {/* Background overlapping circles for depth */}
-            <View style={{ position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            <View style={{ position: 'absolute', bottom: -50, left: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.05)' }} />
+            <View style={{ position: 'absolute', top: scale(-40), right: scale(-20), width: scale(140), height: scale(140), borderRadius: scale(70), backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <View style={{ position: 'absolute', bottom: scale(-50), left: scale(-30), width: scale(120), height: scale(120), borderRadius: scale(60), backgroundColor: 'rgba(255,255,255,0.05)' }} />
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View>
                 <TouchableOpacity onPress={handleTotalMoneyInfo} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={{ ...theme.typography.caption, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>TOTAL NET WORTH</Text>
-                  <MaterialIcons name="info-outline" size={14} color="rgba(255,255,255,0.8)" style={{ marginLeft: 4 }} />
+                  <MaterialIcons name="info-outline" size={scale(14)} color="rgba(255,255,255,0.8)" style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
                 <Text style={{ ...theme.typography.h1, color: '#FFFFFF' }}>{maskAmount(totalActualMoney)}</Text>
               </View>
               <TouchableOpacity
                 onPress={toggleBalances}
-                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
               >
-                <MaterialIcons name={balancesVisible ? "visibility" : "visibility-off"} size={22} color="#FFFFFF" />
+                <MaterialIcons name={balancesVisible ? "visibility" : "visibility-off"} size={scale(22)} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
@@ -551,13 +552,13 @@ const DashboardScreen = function (props) {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <TouchableOpacity onPress={handleReadyToAssignInfo} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase' }}>Ready to Budget</Text>
-                <Text style={{ fontSize: 13, color: '#6EE7B7', fontWeight: 'bold', marginLeft: 8 }}>{maskAmount(state.readyToAssign)}</Text>
+                <Text style={{ fontSize: scale(11), color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase' }}>Ready to Budget</Text>
+                <Text style={{ fontSize: scale(13), color: '#6EE7B7', fontWeight: 'bold', marginLeft: 8 }}>{maskAmount(state.readyToAssign)}</Text>
               </TouchableOpacity>
 
               {state.readyToAssign < 0 && (
-                <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 10, color: '#FECACA', fontWeight: 'bold' }}>OVER-ASSIGNED</Text>
+                <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(6) }}>
+                  <Text style={{ fontSize: scale(10), color: '#FECACA', fontWeight: 'bold' }}>OVER-ASSIGNED</Text>
                 </View>
               )}
             </View>
@@ -566,72 +567,72 @@ const DashboardScreen = function (props) {
 
         {/* Content Container with standard padding */}
       <Animated.View
-        style={{ paddingHorizontal: 20, paddingTop: 20, opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
+        style={{ paddingHorizontal: moderateScale(20), paddingTop: moderateScale(20), opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
         onLayout={function (e) { scrollContentY.current = e.nativeEvent.layout.y; }}
       >
 
           {/* Monthly Stats Card - Professional Redesign */}
-          <View style={{ backgroundColor: theme.colors.card, borderRadius: 24, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(18) }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-                  <MaterialIcons name="auto-graph" size={18} color={theme.colors.primary} />
+                <View style={{ width: scale(32), height: scale(32), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: scale(10) }}>
+                  <MaterialIcons name="auto-graph" size={scale(18)} color={theme.colors.primary} />
                 </View>
-                <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary }}>Money Manager</Text>
+                <Text style={{ fontSize: scale(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Money Manager</Text>
               </View>
-              <View style={{ backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                <Text style={{ fontSize: 10, color: theme.colors.textSecondary, fontWeight: 'bold' }}>THIS MONTH</Text>
+              <View style={{ backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', paddingHorizontal: scale(10), paddingVertical: scale(4), borderRadius: scale(8) }}>
+                <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, fontWeight: 'bold' }}>THIS MONTH</Text>
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+            <View style={{ flexDirection: 'row', gap: moderateScale(10), marginBottom: moderateScale(20) }}>
               {/* Income Block */}
               <TouchableOpacity
                 onPress={function () { triggerImpactHaptic('Light'); setShowIncomeModal(true); }}
-                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.05)' : '#F0FDF4', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: theme.isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7' }}
+                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.05)' : '#F0FDF4', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7' }}
               >
-                <Text style={{ fontSize: 10, color: '#16A34A', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>INCOME</Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
-                <MaterialIcons name="add-circle" size={14} color="#16A34A" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+                <Text style={{ fontSize: scale(10), color: '#16A34A', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>INCOME</Text>
+                <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
+                <MaterialIcons name="add-circle" size={scale(14)} color="#16A34A" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
               </TouchableOpacity>
 
               {/* Spent Block */}
               <TouchableOpacity
                 onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}
-                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(239, 68, 68, 0.05)' : '#FEF2F2', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: theme.isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }}
+                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(239, 68, 68, 0.05)' : '#FEF2F2', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }}
               >
-                <Text style={{ fontSize: 10, color: '#DC2626', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SPENT</Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
-                <MaterialIcons name="visibility" size={14} color="#DC2626" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+                <Text style={{ fontSize: scale(10), color: '#DC2626', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SPENT</Text>
+                <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
+                <MaterialIcons name="visibility" size={scale(14)} color="#DC2626" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
               </TouchableOpacity>
 
               {/* Savings Block */}
               <TouchableOpacity
                 onPress={function () { triggerImpactHaptic('Light'); setShowSavingsManagerModal(true); }}
-                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : '#EFF6FF', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: theme.isDark ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE' }}
+                style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : '#EFF6FF', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE' }}
               >
-                <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SAVINGS</Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
-                <MaterialIcons name="account-balance-wallet" size={14} color="#2563EB" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+                <Text style={{ fontSize: scale(10), color: '#2563EB', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SAVINGS</Text>
+                <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
+                <MaterialIcons name="account-balance-wallet" size={scale(14)} color="#2563EB" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
               </TouchableOpacity>
             </View>
 
             {/* Spending Progress Bar - Premium Finish */}
-            <View style={{ backgroundColor: theme.isDark ? 'rgba(0,0,0,0.1)' : '#F9FAFB', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border }}>
+            <View style={{ backgroundColor: theme.isDark ? 'rgba(0,0,0,0.1)' : '#F9FAFB', padding: moderateScale(14), borderRadius: scale(14), borderWidth: 1, borderColor: theme.colors.border }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, fontWeight: '600' }}>Budget Utilization</Text>
+                  <Text style={{ fontSize: scale(12), color: theme.colors.textSecondary, fontWeight: '600' }}>Budget Utilization</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary }}>
+                <Text style={{ fontSize: scale(13), fontWeight: '800', color: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary }}>
                   {state.totalIncome > 0 ? Math.round((state.totalExpenses / state.totalIncome) * 100) : 0}%
                 </Text>
               </View>
-              <View style={{ height: 8, backgroundColor: theme.isDark ? '#374151' : '#E5E7EB', borderRadius: 6, overflow: 'hidden' }}>
+              <View style={{ height: scale(8), backgroundColor: theme.isDark ? '#374151' : '#E5E7EB', borderRadius: scale(6), overflow: 'hidden' }}>
                 <View style={{
                   width: (state.totalIncome > 0 ? Math.min(100, (state.totalExpenses / state.totalIncome) * 100) : 0) + '%',
                   height: '100%',
                   backgroundColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary,
-                  borderRadius: 6,
+                  borderRadius: scale(6),
                   shadowColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary,
                   shadowOffset: { width: 0, height: 0 },
                   shadowOpacity: 0.5,
@@ -690,7 +691,7 @@ const DashboardScreen = function (props) {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   nestedScrollEnabled={true}
-                  style={{ minHeight: 118 }}
+                  style={{ minHeight: scale(118) }}
                   contentContainerStyle={{ paddingVertical: 4, paddingRight: 8, alignItems: 'center' }}
                 >
                   {state.accounts.map(function (acc) {
@@ -706,12 +707,12 @@ const DashboardScreen = function (props) {
                           onPress={openWalletEditor}
                           style={function (pressed) {
                             return {
-                              width: 180,
-                              height: 110,
+                              width: scale(180),
+                              height: scale(110),
                               backgroundColor: acc.color || walletStyle.color,
-                              borderRadius: 20,
-                              padding: 16,
-                              marginRight: 14,
+                              borderRadius: scale(20),
+                              padding: moderateScale(16),
+                              marginRight: moderateScale(14),
                               justifyContent: 'space-between',
                               position: 'relative',
                               overflow: 'hidden',
@@ -728,24 +729,24 @@ const DashboardScreen = function (props) {
                           }}
                         >
                           {/* Background Watermark Icon */}
-                          <View style={{ position: 'absolute', right: -15, bottom: -15, opacity: 0.15 }}>
-                             <BrandLogo type={acc.type} size={80} />
+                          <View style={{ position: 'absolute', right: scale(-15), bottom: scale(-15), opacity: 0.15 }}>
+                             <BrandLogo type={acc.type} size={scale(80)} />
                           </View>
 
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
-                            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 6, borderRadius: 10 }}>
-                               <BrandLogo type={acc.type} size={22} />
+                            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: scale(6), borderRadius: scale(10) }}>
+                               <BrandLogo type={acc.type} size={scale(22)} />
                             </View>
-                            <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="edit" size={14} color="#FFFFFF" />
+                            <View style={{ width: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+                              <MaterialIcons name="edit" size={scale(14)} color="#FFFFFF" />
                             </View>
                           </View>
 
                           <View style={{ zIndex: 1 }}>
-                            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }} numberOfLines={1}>
+                            <Text style={{ fontSize: scale(11), color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }} numberOfLines={1}>
                               {acc.name || 'Wallet'}
                             </Text>
-                            <Text style={{ fontSize: 18, color: '#FFFFFF', fontWeight: '800', marginTop: 2 }}>
+                            <Text style={{ fontSize: scale(18), color: '#FFFFFF', fontWeight: '800', marginTop: 2 }}>
                               {maskAmount(acc.balance)}
                             </Text>
                           </View>
@@ -770,11 +771,11 @@ const DashboardScreen = function (props) {
                         style={function (pressed) {
                           return {
                             width: '48%',
-                            height: 100,
+                            height: scale(100),
                             backgroundColor: acc.color || walletStyle.color,
-                            borderRadius: 18,
-                            padding: 12,
-                            marginBottom: 12,
+                            borderRadius: scale(18),
+                            padding: moderateScale(12),
+                            marginBottom: moderateScale(12),
                             justifyContent: 'space-between',
                             position: 'relative',
                             overflow: 'hidden',
@@ -790,18 +791,18 @@ const DashboardScreen = function (props) {
                           };
                         }}
                       >
-                        <View style={{ position: 'absolute', right: -10, bottom: -10, opacity: 0.12 }}>
-                           <BrandLogo type={acc.type} size={60} />
+                        <View style={{ position: 'absolute', right: scale(-10), bottom: scale(-10), opacity: 0.12 }}>
+                           <BrandLogo type={acc.type} size={scale(60)} />
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <BrandLogo type={acc.type} size={20} />
-                          <MaterialIcons name="edit" size={12} color="#FFFFFF" style={{ opacity: 0.8 }} />
+                          <BrandLogo type={acc.type} size={scale(20)} />
+                          <MaterialIcons name="edit" size={scale(12)} color="#FFFFFF" style={{ opacity: 0.8 }} />
                         </View>
                         <View>
-                          <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', textTransform: 'uppercase' }} numberOfLines={1}>
+                          <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.8)', fontWeight: 'bold', textTransform: 'uppercase' }} numberOfLines={1}>
                             {acc.name}
                           </Text>
-                          <Text style={{ fontSize: 15, color: '#FFFFFF', fontWeight: '800', marginTop: 1 }}>
+                          <Text style={{ fontSize: scale(15), color: '#FFFFFF', fontWeight: '800', marginTop: 1 }}>
                             {maskAmount(acc.balance)}
                           </Text>
                         </View>
@@ -847,7 +848,7 @@ const DashboardScreen = function (props) {
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 nestedScrollEnabled={true}
-                style={{ minHeight: 140 }}
+                style={{ minHeight: scale(140) }}
                 contentContainerStyle={{ paddingVertical: 4, paddingRight: 8, alignItems: 'center' }}
               >
                 {state.envelopeBalances.map(function (env) {
@@ -865,12 +866,12 @@ const DashboardScreen = function (props) {
                         }}
                         style={function (pressed) {
                           return {
-                            width: 200,
-                            height: 130,
+                            width: scale(200),
+                            height: scale(130),
                             backgroundColor: theme.colors.card,
-                            borderRadius: 24,
-                            padding: 18,
-                            marginRight: 14,
+                            borderRadius: scale(24),
+                            padding: moderateScale(18),
+                            marginRight: moderateScale(14),
                             justifyContent: 'space-between',
                             shadowColor: isOverspent ? theme.colors.error : theme.colors.primary,
                             shadowOffset: { width: 0, height: 4 },
@@ -885,21 +886,21 @@ const DashboardScreen = function (props) {
                         }}
                       >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                           <View style={{ backgroundColor: isOverspent ? theme.colors.error + '15' : theme.colors.primary + '15', padding: 8, borderRadius: 12 }}>
-                             <MaterialIcons name={getEnvelopeIcon(env.name)} size={22} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                           <View style={{ backgroundColor: isOverspent ? theme.colors.error + '15' : theme.colors.primary + '15', padding: scale(8), borderRadius: scale(12) }}>
+                             <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(22)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
                            </View>
                            {isOverspent && (
-                             <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                               <Text style={{ fontSize: 9, color: '#FFFFFF', fontWeight: 'bold' }}>OVERSPENT</Text>
+                             <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(8) }}>
+                               <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: 'bold' }}>OVERSPENT</Text>
                              </View>
                            )}
                         </View>
 
                         <View>
-                          <Text style={{ fontSize: 13, color: theme.colors.textPrimary, fontWeight: '700' }} numberOfLines={1}>{env.name}</Text>
-                          <Text style={{ fontSize: 20, color: isOverspent ? theme.colors.error : theme.colors.textPrimary, fontWeight: '800', marginTop: 2 }}>{maskAmount(env.available)}</Text>
+                          <Text style={{ fontSize: scale(13), color: theme.colors.textPrimary, fontWeight: '700' }} numberOfLines={1}>{env.name}</Text>
+                          <Text style={{ fontSize: scale(20), color: isOverspent ? theme.colors.error : theme.colors.textPrimary, fontWeight: '800', marginTop: 2 }}>{maskAmount(env.available)}</Text>
 
-                          <View style={{ height: 6, backgroundColor: theme.colors.border, borderRadius: 3, marginTop: 10, overflow: 'hidden' }}>
+                          <View style={{ height: scale(6), backgroundColor: theme.colors.border, borderRadius: scale(3), marginTop: 10, overflow: 'hidden' }}>
                             <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
                           </View>
                         </View>
@@ -924,9 +925,9 @@ const DashboardScreen = function (props) {
                     }} style={{
                       width: '48%',
                       backgroundColor: theme.colors.card,
-                      borderRadius: 20,
-                      padding: 16,
-                      marginBottom: 16,
+                      borderRadius: scale(20),
+                      padding: moderateScale(16),
+                      marginBottom: moderateScale(16),
                       shadowColor: '#000',
                       shadowOffset: { width: 0, height: 2 },
                       shadowOpacity: 0.05,
@@ -935,11 +936,11 @@ const DashboardScreen = function (props) {
                       borderWidth: 1,
                       borderColor: isOverspent ? theme.colors.error + '44' : theme.colors.border
                     }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <View style={{ backgroundColor: isOverspent ? theme.colors.error + '10' : theme.colors.primary + '10', padding: 6, borderRadius: 8 }}>
-                          <MaterialIcons name={getEnvelopeIcon(env.name)} size={18} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(12) }}>
+                        <View style={{ backgroundColor: isOverspent ? theme.colors.error + '10' : theme.colors.primary + '10', padding: scale(6), borderRadius: scale(8) }}>
+                          <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(18)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(6) }}>
                           <TouchableOpacity onPress={function (e) {
                             triggerImpactHaptic('Light');
                             e.stopPropagation();
@@ -971,25 +972,25 @@ const DashboardScreen = function (props) {
                                 );
                               }
                             });
-                          }} style={{ padding: 4, backgroundColor: '#FEF2F2', borderRadius: 6 }}>
-                            <MaterialIcons name="delete-outline" size={14} color={theme.colors.error} />
+                          }} style={{ padding: scale(4), backgroundColor: '#FEF2F2', borderRadius: scale(6) }}>
+                            <MaterialIcons name="delete-outline" size={scale(14)} color={theme.colors.error} />
                           </TouchableOpacity>
                         </View>
                       </View>
-                      <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 }} numberOfLines={1}>{env.name}</Text>
-                      <Text style={{ fontSize: 16, fontWeight: '800', color: isOverspent ? theme.colors.error : theme.colors.textPrimary }}>{maskAmount(env.available)}</Text>
+                      <Text style={{ fontSize: scale(13), fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 }} numberOfLines={1}>{env.name}</Text>
+                      <Text style={{ fontSize: scale(16), fontWeight: '800', color: isOverspent ? theme.colors.error : theme.colors.textPrimary }}>{maskAmount(env.available)}</Text>
 
-                      <View style={{ height: 4, backgroundColor: theme.colors.border, borderRadius: 2, marginTop: 12, overflow: 'hidden' }}>
+                      <View style={{ height: scale(4), backgroundColor: theme.colors.border, borderRadius: scale(2), marginTop: 12, overflow: 'hidden' }}>
                         <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
                       </View>
 
                       {goalAmount > 0 ? (
-                        <View style={{ marginTop: 10, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)', borderRadius: 10, padding: 6, borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.15)' }}>
+                        <View style={{ marginTop: 10, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)', borderRadius: scale(10), padding: scale(6), borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.15)' }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                            <Text style={{ fontSize: 8, color: '#059669', fontWeight: 'bold' }}>GOAL</Text>
-                            <Text style={{ fontSize: 8, color: '#059669', fontWeight: 'bold' }}>{goalPct}%</Text>
+                            <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: 'bold' }}>GOAL</Text>
+                            <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: 'bold' }}>{goalPct}%</Text>
                           </View>
-                          <Text style={{ fontSize: 9, fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>
+                          <Text style={{ fontSize: scale(9), fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>
                             {maskAmount(env.available)} / {formatCurrency(goalAmount)}
                           </Text>
                         </View>

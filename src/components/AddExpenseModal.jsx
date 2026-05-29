@@ -19,6 +19,7 @@ import {
 } from '../utils/envelopeGuards';
 import BrandLogo from './BrandLogo';
 import { getEnvelopeIcon } from '../screens/dashboard/envelopeUtils';
+import { scale, verticalScale, moderateScale, normalize } from '../utils/responsive';
 
 const WALLET_STYLES = {
   GCash: { color: '#1E3A8A', name: 'GCash', logo: 'account-balance-wallet' },
@@ -286,11 +287,11 @@ const AddExpenseModal = function (props) {
         <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={saveMessage} />
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insetsBottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insetsBottom + moderateScale(24),
           maxHeight: '92%',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -298,27 +299,27 @@ const AddExpenseModal = function (props) {
           shadowRadius: 10,
           elevation: 20
         }}>
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.textPrimary, letterSpacing: -0.5 }}>{typeHelp.modalTitle}</Text>
-              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Record financial activity</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <View style={{ flex: 1, paddingRight: moderateScale(12) }}>
+              <Text style={{ fontSize: normalize(22), fontWeight: '900', color: theme.colors.textPrimary, letterSpacing: -0.5 }}>{typeHelp.modalTitle}</Text>
+              <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginTop: 2, fontWeight: '500' }}>Record financial activity</Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ backgroundColor: theme.colors.background, padding: 8, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border }}>
-              <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={{ backgroundColor: theme.colors.background, padding: moderateScale(8), borderRadius: scale(20), borderWidth: 1, borderColor: theme.colors.border }}>
+              <MaterialIcons name="close" size={scale(20)} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', backgroundColor: theme.isDark ? 'rgba(0,0,0,0.2)' : theme.colors.background, borderRadius: 16, padding: 6, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border }}>
+            <View style={{ flexDirection: 'row', backgroundColor: theme.isDark ? 'rgba(0,0,0,0.2)' : theme.colors.background, borderRadius: scale(16), padding: scale(6), marginBottom: moderateScale(20), borderWidth: 1, borderColor: theme.colors.border }}>
               <TouchableOpacity
                 onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('one_time'); }}
                 disabled={rawEnvelopes.length === 0}
                 style={{
                   flex: 1,
                   flexDirection: 'row',
-                  paddingVertical: 12,
-                  borderRadius: 12,
+                  paddingVertical: moderateScale(12),
+                  borderRadius: scale(12),
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent',
@@ -330,8 +331,8 @@ const AddExpenseModal = function (props) {
                   elevation: expType === 'one_time' ? 3 : 0
                 }}
               >
-                <MaterialIcons name="shopping-cart" size={18} color={expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
-                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
+                <MaterialIcons name="shopping-cart" size={scale(18)} color={expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: normalize(14) }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('recurring'); }}
@@ -339,8 +340,8 @@ const AddExpenseModal = function (props) {
                 style={{
                   flex: 1,
                   flexDirection: 'row',
-                  paddingVertical: 12,
-                  borderRadius: 12,
+                  paddingVertical: moderateScale(12),
+                  borderRadius: scale(12),
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent',
@@ -352,63 +353,64 @@ const AddExpenseModal = function (props) {
                   elevation: expType === 'recurring' ? 3 : 0
                 }}
               >
-                <MaterialIcons name="event-repeat" size={18} color={expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
-                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: 14 }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
+                <MaterialIcons name="event-repeat" size={scale(18)} color={expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={{ color: expType === 'recurring' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: normalize(14) }}>{EXPENSE_TYPE_HELP.recurring.tabLabel}</Text>
               </TouchableOpacity>
             </View>
 
             {rawEnvelopes.length === 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.25)' }}>
-                <MaterialIcons name="info-outline" size={18} color="#3B82F6" style={{ marginRight: 8, marginTop: 1 }} />
-                <Text style={{ flex: 1, fontSize: 12, color: theme.colors.textSecondary, lineHeight: 18 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: scale(10), padding: moderateScale(12), marginBottom: moderateScale(12), borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.25)' }}>
+                <MaterialIcons name="info-outline" size={scale(18)} color="#3B82F6" style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={{ flex: 1, fontSize: normalize(12), color: theme.colors.textSecondary, lineHeight: normalize(18) }}>
                   Create an envelope on the Dashboard to use Spend or Bill.
                 </Text>
               </View>
             ) : null}
 
             {showHint && (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : theme.colors.background, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: theme.colors.border }}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                  <MaterialIcons name={typeHelp.icon} size={20} color={theme.colors.primary} />
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : theme.colors.background, borderRadius: scale(16), padding: moderateScale(16), marginBottom: moderateScale(20), borderWidth: 1, borderColor: theme.colors.border }}>
+                <View style={{ width: scale(36), height: scale(36), borderRadius: scale(18), backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
+                  <MaterialIcons name={typeHelp.icon} size={scale(20)} color={theme.colors.primary} />
                 </View>
-                <Text style={{ flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20, paddingRight: 8 }}>{typeHelp.hint}</Text>
+                <Text style={{ flex: 1, fontSize: normalize(13), color: theme.colors.textSecondary, lineHeight: normalize(20), paddingRight: 8 }}>{typeHelp.hint}</Text>
                 <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowHint(false); }} style={{ padding: 4 }}>
-                  <MaterialIcons name="close" size={16} color={theme.colors.textSecondary} />
+                  <MaterialIcons name="close" size={scale(16)} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
             )}
 
             {spendBlocked ? (
-              <View style={{ alignItems: 'center', paddingVertical: 20, paddingHorizontal: 8, marginBottom: 8 }}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-                  <MaterialIcons name="folder-special" size={28} color={theme.colors.primary} />
+              <View style={{ alignItems: 'center', paddingVertical: moderateScale(20), paddingHorizontal: moderateScale(8), marginBottom: moderateScale(8) }}>
+                <View style={{ width: scale(56), height: scale(56), borderRadius: scale(28), backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginBottom: moderateScale(14) }}>
+                  <MaterialIcons name="folder-special" size={scale(28)} color={theme.colors.primary} />
                 </View>
-                <Text style={{ fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: normalize(17), fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: moderateScale(8) }}>
                   Create an envelope first
                 </Text>
-                <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 16 }}>
+                <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: normalize(22), marginBottom: moderateScale(16) }}>
                   Spending and bills need a budget envelope. Close this and tap + on an envelope row.
                 </Text>
                 <TouchableOpacity onPress={onClose}>
-                  <Text style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: '600' }}>Close</Text>
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(14), fontWeight: '600' }}>Close</Text>
                 </TouchableOpacity>
               </View>
             ) : (
             <>
             {errorMsg ? (
-              <View style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 14 }}>
-                <Text style={{ color: theme.colors.error, fontSize: 13 }}>{errorMsg}</Text>
+              <View style={{ backgroundColor: '#FEF2F2', borderRadius: scale(8), padding: moderateScale(10), marginBottom: moderateScale(14) }}>
+                <Text style={{ color: theme.colors.error, fontSize: normalize(13) }}>{errorMsg}</Text>
               </View>
             ) : null}
 
-            <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>
+
+            <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>
               {typeHelp.nameLabel.toUpperCase()}
             </Text>
-            <TextInput value={expName} onChangeText={setExpName} placeholder={typeHelp.namePlaceholder} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 16, fontSize: 16, color: theme.colors.textPrimary, marginBottom: 20 }} />
+            <TextInput value={expName} onChangeText={setExpName} placeholder={typeHelp.namePlaceholder} autoCapitalize="words" style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(12), padding: moderateScale(16), fontSize: normalize(16), color: theme.colors.textPrimary, marginBottom: moderateScale(20) }} />
 
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>AMOUNT</Text>
-              <Text style={{ fontSize: 11, color: theme.colors.primary, fontWeight: '600' }}>Supports math (e.g. 150+45)</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(8) }}>
+              <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>AMOUNT</Text>
+              <Text style={{ fontSize: normalize(11), color: theme.colors.primary, fontWeight: '600' }}>Supports math (e.g. 150+45)</Text>
             </View>
             <AmountInput
               value={expAmount}
@@ -416,30 +418,30 @@ const AddExpenseModal = function (props) {
               theme={theme}
               variant="boxed"
               allowExpression={true}
-              fontSize={20}
-              containerStyle={{ marginBottom: 20 }}
+              fontSize={normalize(20)}
+              containerStyle={{ marginBottom: moderateScale(20) }}
               placeholder="0.00"
             />
 
             {expType === 'one_time' ? (
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE</Text>
+                <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>DATE</Text>
                 <DatePickerInput value={expDate} onChange={setExpDate} placeholder="Select date" />
               </View>
             ) : (
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DUE DATE</Text>
+                <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>DUE DATE</Text>
                 <DatePickerInput value={dueDate} onChange={setDueDate} placeholder="Select due date" />
               </View>
             )}
 
-            <View style={{ marginTop: 16 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>WHICH ENVELOPE PAYS FOR THIS?</Text>
-                {rawEnvelopes.length > 3 && <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Scroll →</Text>}
+            <View style={{ marginTop: moderateScale(16) }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(10) }}>
+                <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>WHICH ENVELOPE PAYS FOR THIS?</Text>
+                {rawEnvelopes.length > 3 && <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary }}>Scroll →</Text>}
               </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: 20 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: moderateScale(20) }}>
                 {optionsList.map(opt => {
                   var isSelected = selectedFund === opt.id;
                   var previewAmt = parseAmount(expAmount);
@@ -455,16 +457,16 @@ const AddExpenseModal = function (props) {
                       key={opt.id}
                       onPress={() => { triggerImpactHaptic('Light'); setSelectedFund(opt.id); }}
                       style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: 16,
+                        paddingHorizontal: moderateScale(16),
+                        paddingVertical: moderateScale(12),
+                        borderRadius: scale(16),
                         borderWidth: 2,
                         borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border),
                         backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : (isExceeded ? (theme.isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2') : theme.colors.background),
                         alignItems: 'center',
-                        marginRight: 10,
+                        marginRight: moderateScale(10),
                         flexDirection: 'row',
-                        minWidth: 140,
+                        minWidth: scale(140),
                         shadowColor: isSelected ? theme.colors.primary : '#000',
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: isSelected ? 0.2 : 0.05,
@@ -473,26 +475,26 @@ const AddExpenseModal = function (props) {
                       }}
                     >
                       <View style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
+                        width: scale(32),
+                        height: scale(32),
+                        borderRadius: scale(16),
                         backgroundColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border + '40'),
                         alignItems: 'center',
                         justifyContent: 'center',
-                        marginRight: 10
+                        marginRight: moderateScale(10)
                       }}>
-                        <MaterialIcons name={icon} size={18} color={isSelected ? '#FFFFFF' : (isExceeded ? '#FFFFFF' : theme.colors.textSecondary)} />
+                        <MaterialIcons name={icon} size={scale(18)} color={isSelected ? '#FFFFFF' : (isExceeded ? '#FFFFFF' : theme.colors.textSecondary)} />
                       </View>
                       <View>
-                        <Text style={{ fontSize: 13, fontWeight: 'bold', color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textPrimary) }} numberOfLines={1}>
+                        <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textPrimary) }} numberOfLines={1}>
                           {opt.name}
                         </Text>
-                        <Text style={{ fontSize: 11, color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textSecondary), fontWeight: '700', marginTop: 1 }}>
+                        <Text style={{ fontSize: normalize(11), color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textSecondary), fontWeight: '700', marginTop: 1 }}>
                           ₱{opt.available.toLocaleString()}
                         </Text>
                       </View>
                       {isExceeded && (
-                        <MaterialIcons name="warning" size={16} color={theme.colors.error} style={{ marginLeft: 8 }} />
+                        <MaterialIcons name="warning" size={scale(16)} color={theme.colors.error} style={{ marginLeft: moderateScale(8) }} />
                       )}
                     </TouchableOpacity>
                   );
@@ -501,13 +503,13 @@ const AddExpenseModal = function (props) {
             </View>
 
             {accounts.length > 0 && (
-              <View style={{ marginTop: 20 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>PAID WITH (WALLET)</Text>
-                  {accounts.length > 2 && <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>Scroll →</Text>}
+              <View style={{ marginTop: moderateScale(20) }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(10) }}>
+                  <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>PAID WITH (WALLET)</Text>
+                  {accounts.length > 2 && <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary }}>Scroll →</Text>}
                 </View>
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: 20 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: moderateScale(20) }}>
                   {accounts.map(acc => {
                     var isSelected = selectedAccount === acc.id;
                     var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
@@ -524,14 +526,14 @@ const AddExpenseModal = function (props) {
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          borderRadius: 16,
+                          paddingHorizontal: moderateScale(16),
+                          paddingVertical: moderateScale(12),
+                          borderRadius: scale(16),
                           borderWidth: 2,
                           borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                           backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : theme.colors.background,
-                          marginRight: 10,
-                          minWidth: 150,
+                          marginRight: moderateScale(10),
+                          minWidth: scale(150),
                           shadowColor: isSelected ? theme.colors.primary : '#000',
                           shadowOffset: { width: 0, height: 2 },
                           shadowOpacity: isSelected ? 0.2 : 0.05,
@@ -539,19 +541,19 @@ const AddExpenseModal = function (props) {
                           elevation: isSelected ? 3 : 1
                         }}
                       >
-                        <View style={{ marginRight: 10 }}>
-                          <BrandLogo type={acc.type} size={24} />
+                        <View style={{ marginRight: moderateScale(10) }}>
+                          <BrandLogo type={acc.type} size={scale(24)} />
                         </View>
                         <View>
-                          <Text style={{ fontSize: 13, fontWeight: 'bold', color: isSelected ? theme.colors.primary : displayColor }} numberOfLines={1}>
+                          <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isSelected ? theme.colors.primary : displayColor }} numberOfLines={1}>
                             {acc.name}
                           </Text>
-                          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, fontWeight: '600', marginTop: 1 }}>
+                          <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, fontWeight: '600', marginTop: 1 }}>
                             ₱{acc.balance.toLocaleString()}
                           </Text>
                         </View>
                         {isSelected && (
-                          <MaterialIcons name="check-circle" size={14} color={theme.colors.primary} style={{ marginLeft: 6 }} />
+                          <MaterialIcons name="check-circle" size={scale(14)} color={theme.colors.primary} style={{ marginLeft: moderateScale(6) }} />
                         )}
                       </TouchableOpacity>
                     );
@@ -563,12 +565,12 @@ const AddExpenseModal = function (props) {
             <TouchableOpacity
               onPress={function () { triggerImpactHaptic('Medium'); handleSave(); }}
               disabled={isSaving}
-              style={{ backgroundColor: theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 24, opacity: isSaving ? 0.5 : 1 }}
+              style={{ backgroundColor: theme.colors.primary, borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center', marginTop: moderateScale(24), opacity: isSaving ? 0.5 : 1 }}
             >
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>
                   {typeHelp.saveLabel}
                 </Text>
               )}

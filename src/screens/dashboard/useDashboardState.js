@@ -134,22 +134,20 @@ export function useDashboardState(userId) {
 
   // Ready to Assign is the money you have in your wallets that hasn't been put into an envelope yet.
   var readyToAssign = useMemo(function() {
-    var totalEnvelopeLiabilities = envelopeBalances.reduce(function (sum, env) {
-      // Money already assigned that is still available (not ready to re-assign)
-      // FIX: Liabilities should be calculated based on (assigned - spent), not (available).
-      // If we use (available), then reserved bills correctly reduce available balance,
-      // but INCORRECTLY reduce liabilities, which makes RTI increase.
-      var netEnveloped = (parseFloat(env.assigned) || 0) - (parseFloat(env.spent) || 0);
-      return sum + (netEnveloped > 0 ? netEnveloped : 0);
+    var totalReduction = envelopeBalances.reduce(function (sum, env) {
+        var netEnveloped = (parseFloat(env.assigned) || 0) - (parseFloat(env.spent) || 0);
+        var reserved = parseFloat(env.reserved) || 0;
+
+        // 1. Commitment: The higher of what we planned (assigned-spent) or what we must pay (reserved)
+        var commitment = Math.max(0, netEnveloped, reserved);
+
+        // 2. Overspending: If we spent more than assigned, that cash is already gone and must be "paid back"
+        var overspending = Math.max(0, -netEnveloped);
+
+        return sum + commitment + overspending;
     }, 0);
 
-    var totalOverspending = envelopeBalances.reduce(function (sum, env) {
-      // FIX: Overspending is when spent > assigned.
-      var netEnveloped = (parseFloat(env.assigned) || 0) - (parseFloat(env.spent) || 0);
-      return sum + (netEnveloped < 0 ? Math.abs(netEnveloped) : 0);
-    }, 0);
-
-    return totalAvailableMoney - totalEnvelopeLiabilities - orphanPendingTotal - totalOverspending;
+    return totalAvailableMoney - totalReduction - orphanPendingTotal;
   }, [totalAvailableMoney, envelopeBalances, orphanPendingTotal]);
 
   var refetchAll = useCallback(function () {

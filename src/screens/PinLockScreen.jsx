@@ -7,6 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import { useQuery, useMutation } from 'platform-hooks';
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 import logoImg from '../assets/logo.png';
 
 const PIN_LENGTH = 6;
@@ -31,10 +32,10 @@ var PinDot = function (props) {
     <Animated.View
       style={{
         transform: [{ scale: scaleAnim }],
-        width: 13,
-        height: 13,
-        borderRadius: 7,
-        marginHorizontal: 5,
+        width: scale(13),
+        height: scale(13),
+        borderRadius: scale(7),
+        marginHorizontal: scale(5),
         borderWidth: 2,
         borderColor: error ? errorColor : (filled ? primary : border),
         backgroundColor: filled ? (error ? errorColor : primary) : 'transparent',
@@ -87,9 +88,6 @@ var PinLockScreen = function (props) {
 
       const result = await NativeBiometric.isAvailable();
       if (result.isAvailable && userSettings?.biometrics_enabled) {
-        // Senior Developer Fix: NativeBiometric.verifyIdentity resolves with NOTHING (undefined) on success.
-        // Checking "if (verified)" was causing the bug because undefined is falsy.
-        // We must simply await it; if it succeeds, we unlock. If it fails, it throws.
         try {
           await NativeBiometric.verifyIdentity({
             reason: "Unlock Penny Budget",
@@ -99,17 +97,14 @@ var PinLockScreen = function (props) {
             negativeButtonText: "Use PIN"
           });
 
-          // If we reach here, authentication was successful
           onUnlock();
         } catch (authError) {
-          // This block runs if the user cancels, uses wrong finger, or taps "Use PIN"
           console.log("Biometric identity verification cancelled or failed:", authError);
         }
       }
     } catch (e) {
       console.warn("Biometric hardware access error:", e);
     } finally {
-      // Delay resetting the flag to prevent rapid double-prompts
       setTimeout(() => { isAuthenticating.current = false; }, 1000);
     }
   };
@@ -117,12 +112,10 @@ var PinLockScreen = function (props) {
   useEffect(() => {
     Animated.timing(mountAnim, { toValue: 1, duration: 400, useNativeDriver: !IS_WEB }).start();
 
-    // Auto-trigger biometric on mount if enabled
     if (userSettings?.biometrics_enabled) {
       var t = setTimeout(handleBiometricAuth, 800);
     }
 
-    // Listen for AppState changes to re-trigger biometrics when user backgrounds and returns to the app
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active' && userSettings?.biometrics_enabled) {
         handleBiometricAuth();
@@ -148,7 +141,7 @@ var PinLockScreen = function (props) {
   }, [pin, userSettings]);
 
   var keypadButtonStyle = {
-    width: 68, height: 68, borderRadius: 34,
+    width: scale(68), height: scale(68), borderRadius: scale(34),
     backgroundColor: theme.colors.background,
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: theme.colors.border,
@@ -159,55 +152,54 @@ var PinLockScreen = function (props) {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <Animated.View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top, paddingBottom: insets.bottom, opacity: mountAnim }}>
 
-        {/* LOGO - Now using your actual logo image */}
+        {/* LOGO */}
         <Image
           source={logoImg}
-          style={{ width: 100, height: 100, borderRadius: 24, marginBottom: 16, resizeMode: 'contain' }}
+          style={{ width: scale(100), height: scale(100), borderRadius: scale(24), marginBottom: moderateScale(16), resizeMode: 'contain' }}
         />
 
-        <Text style={{ fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 4 }}>Enter PIN</Text>
-        <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 28 }}>Welcome back, {currentUser?.name || 'User'}</Text>
+        <Text style={{ fontSize: normalize(22), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(28) }}>Enter PIN</Text>
 
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+
+        <View style={{ flexDirection: 'row', gap: scale(10), marginBottom: moderateScale(8) }}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <PinDot key={i} filled={i < pin.length} error={error} primary={theme.colors.primary} errorColor={theme.colors.error} border={theme.colors.border} />
           ))}
         </View>
 
-        <View style={{ height: 26, marginBottom: 16, justifyContent: 'center' }}>
-          {error && <Text style={{ color: theme.colors.error, fontSize: 13, fontWeight: '600' }}>Incorrect PIN</Text>}
+        <View style={{ height: scale(26), marginBottom: moderateScale(16), justifyContent: 'center' }}>
+          {error && <Text style={{ color: theme.colors.error, fontSize: normalize(13), fontWeight: '600' }}>Incorrect PIN</Text>}
         </View>
 
-        {/* KEYPAD - Solid card matching Sign In design */}
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 28, borderWidth: 1, borderColor: theme.colors.border, padding: 24, width: 300, alignItems: 'center' }}>
-          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.border, marginBottom: 24 }} />
-          <View style={{ width: 240, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 }}>
+        {/* KEYPAD */}
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(28), borderWidth: 1, borderColor: theme.colors.border, padding: moderateScale(24), width: scale(300), alignItems: 'center' }}>
+          <View style={{ width: scale(40), height: scale(4), borderRadius: scale(2), backgroundColor: theme.colors.border, marginBottom: moderateScale(24) }} />
+          <View style={{ width: scale(240), flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: scale(12) }}>
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
               <KeypadButton key={num} onPress={() => pin.length < PIN_LENGTH && setPin(p => p + num)} style={keypadButtonStyle}>
-                <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary }}>{num}</Text>
+                <Text style={{ fontSize: normalize(24), fontWeight: 'bold', color: theme.colors.textPrimary }}>{num}</Text>
               </KeypadButton>
             ))}
 
-            {/* Biometric trigger button (Fingerprint icon) */}
             {!IS_WEB && userSettings?.biometrics_enabled ? (
               <TouchableOpacity onPress={handleBiometricAuth} style={keypadButtonStyle}>
-                <MaterialIcons name="fingerprint" size={32} color={theme.colors.primary} />
+                <MaterialIcons name="fingerprint" size={scale(32)} color={theme.colors.primary} />
               </TouchableOpacity>
             ) : (
-              <View style={{ width: 68, height: 68 }} />
+              <View style={{ width: scale(68), height: scale(68) }} />
             )}
 
             <KeypadButton onPress={() => pin.length < PIN_LENGTH && setPin(p => p + '0')} style={keypadButtonStyle}>
-              <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.colors.textPrimary }}>0</Text>
+              <Text style={{ fontSize: normalize(24), fontWeight: 'bold', color: theme.colors.textPrimary }}>0</Text>
             </KeypadButton>
-            <TouchableOpacity onPress={() => setPin(p => p.slice(0, -1))} style={{ width: 68, height: 68, alignItems: 'center', justifyContent: 'center' }}>
-              <MaterialIcons name="backspace" size={24} color={theme.colors.textSecondary} />
+            <TouchableOpacity onPress={() => setPin(p => p.slice(0, -1))} style={{ width: scale(68), height: scale(68), alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialIcons name="backspace" size={scale(24)} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => userCtx.setCurrentUser(null)} style={{ marginTop: 32, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border }}>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textSecondary }}>Sign Out</Text>
+        <TouchableOpacity onPress={() => userCtx.setCurrentUser(null)} style={{ marginTop: moderateScale(32), paddingVertical: moderateScale(10), paddingHorizontal: moderateScale(24), borderRadius: scale(20), borderWidth: 1, borderColor: theme.colors.border }}>
+          <Text style={{ fontSize: normalize(13), fontWeight: '600', color: theme.colors.textSecondary }}>Sign Out</Text>
         </TouchableOpacity>
       </Animated.View>
     </View>

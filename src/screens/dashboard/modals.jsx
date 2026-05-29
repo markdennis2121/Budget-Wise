@@ -17,6 +17,7 @@ import { WALLET_STYLES } from './constants';
 import { getStoredAccountsList, serializeAccountsForStorage } from '../../utils/accountBalances';
 import { getWalletIncomeHistoryForAccount, isManualWalletTopUp } from '../../utils/walletIncomeHistory';
 import { parseUserEnvelopes, validateSpendOperation } from '../../utils/envelopeGuards';
+import { scale, verticalScale, moderateScale, normalize } from '../../utils/responsive';
 import {
   computeBudgetCommitments,
   validateIncomeSourceAmountEdit,
@@ -132,11 +133,11 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insets.bottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(24),
           maxHeight: '92%',
           position: 'relative',
           overflow: 'hidden',
@@ -147,27 +148,27 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Assign Money</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Assign Money</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
-          <View style={{ backgroundColor: '#FFEDD5', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 14, color: '#C2410C', fontWeight: 'bold', marginBottom: 4 }}>Ready to Assign</Text>
-            <Text style={{ fontSize: 28, fontWeight: 'bold', color: remaining < 0 ? theme.colors.error : theme.colors.primary }}>{formatCurrency(remaining)}</Text>
-            {remaining < 0 && <Text style={{ color: theme.colors.error, fontSize: 12, marginTop: 4 }}>You assigned more than available!</Text>}
+          <View style={{ backgroundColor: '#FFEDD5', borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(14), color: '#C2410C', fontWeight: 'bold', marginBottom: 4 }}>Ready to Assign</Text>
+            <Text style={{ fontSize: normalize(28), fontWeight: 'bold', color: remaining < 0 ? theme.colors.error : theme.colors.primary }}>{formatCurrency(remaining)}</Text>
+            {remaining < 0 && <Text style={{ color: theme.colors.error, fontSize: normalize(12), marginTop: 4 }}>You assigned more than available!</Text>}
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: 300 }}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: scale(300) }}>
             {envelopes.map(env => (
-              <View key={env.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+              <View key={env.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: moderateScale(12) }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: moderateScale(8) }}>
                   <View>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{env.name}</Text>
-                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Current: {formatCurrency(env.available || 0)}</Text>
+                    <Text style={{ fontSize: normalize(15), fontWeight: '600', color: theme.colors.textPrimary }}>{env.name}</Text>
+                    <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>Current: {formatCurrency(env.available || 0)}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => handleDeleteEnvelope(env.id)} style={{ marginLeft: 8, padding: 4 }}>
-                    <MaterialIcons name="delete-outline" size={16} color={theme.colors.error} />
+                  <TouchableOpacity onPress={() => handleDeleteEnvelope(env.id)} style={{ marginLeft: moderateScale(8), padding: moderateScale(4) }}>
+                    <MaterialIcons name="delete-outline" size={scale(16)} color={theme.colors.error} />
                   </TouchableOpacity>
                 </View>
                 <AmountInput
@@ -176,9 +177,9 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
                   theme={theme}
                   variant="compact"
                   allowNegative={true}
-                  fontSize={15}
+                  fontSize={normalize(15)}
                   placeholder="0"
-                  containerStyle={{ width: 120 }}
+                  containerStyle={{ width: scale(120) }}
                 />
               </View>
             ))}
@@ -186,11 +187,11 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
 
 
 
-          <TouchableOpacity onPress={handleAssign} disabled={remaining < 0 || isSaving} style={{ backgroundColor: (remaining < 0 || isSaving) ? theme.colors.accent : theme.colors.primary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 16 }}>
+          <TouchableOpacity onPress={handleAssign} disabled={remaining < 0 || isSaving} style={{ backgroundColor: (remaining < 0 || isSaving) ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center', marginTop: moderateScale(16) }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Save Assignments</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>Save Assignments</Text>
             )}
           </TouchableOpacity>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Money assigned!" />
@@ -201,6 +202,9 @@ const AssignMoneyModal = function ({ visible, onClose, readyToAssign, totalIncom
 };
 
 const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign, userSettings, mutateUpdateSettings, onSaved, userId }) {
+  var themeCtx = useTheme();
+  var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [name, setName] = useState('');
   var [assigned, setAssigned] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -273,11 +277,11 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           position: 'relative',
           overflow: 'hidden',
           shadowColor: '#000',
@@ -287,33 +291,34 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Envelope</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(16) }}>
+            <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Envelope</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ENVELOPE NAME</Text>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>ENVELOPE NAME</Text>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="e.g. Travel, Gifts"
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
+            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(10), fontSize: normalize(14), color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}
           />
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ASSIGN INITIAL BUDGET (OPTIONAL)</Text>
-          <AmountInput value={assigned} onChangeText={setAssigned} theme={theme} fontSize={22} containerStyle={{ marginBottom: 22 }} />
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>ASSIGN INITIAL BUDGET (OPTIONAL)</Text>
+          <AmountInput value={assigned} onChangeText={setAssigned} theme={theme} fontSize={normalize(22)} containerStyle={{ marginBottom: moderateScale(22) }} />
 
-          <TouchableOpacity onPress={handleCreate} disabled={isSaving} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <TouchableOpacity onPress={handleCreate} disabled={isSaving} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center' }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Create Envelope</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>Create Envelope</Text>
             )}
           </TouchableOpacity>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Saved!" />
         </View>
+
       </View>
     </Modal>
   );
@@ -322,6 +327,7 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
 const SavingsManagerModal = function ({ visible, onClose, state, userSettings, mutateUpdateSettings, onSaved }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [amount, setAmount] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
@@ -475,11 +481,11 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           position: 'relative',
           overflow: 'hidden',
           shadowColor: '#000',
@@ -489,21 +495,20 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Manage Savings</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>Manage Savings</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <View style={{ backgroundColor: '#DCFCE7', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 13, color: '#15803D', fontWeight: 'bold', marginBottom: 4 }}>Current Savings</Text>
-            <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#16A34A' }}>{formatCurrency(currentSavings)}</Text>
+          <View style={{ backgroundColor: '#DCFCE7', borderRadius: scale(12), padding: moderateScale(16), alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(13), color: '#15803D', fontWeight: 'bold', marginBottom: 4 }}>Current Savings</Text>
+            <Text style={{ fontSize: normalize(28), fontWeight: 'bold', color: '#16A34A' }}>{formatCurrency(currentSavings)}</Text>
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>SOURCE</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>SOURCE</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(8), marginBottom: moderateScale(12) }}>
             { (accountsList || []).map(function(a){
               var isSelected = selectedSource === a.id;
               return (
@@ -511,9 +516,9 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
                   key={a.id}
                   onPress={function() { setSelectedSource(a.id); }}
                   style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 8,
-                    borderRadius: 10,
+                    paddingHorizontal: moderateScale(12),
+                    paddingVertical: moderateScale(8),
+                    borderRadius: scale(10),
                     borderWidth: 1,
                     borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                     backgroundColor: isSelected ? (theme.colors.primary + '22') : theme.colors.background,
@@ -523,42 +528,43 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
                     flexGrow: 1
                   }}
                 >
-                  <BrandLogo type={a.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ color: isSelected ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '700', fontSize: 13 }}>{a.name}</Text>
+                  <BrandLogo type={a.type} size={scale(14)} style={{ marginRight: 6 }} />
+                  <Text style={{ color: isSelected ? theme.colors.primary : theme.colors.textSecondary, fontWeight: '700', fontSize: normalize(13) }}>{a.name}</Text>
                 </TouchableOpacity>
               );
             }) }
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT</Text>
-          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: 8 }} />
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>AMOUNT</Text>
+          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(8) }} />
 
-          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 6 }}>Saved from: { ((accountsList.find(a => a.id === selectedSource) || {}).name || selectedSource || '—') }</Text>
-          <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12 }}>Source balance: {formatCurrency(selectedSourceBalance)}</Text>
+          <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginBottom: moderateScale(6) }}>Saved from: { ((accountsList.find(a => a.id === selectedSource) || {}).name || selectedSource || '—') }</Text>
+          <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginBottom: moderateScale(12) }}>Source balance: {formatCurrency(selectedSourceBalance)}</Text>
 
           { addExceedsSource ? (
-            React.createElement(Text, { style: { color: theme.colors.error, marginBottom: 8 } }, 'Amount exceeds selected source balance.')
+            React.createElement(Text, { style: { color: theme.colors.error, marginBottom: moderateScale(8), fontSize: normalize(13) } }, 'Amount exceeds selected source balance.')
           ) : null }
 
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity disabled={parsedAmount <= 0 || addExceedsSource || isSaving} onPress={parsedAmount > 0 && !addExceedsSource ? handleAdd : undefined} style={{ flex: 1, backgroundColor: (parsedAmount > 0 && !addExceedsSource && !isSaving) ? '#16A34A' : '#94A3B8', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: (parsedAmount > 0 && !addExceedsSource && !isSaving) ? 1 : 0.6 }}>
+          <View style={{ flexDirection: 'row', gap: scale(12) }}>
+            <TouchableOpacity disabled={parsedAmount <= 0 || addExceedsSource || isSaving} onPress={parsedAmount > 0 && !addExceedsSource ? handleAdd : undefined} style={{ flex: 1, backgroundColor: (parsedAmount > 0 && !addExceedsSource && !isSaving) ? '#16A34A' : '#94A3B8', borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: scale(6), opacity: (parsedAmount > 0 && !addExceedsSource && !isSaving) ? 1 : 0.6 }}>
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <MaterialIcons name="add" size={18} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>Add to Savings</Text>
+                  <MaterialIcons name="add" size={scale(18)} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: normalize(14), fontWeight: 'bold' }}>Add to Savings</Text>
                 </>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity disabled={isSaving} onPress={!isSaving ? handleWithdraw : undefined} style={{ flex: 1, backgroundColor: isSaving ? '#94A3B8' : '#EA580C', borderRadius: 12, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6, opacity: isSaving ? 0.6 : 1 }}>
-              <MaterialIcons name="remove" size={18} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' }}>Withdraw</Text>
+            <TouchableOpacity disabled={isSaving} onPress={!isSaving ? handleWithdraw : undefined} style={{ flex: 1, backgroundColor: isSaving ? '#94A3B8' : '#EA580C', borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: scale(6), opacity: isSaving ? 0.6 : 1 }}>
+              <MaterialIcons name="remove" size={scale(18)} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(14), fontWeight: 'bold' }}>Withdraw</Text>
             </TouchableOpacity>
           </View>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
         </View>
+
       </View>
     </Modal>
   );
@@ -601,11 +607,11 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insets.bottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(24),
           maxHeight: '92%',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -4 },
@@ -614,30 +620,31 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialIcons name="notifications-none" size={24} color={theme.colors.primary} />
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Alerts & Reminders</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
+              <MaterialIcons name="notifications-none" size={scale(24)} color={theme.colors.primary} />
+              <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Alerts & Reminders</Text>
             </View>
             <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+              <MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: 20 }}>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ marginBottom: moderateScale(20) }}>
             {/* Active Subscriptions / Reminders */}
-            <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 6, letterSpacing: 0.5 }}>SYSTEM TRIGGERS</Text>
+            <View style={{ backgroundColor: theme.colors.background, borderRadius: scale(12), padding: moderateScale(14), marginBottom: moderateScale(16), borderWidth: 1, borderColor: theme.colors.border }}>
+              <Text style={{ fontSize: normalize(11), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 6, letterSpacing: 0.5 }}>SYSTEM TRIGGERS</Text>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.textPrimary }}>Daily Budget Check</Text>
-                  <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Daily log nudge scheduled at 8:00 PM</Text>
+                  <Text style={{ fontSize: normalize(14), fontWeight: '600', color: theme.colors.textPrimary }}>Daily Budget Check</Text>
+                  <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>Daily log nudge scheduled at 8:00 PM</Text>
                 </View>
                 <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#065F46' }}>ACTIVE</Text>
+                  <Text style={{ fontSize: normalize(11), fontWeight: 'bold', color: '#065F46' }}>ACTIVE</Text>
                 </View>
               </View>
 
@@ -733,6 +740,9 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
 };
 
 const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mutateUpdateSettings, onSaved, userId }) {
+  var themeCtx = useTheme();
+  var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [name, setName] = useState('');
   var [type, setType] = useState('GCash');
   var [startingBalance, setStartingBalance] = useState('');
@@ -810,11 +820,11 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           position: 'relative',
           overflow: 'hidden',
           shadowColor: '#000',
@@ -824,29 +834,29 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Wallet / Bank Account</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(16) }}>
+            <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>Add Wallet / Bank Account</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
           {type === 'Custom' && (
             <>
-              <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ACCOUNT NAME</Text>
+              <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>ACCOUNT NAME</Text>
               <TextInput
                 value={name}
                 onChangeText={setName}
                 placeholder="e.g. BDO Personal, GCash Business"
-                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
+                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(10), fontSize: normalize(14), color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}
               />
             </>
           )}
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 12 }}>WALLET / BANK TYPE</Text>
-          <View style={{ maxHeight: 200, marginBottom: 20 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(12) }}>WALLET / BANK TYPE</Text>
+          <View style={{ maxHeight: scale(200), marginBottom: moderateScale(20) }}>
             <ScrollView showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(8) }}>
                 {Object.keys(WALLET_STYLES).map(t => {
                   var isSelected = type === t;
                   var styleInfo = WALLET_STYLES[t] || {};
@@ -873,9 +883,9 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        paddingHorizontal: 12,
-                        paddingVertical: 10,
-                        borderRadius: 10,
+                        paddingHorizontal: moderateScale(12),
+                        paddingVertical: moderateScale(10),
+                        borderRadius: scale(10),
                         backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
                         borderWidth: 1,
                         borderColor: isSelected ? theme.colors.primary : theme.colors.border,
@@ -883,8 +893,8 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
                         flexGrow: 1
                       }}
                     >
-                      <BrandLogo type={t} size={18} style={{ marginRight: 8 }} />
-                      <Text style={{ color: isSelected ? '#FFFFFF' : displayColor, fontSize: 12, fontWeight: '700' }}>{t}</Text>
+                      <BrandLogo type={t} size={scale(18)} style={{ marginRight: 8 }} />
+                      <Text style={{ color: isSelected ? '#FFFFFF' : displayColor, fontSize: normalize(12), fontWeight: '700' }}>{t}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -892,19 +902,20 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
             </ScrollView>
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 4 }}>OPENING BALANCE</Text>
-          <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginBottom: 8 }}>How much money is currently inside this wallet?</Text>
-          <AmountInput value={startingBalance} onChangeText={setStartingBalance} theme={theme} containerStyle={{ marginBottom: 20 }} />
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(4) }}>OPENING BALANCE</Text>
+          <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>How much money is currently inside this wallet?</Text>
+          <AmountInput value={startingBalance} onChangeText={setStartingBalance} theme={theme} containerStyle={{ marginBottom: moderateScale(20) }} />
 
-          <TouchableOpacity disabled={isSaving} onPress={handleCreate} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <TouchableOpacity disabled={isSaving} onPress={handleCreate} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center' }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Create Wallet / Account</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>Create Wallet / Account</Text>
             )}
           </TouchableOpacity>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Saved!" />
         </View>
+
       </View>
     </Modal>
   );
@@ -913,6 +924,7 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
 const EditAccountModal = function ({ visible, onClose, account, accounts, userSettings, envelopeBalances, mutateUpdateSettings, onSaved, userId, userHistory }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [name, setName] = useState('');
   var [mode, setMode] = useState('add'); // 'add' or 'reduce'
   var [amount, setAmount] = useState('');
@@ -1088,11 +1100,11 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           maxHeight: '92%',
           position: 'relative',
           overflow: 'hidden',
@@ -1102,73 +1114,74 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
           shadowRadius: 10,
           elevation: 20
         }}>
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
-            <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>WALLET NAME</Text>
+            <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>WALLET NAME</Text>
             <TextInput
               value={name}
               onChangeText={setName}
               placeholder="Account Name"
-              style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 20 }}
+              style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(12), paddingHorizontal: moderateScale(14), paddingVertical: moderateScale(12), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(20) }}
             />
 
-            <View style={{ backgroundColor: (isNegativeWarning || isIntegrityWarning) ? 'rgba(239, 68, 68, 0.08)' : 'rgba(15, 118, 110, 0.08)', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : 'rgba(15, 118, 110, 0.15)' }}>
-              <Text style={{ fontSize: 11, color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.primary, fontWeight: '800', marginBottom: 4, letterSpacing: 0.5 }}>
+            <View style={{ backgroundColor: (isNegativeWarning || isIntegrityWarning) ? 'rgba(239, 68, 68, 0.08)' : 'rgba(15, 118, 110, 0.08)', borderRadius: scale(16), padding: moderateScale(16), marginBottom: moderateScale(24), borderWidth: 1, borderColor: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : 'rgba(15, 118, 110, 0.15)' }}>
+              <Text style={{ fontSize: normalize(11), color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.primary, fontWeight: '800', marginBottom: 4, letterSpacing: 0.5 }}>
                 {isNegativeWarning ? 'RESULTING BALANCE (NEGATIVE!)' : (isIntegrityWarning ? 'BUDGET INTEGRITY ERROR' : 'PROJECTED LIVE BALANCE')}
               </Text>
-              <Text style={{ fontSize: 28, fontWeight: 'bold', color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(previewBal)}</Text>
+              <Text style={{ fontSize: normalize(28), fontWeight: 'bold', color: (isNegativeWarning || isIntegrityWarning) ? theme.colors.error : theme.colors.textPrimary }}>{formatCurrency(previewBal)}</Text>
 
               {isIntegrityWarning && (
-                <Text style={{ fontSize: 12, color: theme.colors.error, marginTop: 8, fontWeight: '600', lineHeight: 18 }}>
+                <Text style={{ fontSize: normalize(12), color: theme.colors.error, marginTop: 8, fontWeight: '600', lineHeight: normalize(18) }}>
                   Budget Integrity: You need {formatCurrency(totalEnvelopeLiabilities)} for envelopes, but will only have {formatCurrency(projectedTotalCash)} left.
                 </Text>
               )}
             </View>
 
-            <View style={{ marginBottom: 20 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <MaterialIcons name="tune" size={16} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>BALANCE ADJUSTMENT</Text>
+            <View style={{ marginBottom: moderateScale(20) }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(12) }}>
+                <MaterialIcons name="tune" size={scale(16)} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>BALANCE ADJUSTMENT</Text>
               </View>
 
-              <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: theme.colors.border }}>
-                <TouchableOpacity onPress={() => setMode('add')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: 8 }}>
-                  <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD FUNDS</Text>
+              <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: scale(12), padding: scale(4), marginBottom: moderateScale(16), borderWidth: 1, borderColor: theme.colors.border }}>
+                <TouchableOpacity onPress={() => setMode('add')} style={{ flex: 1, paddingVertical: moderateScale(10), alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: scale(8) }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: normalize(13), color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD FUNDS</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setMode('reduce')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: 8 }}>
-                  <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE FUNDS</Text>
+                <TouchableOpacity onPress={() => setMode('reduce')} style={{ flex: 1, paddingVertical: moderateScale(10), alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: scale(8) }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: normalize(13), color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE FUNDS</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8 }}>Amount to {mode === 'add' ? 'Deposit' : 'Withdraw'}</Text>
-              <AmountInput value={amount} onChangeText={setAmount} theme={theme} variant="boxed" containerStyle={{ marginBottom: 12 }} placeholder="0.00" />
+              <Text style={{ fontSize: normalize(12), fontWeight: '600', color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>Amount to {mode === 'add' ? 'Deposit' : 'Withdraw'}</Text>
+              <AmountInput value={amount} onChangeText={setAmount} theme={theme} variant="boxed" containerStyle={{ marginBottom: moderateScale(12) }} placeholder="0.00" />
             </View>
           </ScrollView>
 
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-            <TouchableOpacity disabled={isSaving} onPress={handleDelete} style={{ flex: 1, backgroundColor: theme.isDark ? '#2D1A1A' : '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: isSaving ? 0.6 : 1 }}>
-              <Text style={{ color: theme.colors.error, fontSize: 15, fontWeight: 'bold' }}>Delete</Text>
+          <View style={{ flexDirection: 'row', gap: scale(12), marginTop: moderateScale(12) }}>
+            <TouchableOpacity disabled={isSaving} onPress={handleDelete} style={{ flex: 1, backgroundColor: theme.isDark ? '#2D1A1A' : '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: scale(14), paddingVertical: moderateScale(14), alignItems: 'center', opacity: isSaving ? 0.6 : 1 }}>
+              <Text style={{ color: theme.colors.error, fontSize: normalize(15), fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleSave}
               disabled={isNegativeWarning || isIntegrityWarning || !name.trim() || isSaving}
-              style={{ flex: 2, backgroundColor: (isNegativeWarning || isIntegrityWarning || !name.trim() || isSaving) ? theme.colors.border : (mode === 'reduce' ? theme.colors.error : theme.colors.primary), borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: (isNegativeWarning || isIntegrityWarning || !name.trim() || isSaving) ? 0.6 : 1 }}
+              style={{ flex: 2, backgroundColor: (isNegativeWarning || isIntegrityWarning || !name.trim() || isSaving) ? theme.colors.border : (mode === 'reduce' ? theme.colors.error : theme.colors.primary), borderRadius: scale(14), paddingVertical: moderateScale(14), alignItems: 'center', opacity: (isNegativeWarning || isIntegrityWarning || !name.trim() || isSaving) ? 0.6 : 1 }}
             >
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Save Changes</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: normalize(15), fontWeight: 'bold' }}>Save Changes</Text>
               )}
             </TouchableOpacity>
           </View>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
         </View>
+
       </View>
     </Modal>
   );
@@ -1177,6 +1190,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
 const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign, envelopes, userSettings, mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, recurringExpenses, onSaved }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [name, setName] = useState('');
   var [goalAmount, setGoalAmount] = useState('');
   var [goalDate, setGoalDate] = useState('');
@@ -1274,11 +1288,11 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           position: 'relative',
           overflow: 'hidden',
           shadowColor: '#000',
@@ -1288,50 +1302,47 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Envelope</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Envelope</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>ENVELOPE NAME</Text>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>ENVELOPE NAME</Text>
           <TextInput
             value={name}
             onChangeText={setName}
             placeholder="Envelope Name"
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 16 }}
+            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(10), fontSize: normalize(14), color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}
           />
 
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>SAVINGS GOAL TARGET AMOUNT (OPTIONAL)</Text>
+          <AmountInput value={goalAmount} onChangeText={setGoalAmount} theme={theme} fontSize={normalize(20)} containerStyle={{ marginBottom: moderateScale(16) }} placeholder="15000" />
 
-
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>SAVINGS GOAL TARGET AMOUNT (OPTIONAL)</Text>
-          <AmountInput value={goalAmount} onChangeText={setGoalAmount} theme={theme} fontSize={20} containerStyle={{ marginBottom: 16 }} placeholder="15000" />
-
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>TARGET DATE (OPTIONAL)</Text>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>TARGET DATE (OPTIONAL)</Text>
           <DatePickerInput
             value={goalDate}
             onChange={setGoalDate}
             placeholder="Select target savings date..."
-            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 }}
+            style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(10), marginBottom: moderateScale(16) }}
           />
 
-
-
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            <TouchableOpacity onPress={handleDelete} disabled={isSaving} style={{ flex: 1, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: isSaving ? 0.6 : 1 }}>
-              <Text style={{ color: theme.colors.error, fontSize: 15, fontWeight: 'bold' }}>Delete</Text>
+          <View style={{ flexDirection: 'row', gap: scale(12), marginTop: moderateScale(8) }}>
+            <TouchableOpacity onPress={handleDelete} disabled={isSaving} style={{ flex: 1, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: theme.colors.error, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center', opacity: isSaving ? 0.6 : 1 }}>
+              <Text style={{ color: theme.colors.error, fontSize: normalize(15), fontWeight: 'bold' }}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} disabled={isSaving} style={{ flex: 2, backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+            <TouchableOpacity onPress={handleSave} disabled={isSaving} style={{ flex: 2, backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center' }}>
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Save Changes</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: normalize(15), fontWeight: 'bold' }}>Save Changes</Text>
               )}
             </TouchableOpacity>
           </View>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
         </View>
+
       </View>
     </Modal>
   );
@@ -1340,6 +1351,7 @@ const EditEnvelopeModal = function ({ visible, onClose, envelope, readyToAssign,
 const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSettings, mutateUpdateSettings, onSaved }) {
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
+  var insets = useSafeAreaInsets();
   var [sourceId, setSourceId] = useState('');
   var [destId, setDestId] = useState('');
   var [amount, setAmount] = useState('');
@@ -1431,11 +1443,11 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: 40,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(40),
           position: 'relative',
           overflow: 'hidden',
           shadowColor: '#000',
@@ -1445,53 +1457,54 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelope Budget Transfer</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelope Budget Transfer</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
           {errorMsg ? (
-            <Text style={{ color: theme.colors.error, fontSize: 13, marginBottom: 12, fontWeight: '600' }}>{errorMsg}</Text>
+            <Text style={{ color: theme.colors.error, fontSize: normalize(13), marginBottom: moderateScale(12), fontWeight: '600' }}>{errorMsg}</Text>
           ) : null}
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>FROM ENVELOPE (SOURCE)</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>FROM ENVELOPE (SOURCE)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(6), marginBottom: moderateScale(16) }}>
             {envelopes.map(e => {
               var isSel = sourceId === e.id;
               return (
-                <TouchableOpacity key={e.id} onPress={() => setSourceId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
+                <TouchableOpacity key={e.id} onPress={() => setSourceId(e.id)} style={{ paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(8), borderRadius: scale(8), backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
+                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: normalize(13), fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>TO ENVELOPE (DESTINATION)</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>TO ENVELOPE (DESTINATION)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(6), marginBottom: moderateScale(16) }}>
             {envelopes.map(e => {
               var isSel = destId === e.id;
               return (
-                <TouchableOpacity key={e.id} onPress={() => setDestId(e.id)} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
-                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
+                <TouchableOpacity key={e.id} onPress={() => setDestId(e.id)} style={{ paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(8), borderRadius: scale(8), backgroundColor: isSel ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: isSel ? theme.colors.primary : theme.colors.border }}>
+                  <Text style={{ color: isSel ? '#FFFFFF' : theme.colors.textPrimary, fontSize: normalize(13), fontWeight: '600' }}>{e.name} ({formatCurrency(e.assigned || 0)})</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>AMOUNT TO TRANSFER</Text>
-          <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={22} containerStyle={{ marginBottom: 20 }} />
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>AMOUNT TO TRANSFER</Text>
+          <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={normalize(22)} containerStyle={{ marginBottom: moderateScale(20) }} />
 
-          <TouchableOpacity disabled={isSaving} onPress={handleTransfer} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
+          <TouchableOpacity disabled={isSaving} onPress={handleTransfer} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center' }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' }}>Complete Transfer</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(15), fontWeight: 'bold' }}>Complete Transfer</Text>
             )}
           </TouchableOpacity>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Transferred!" />
         </View>
+
       </View>
     </Modal>
   );
@@ -1578,11 +1591,11 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insetsBottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insetsBottom + moderateScale(40),
           maxHeight: '92%',
           position: 'relative',
           overflow: 'hidden',
@@ -1593,21 +1606,21 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Wallet Money Transfer</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Wallet Money Transfer</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
           {errorMsg ? (
-            <View style={{ backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 16 }}>
-              <Text style={{ color: theme.colors.error, fontSize: 13, fontWeight: '600' }}>{errorMsg}</Text>
+            <View style={{ backgroundColor: '#FEF2F2', borderRadius: scale(8), padding: moderateScale(10), marginBottom: moderateScale(16) }}>
+              <Text style={{ color: theme.colors.error, fontSize: normalize(13), fontWeight: '600' }}>{errorMsg}</Text>
             </View>
           ) : null}
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>MOVE FROM (SOURCE)</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8), fontWeight: '600' }}>MOVE FROM (SOURCE)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(8), marginBottom: moderateScale(16) }}>
             {accounts.map(acc => {
               var isSel = sourceId === acc.id;
               var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
@@ -1625,9 +1638,9 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
                   key={acc.id}
                   onPress={() => setSourceId(acc.id)}
                   style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
+                    paddingHorizontal: moderateScale(14),
+                    paddingVertical: moderateScale(10),
+                    borderRadius: scale(12),
                     backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
                     borderWidth: 1,
                     borderColor: isSel ? theme.colors.primary : theme.colors.border,
@@ -1637,15 +1650,15 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
                     flexGrow: 1
                   }}
                 >
-                  <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
+                  <BrandLogo type={acc.type} size={scale(14)} style={{ marginRight: 6 }} />
+                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: normalize(13), fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>MOVE TO (DESTINATION)</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8), fontWeight: '600' }}>MOVE TO (DESTINATION)</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(8), marginBottom: moderateScale(16) }}>
             {accounts.map(acc => {
               var isSel = destId === acc.id;
               var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
@@ -1663,9 +1676,9 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
                   key={acc.id}
                   onPress={() => setDestId(acc.id)}
                   style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 12,
+                    paddingHorizontal: moderateScale(14),
+                    paddingVertical: moderateScale(10),
+                    borderRadius: scale(12),
                     backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
                     borderWidth: 1,
                     borderColor: isSel ? theme.colors.primary : theme.colors.border,
@@ -1675,25 +1688,26 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
                     flexGrow: 1
                   }}
                 >
-                  <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
-                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
+                  <BrandLogo type={acc.type} size={scale(14)} style={{ marginRight: 6 }} />
+                  <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: normalize(13), fontWeight: '700' }}>{acc.name} ({formatCurrency(acc.balance)})</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8, fontWeight: '600' }}>AMOUNT TO MOVE</Text>
-          <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={22} containerStyle={{ marginBottom: 24 }} />
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8), fontWeight: '600' }}>AMOUNT TO MOVE</Text>
+          <AmountInput value={amount} onChangeText={setAmount} theme={theme} fontSize={normalize(22)} containerStyle={{ marginBottom: moderateScale(24) }} />
 
-          <TouchableOpacity disabled={isSaving || accounts.length < 2} onPress={handleTransfer} style={{ backgroundColor: (isSaving || accounts.length < 2) ? theme.colors.border : theme.colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', elevation: 2 }}>
+          <TouchableOpacity disabled={isSaving || accounts.length < 2} onPress={handleTransfer} style={{ backgroundColor: (isSaving || accounts.length < 2) ? theme.colors.border : theme.colors.primary, borderRadius: scale(14), paddingVertical: moderateScale(16), alignItems: 'center', elevation: 2 }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>Complete Transfer</Text>
+              <Text style={{ color: '#FFFFFF', fontSize: normalize(16), fontWeight: 'bold' }}>Complete Transfer</Text>
             )}
           </TouchableOpacity>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Money moved!" />
         </View>
+
       </View>
     </Modal>
   );
@@ -1755,23 +1769,24 @@ const EditSalaryModal = function ({ visible, onClose, incomeSources, userSetting
 
   return (
     <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 16, padding: 24, position: 'relative', overflow: 'hidden' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 16 }}>Edit Main Salary</Text>
-          <Text style={{ fontSize: 13, color: theme.colors.textSecondary, marginBottom: 8 }}>MONTHLY AMOUNT</Text>
-          <AmountInput value={salary} onChangeText={setSalary} theme={theme} fontSize={22} containerStyle={{ marginBottom: 20 }} />
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
-            <TouchableOpacity onPress={onClose} disabled={isSaving} style={{ padding: 12 }}><Text style={{ color: theme.colors.textSecondary, fontWeight: '600', fontSize: 15 }}>Cancel</Text></TouchableOpacity>
-            <TouchableOpacity onPress={handleSave} disabled={isSaving} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 12, minWidth: 80, alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: moderateScale(20) }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(16), padding: moderateScale(24), position: 'relative', overflow: 'hidden' }}>
+          <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}>Edit Main Salary</Text>
+          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: moderateScale(8) }}>MONTHLY AMOUNT</Text>
+          <AmountInput value={salary} onChangeText={setSalary} theme={theme} fontSize={normalize(22)} containerStyle={{ marginBottom: moderateScale(20) }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: moderateScale(12) }}>
+            <TouchableOpacity onPress={onClose} disabled={isSaving} style={{ padding: moderateScale(12) }}><Text style={{ color: theme.colors.textSecondary, fontWeight: '600', fontSize: normalize(15) }}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={handleSave} disabled={isSaving} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(8), paddingHorizontal: moderateScale(20), paddingVertical: moderateScale(12), minWidth: scale(80), alignItems: 'center' }}>
               {isSaving ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Save</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(15) }}>Save</Text>
               )}
             </TouchableOpacity>
           </View>
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Salary saved!" />
         </View>
+
       </View>
     </Modal>
   );
@@ -1966,11 +1981,11 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insetsBottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insetsBottom + moderateScale(40),
           maxHeight: '92%',
           position: 'relative',
           overflow: 'hidden',
@@ -1980,101 +1995,101 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
           shadowRadius: 10,
           elevation: 20
         }}>
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
             <View>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary }}>Log Income Receipt</Text>
-              {!hasNoAccounts && <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Record actual money received to update wallet balances.</Text>}
+              <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Log Income Receipt</Text>
+              {!hasNoAccounts && <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>Record actual money received to update wallet balances.</Text>}
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity onPress={() => setShowEditSources(!showEditSources)} style={{ padding: 8, backgroundColor: showEditSources ? theme.colors.primary : (theme.isDark ? '#374151' : '#F3F4F6'), borderRadius: 12 }}>
-                <MaterialIcons name="settings" size={20} color={showEditSources ? '#FFFFFF' : theme.colors.textSecondary} />
+            <View style={{ flexDirection: 'row', gap: moderateScale(8) }}>
+              <TouchableOpacity onPress={() => setShowEditSources(!showEditSources)} style={{ padding: moderateScale(8), backgroundColor: showEditSources ? theme.colors.primary : (theme.isDark ? '#374151' : '#F3F4F6'), borderRadius: scale(12) }}>
+                <MaterialIcons name="settings" size={scale(20)} color={showEditSources ? '#FFFFFF' : theme.colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} style={{ padding: 8, backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', borderRadius: 12 }}>
-                <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+              <TouchableOpacity onPress={onClose} style={{ padding: moderateScale(8), backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', borderRadius: scale(12) }}>
+                <MaterialIcons name="close" size={scale(20)} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
 
           {showEditSources ? (
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
-              <Text style={{ fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 16 }}>Manage Income Sources</Text>
+              <Text style={{ fontSize: normalize(15), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}>Manage Income Sources</Text>
               {incomeSources.map(src => {
                 var isEditing = editingSourceId === src.id;
                 return (
-                  <View key={src.id} style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                  <View key={src.id} style={{ backgroundColor: theme.colors.background, borderRadius: scale(12), padding: moderateScale(14), marginBottom: moderateScale(10), borderWidth: 1, borderColor: theme.colors.border }}>
                     {isEditing ? (
                       <View>
-                        <TextInput value={editSourceName} onChangeText={setEditSourceName} style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, padding: 10, color: theme.colors.textPrimary, marginBottom: 8 }} />
-                        <AmountInput value={editSourceAmount} onChangeText={setEditTxnAmount} theme={theme} containerStyle={{ marginBottom: 10 }} />
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TouchableOpacity onPress={handleUpdateSource} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Save</Text></TouchableOpacity>
-                          <TouchableOpacity onPress={() => setEditingSourceId(null)} style={{ flex: 1, backgroundColor: theme.colors.border, borderRadius: 8, paddingVertical: 10, alignItems: 'center' }}><Text style={{ color: theme.colors.textSecondary }}>Cancel</Text></TouchableOpacity>
+                        <TextInput value={editSourceName} onChangeText={setEditSourceName} style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), padding: moderateScale(10), color: theme.colors.textPrimary, marginBottom: moderateScale(8) }} />
+                        <AmountInput value={editSourceAmount} onChangeText={setEditTxnAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(10) }} />
+                        <View style={{ flexDirection: 'row', gap: scale(8) }}>
+                          <TouchableOpacity onPress={handleUpdateSource} style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: scale(8), paddingVertical: moderateScale(10), alignItems: 'center' }}><Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(13) }}>Save</Text></TouchableOpacity>
+                          <TouchableOpacity onPress={() => setEditingSourceId(null)} style={{ flex: 1, backgroundColor: theme.colors.border, borderRadius: scale(8), paddingVertical: moderateScale(10), alignItems: 'center' }}><Text style={{ color: theme.colors.textSecondary, fontSize: normalize(13) }}>Cancel</Text></TouchableOpacity>
                         </View>
                       </View>
                     ) : (
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                         <View>
-                          <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>{src.name}</Text>
+                          <Text style={{ fontSize: normalize(14), fontWeight: 'bold', color: theme.colors.textPrimary }}>{src.name}</Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                            <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: '600' }}>
+                            <Text style={{ fontSize: normalize(13), color: theme.colors.primary, fontWeight: '600' }}>
                               {formatCurrency(incomeReceivedBySource[src.id] || 0)}
                             </Text>
-                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary }}> / {formatCurrency(src.amount)} target</Text>
+                            <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary }}> / {formatCurrency(src.amount)} target</Text>
                           </View>
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                          <TouchableOpacity onPress={() => { setEditingSourceId(src.id); setEditSourceName(src.name); setEditTxnAmount(String(src.amount)); }}><MaterialIcons name="edit" size={18} color={theme.colors.primary} /></TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDeleteSource(src.id)}><MaterialIcons name="delete-outline" size={18} color={theme.colors.error} /></TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: scale(10) }}>
+                          <TouchableOpacity onPress={() => { setEditingSourceId(src.id); setEditSourceName(src.name); setEditTxnAmount(String(src.amount)); }}><MaterialIcons name="edit" size={scale(18)} color={theme.colors.primary} /></TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDeleteSource(src.id)}><MaterialIcons name="delete-outline" size={scale(18)} color={theme.colors.error} /></TouchableOpacity>
                         </View>
                       </View>
                     )}
                   </View>
                 );
               })}
-              <TouchableOpacity onPress={() => setShowEditSources(false)} style={{ marginTop: 10, alignItems: 'center', padding: 12 }}><Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back to Logging</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setShowEditSources(false)} style={{ marginTop: moderateScale(10), alignItems: 'center', padding: moderateScale(12) }}><Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: normalize(14) }}>Back to Logging</Text></TouchableOpacity>
             </ScrollView>
           ) : hasNoAccounts ? (
-            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                <MaterialIcons name="account-balance-wallet" size={40} color={theme.colors.primary} />
+            <View style={{ alignItems: 'center', paddingVertical: moderateScale(40) }}>
+              <View style={{ width: scale(80), height: scale(80), borderRadius: scale(40), backgroundColor: theme.colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: moderateScale(20) }}>
+                <MaterialIcons name="account-balance-wallet" size={scale(40)} color={theme.colors.primary} />
               </View>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 12 }}>First, let's create a home for your money.</Text>
-              <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 32, lineHeight: 22 }}>
+              <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: moderateScale(12) }}>First, let's create a home for your money.</Text>
+              <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', marginBottom: moderateScale(32), lineHeight: normalize(22) }}>
                 To track income accurately, Penny needs to know where the money is stored (e.g., GCash, Bank, or Physical Cash).
               </Text>
               <TouchableOpacity
                 onPress={onAddAccount}
-                style={{ backgroundColor: theme.colors.primary, borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, width: '100%', alignItems: 'center', elevation: 4 }}
+                style={{ backgroundColor: theme.colors.primary, borderRadius: scale(16), paddingVertical: moderateScale(16), paddingHorizontal: moderateScale(32), width: '100%', alignItems: 'center', elevation: 4 }}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 16 }}>Add My First Wallet</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(16) }}>Add My First Wallet</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DESCRIPTION / SOURCE</Text>
+              <Text style={{ fontSize: normalize(12), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>DESCRIPTION / SOURCE</Text>
               <TextInput
                 value={logName}
                 onChangeText={setLogName}
                 placeholder="e.g. Salary Payment, Side Gig, Cash Gift"
                 placeholderTextColor={theme.isDark ? '#6B7280' : '#9CA3AF'}
-                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: theme.colors.textPrimary, marginBottom: 16 }}
+                style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(12), paddingHorizontal: moderateScale(14), paddingVertical: moderateScale(12), fontSize: normalize(15), color: theme.colors.textPrimary, marginBottom: moderateScale(16) }}
               />
 
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>AMOUNT RECEIVED</Text>
+              <Text style={{ fontSize: normalize(12), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>AMOUNT RECEIVED</Text>
               <AmountInput
                 value={logAmount}
                 onChangeText={setLogAmount}
                 theme={theme}
                 variant="boxed"
-                fontSize={18}
-                containerStyle={{ marginBottom: 16 }}
+                fontSize={normalize(18)}
+                containerStyle={{ marginBottom: moderateScale(16) }}
                 placeholder="0.00"
               />
 
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DEPOSIT TO WALLET</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              <Text style={{ fontSize: normalize(12), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>DEPOSIT TO WALLET</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: moderateScale(8), marginBottom: moderateScale(16) }}>
                 {accounts.map(a => {
                   var isSel = logAccount === a.id;
                   var styleInfo = WALLET_STYLES[a.type] || WALLET_STYLES.Custom;
@@ -2094,9 +2109,9 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 12,
+                        paddingHorizontal: moderateScale(14),
+                        paddingVertical: moderateScale(10),
+                        borderRadius: scale(12),
                         backgroundColor: isSel ? theme.colors.primary : theme.colors.background,
                         borderWidth: 1,
                         borderColor: isSel ? theme.colors.primary : theme.colors.border,
@@ -2104,8 +2119,8 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
                         flexGrow: 1
                       }}
                     >
-                      <BrandLogo type={a.type} size={16} style={{ marginRight: 8 }} />
-                      <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: 13, fontWeight: '700' }}>
+                      <BrandLogo type={a.type} size={scale(16)} style={{ marginRight: 8 }} />
+                      <Text style={{ color: isSel ? '#FFFFFF' : displayColor, fontSize: normalize(13), fontWeight: '700' }}>
                         {a.name} (₱{a.balance})
                       </Text>
                     </TouchableOpacity>
@@ -2113,14 +2128,14 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
                 })}
               </View>
 
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>DATE RECEIVED</Text>
-              <DatePickerInput value={logDate} onChange={setLogDate} theme={theme} containerStyle={{ marginBottom: 20 }} />
+              <Text style={{ fontSize: normalize(12), fontWeight: '700', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>DATE RECEIVED</Text>
+              <DatePickerInput value={logDate} onChange={setLogDate} theme={theme} containerStyle={{ marginBottom: moderateScale(20) }} />
 
               <TouchableOpacity
                 onPress={handleSaveLog}
-                style={{ backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 14, alignItems: 'center', elevation: 4, marginBottom: 8 }}
+                style={{ backgroundColor: theme.colors.primary, borderRadius: scale(14), paddingVertical: moderateScale(14), alignItems: 'center', elevation: 4, marginBottom: moderateScale(8) }}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>Log Income Transaction</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(15) }}>Log Income Transaction</Text>
               </TouchableOpacity>
             </ScrollView>
           )}
@@ -2299,11 +2314,11 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View style={{
           backgroundColor: theme.colors.card,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          paddingHorizontal: 24,
-          paddingTop: 10,
-          paddingBottom: insetsBottom + 24,
+          borderTopLeftRadius: scale(28),
+          borderTopRightRadius: scale(28),
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insetsBottom + moderateScale(40),
           maxHeight: '85%',
           position: 'relative',
           overflow: 'hidden',
@@ -2314,68 +2329,68 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
           elevation: 20
         }}>
           {/* Handle */}
-          <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 15, opacity: 0.8 }} />
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{title}</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>{title}</Text>
+            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: 400 }}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: scale(400) }}>
             {filteredExpenses.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <MaterialIcons name="shopping-bag" size={44} color={theme.colors.border} />
-                <Text style={{ color: theme.colors.textSecondary, marginTop: 12, fontSize: 14 }}>No spent items for this period</Text>
+              <View style={{ alignItems: 'center', paddingVertical: moderateScale(40) }}>
+                <MaterialIcons name="shopping-bag" size={scale(44)} color={theme.colors.border} />
+                <Text style={{ color: theme.colors.textSecondary, marginTop: moderateScale(12), fontSize: normalize(14) }}>No spent items for this period</Text>
               </View>
             ) : (
               filteredExpenses.map(function (exp) {
                 var isEditing = editingId === exp.id;
                 var env = envelopes.find(function (e) { return e.id === exp.category; });
-                return React.createElement(View, { key: exp.id, style: { backgroundColor: theme.colors.background, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border } },
+                return React.createElement(View, { key: exp.id, style: { backgroundColor: theme.colors.background, borderRadius: scale(12), padding: moderateScale(14), marginBottom: moderateScale(10), borderWidth: 1, borderColor: theme.colors.border } },
                   isEditing
                     ? React.createElement(View, null,
                       React.createElement(TextInput, {
                         value: editName, onChangeText: setEditName, placeholder: 'Name',
                         placeholderTextColor: theme.isDark ? '#6B7280' : '#9CA3AF',
-                        style: { backgroundColor: theme.colors.inputBg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: theme.colors.textPrimary, marginBottom: 8 }
+                        style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(10), paddingVertical: moderateScale(6), fontSize: normalize(14), color: theme.colors.textPrimary, marginBottom: moderateScale(8) }
                       }),
                       React.createElement(AmountInput, {
                         value: editAmount,
                         onChangeText: setEditAmount,
                         theme: theme,
                         variant: 'boxed',
-                        fontSize: 14,
+                        fontSize: normalize(14),
                         containerStyle: { flex: 1, marginBottom: 0 },
                         placeholder: '0.00'
                       }),
-                      React.createElement(View, { style: { flexDirection: 'row', gap: 8, marginTop: 8 } },
+                      React.createElement(View, { style: { flexDirection: 'row', gap: moderateScale(8), marginTop: moderateScale(8) } },
                         React.createElement(TouchableOpacity, {
                           onPress: function () { handleSaveEdit(exp); },
-                          style: { backgroundColor: theme.colors.primary, borderRadius: 8, paddingHorizontal: 12, justifyContent: 'center' }
+                          style: { backgroundColor: theme.colors.primary, borderRadius: scale(8), paddingHorizontal: moderateScale(12), justifyContent: 'center' }
                         },
-                          React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 } }, 'Save')
+                          React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(13) } }, 'Save')
                         ),
                         React.createElement(TouchableOpacity, {
                           onPress: function () { setEditingId(null); },
-                          style: { backgroundColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 10, justifyContent: 'center' }
+                          style: { backgroundColor: theme.colors.border, borderRadius: scale(8), paddingHorizontal: moderateScale(10), justifyContent: 'center' }
                         },
-                          React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 13 } }, 'Cancel')
+                          React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: normalize(13) } }, 'Cancel')
                         )
                       )
                     )
                     : React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
                       React.createElement(View, { style: { flex: 1 } },
-                        React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, exp.name),
-                        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, formatDate(exp.date) + (env ? ' • Env: ' + env.name : ''))
+                        React.createElement(Text, { style: { fontSize: normalize(15), fontWeight: '600', color: theme.colors.textPrimary } }, exp.name),
+                        React.createElement(Text, { style: { fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 } }, formatDate(exp.date) + (env ? ' • Env: ' + env.name : ''))
                       ),
                       React.createElement(View, { style: { alignItems: 'flex-end' } },
-                        React.createElement(Text, { style: { fontSize: 15, fontWeight: 'bold', color: '#DC2626', marginBottom: 6 } }, '-' + formatCurrency(exp.amount)),
-                        React.createElement(View, { style: { flexDirection: 'row', gap: 8 } },
-                          React.createElement(TouchableOpacity, { onPress: function () { handleStartEdit(exp); }, style: { padding: 4, backgroundColor: '#FFEDD5', borderRadius: 6 } },
-                            React.createElement(MaterialIcons, { name: 'edit', size: 16, color: theme.colors.primary })
+                        React.createElement(Text, { style: { fontSize: normalize(15), fontWeight: 'bold', color: '#DC2626', marginBottom: moderateScale(6) } }, '-' + formatCurrency(exp.amount)),
+                        React.createElement(View, { style: { flexDirection: 'row', gap: moderateScale(8) } },
+                          React.createElement(TouchableOpacity, { onPress: function () { handleStartEdit(exp); }, style: { padding: scale(4), backgroundColor: '#FFEDD5', borderRadius: scale(6) } },
+                            React.createElement(MaterialIcons, { name: 'edit', size: scale(16), color: theme.colors.primary })
                           ),
-                          React.createElement(TouchableOpacity, { onPress: function () { handleDelete(exp); }, style: { padding: 4, backgroundColor: '#FEF2F2', borderRadius: 6 } },
-                            React.createElement(MaterialIcons, { name: 'delete-outline', size: 16, color: theme.colors.error })
+                          React.createElement(TouchableOpacity, { onPress: function () { handleDelete(exp); }, style: { padding: scale(4), backgroundColor: '#FEF2F2', borderRadius: scale(6) } },
+                            React.createElement(MaterialIcons, { name: 'delete-outline', size: scale(16), color: theme.colors.error })
                           )
                         )
                       )
@@ -2388,6 +2403,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
 
         </View>
+
       </View>
     </Modal>
   );
@@ -2509,12 +2525,12 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
 
   return (
     <Modal visible={visible} animationType="fade" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 16 }}>
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, maxHeight: '90%', position: 'relative', overflow: 'hidden' }}>
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: moderateScale(16) }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(20), padding: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, maxHeight: '90%', position: 'relative', overflow: 'hidden' }}>
           
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>Adjust Budget: {envelope.name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(16) }}>
+            <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>Adjust Budget: {envelope.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) }}>
               <TouchableOpacity onPress={function () {
                 onClose();
                 var rawEnvs = [];
@@ -2524,54 +2540,54 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
                 var orig = rawEnvs.find(x => x.id === envelope.id) || envelope;
                 setSelectedEnvelope(orig);
                 setShowEditEnvModal(true);
-              }} style={{ padding: 4 }}>
-                <MaterialIcons name="edit" size={20} color={theme.colors.textSecondary} />
+              }} style={{ padding: scale(4) }}>
+                <MaterialIcons name="edit" size={scale(20)} color={theme.colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-                <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+              <TouchableOpacity onPress={onClose} style={{ padding: scale(4) }}>
+                <MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Segmented Mode Picker */}
-          <View style={{ flexDirection: 'row', backgroundColor: theme.colors.inputBg, borderRadius: 12, padding: 4, marginBottom: 14, borderWidth: 1, borderColor: theme.colors.border }}>
-            <TouchableOpacity onPress={() => { setMode('add'); setErrorMsg(''); }} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: 8 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD FUNDS</Text>
+          <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: scale(12), padding: scale(4), marginBottom: moderateScale(14), borderWidth: 1, borderColor: theme.colors.border }}>
+            <TouchableOpacity onPress={() => { setMode('add'); setErrorMsg(''); }} style={{ flex: 1, paddingVertical: moderateScale(10), alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: scale(8) }}>
+              <Text style={{ fontWeight: 'bold', fontSize: normalize(13), color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD FUNDS</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setMode('reduce'); setErrorMsg(''); }} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: 8 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 13, color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE FUNDS</Text>
+            <TouchableOpacity onPress={() => { setMode('reduce'); setErrorMsg(''); }} style={{ flex: 1, paddingVertical: moderateScale(10), alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: scale(8) }}>
+              <Text style={{ fontWeight: 'bold', fontSize: normalize(13), color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE FUNDS</Text>
             </TouchableOpacity>
           </View>
 
           {errorMsg ? (
-            <View style={{ backgroundColor: '#FEE2E2', borderRadius: 8, padding: 10, marginBottom: 12 }}>
-              <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: 'bold' }}>{errorMsg}</Text>
+            <View style={{ backgroundColor: '#FEE2E2', borderRadius: scale(8), padding: moderateScale(10), marginBottom: moderateScale(12) }}>
+              <Text style={{ color: '#DC2626', fontSize: normalize(13), fontWeight: 'bold' }}>{errorMsg}</Text>
             </View>
           ) : null}
 
           {/* Balance Summary */}
-          <View style={{ backgroundColor: theme.colors.background, borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: theme.colors.border }}>
+          <View style={{ backgroundColor: theme.colors.background, borderRadius: scale(12), padding: moderateScale(12), marginBottom: moderateScale(14), borderWidth: 1, borderColor: theme.colors.border }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>Ready to Assign</Text>
-              <Text style={{ color: '#16A34A', fontSize: 13, fontWeight: 'bold' }}>{formatCurrency(readyToAssign)}</Text>
+              <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(13) }}>Ready to Assign</Text>
+              <Text style={{ color: '#16A34A', fontSize: normalize(13), fontWeight: 'bold' }}>{formatCurrency(readyToAssign)}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>{mode === 'add' ? 'Remaining RTA' : 'New RTA Balance'}</Text>
-              <Text style={{ color: remainingRta < 0 ? '#DC2626' : '#16A34A', fontSize: 13, fontWeight: 'bold' }}>{formatCurrency(remainingRta)}</Text>
+              <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(13) }}>{mode === 'add' ? 'Remaining RTA' : 'New RTA Balance'}</Text>
+              <Text style={{ color: remainingRta < 0 ? '#DC2626' : '#16A34A', fontSize: normalize(13), fontWeight: 'bold' }}>{formatCurrency(remainingRta)}</Text>
             </View>
           </View>
 
           {/* Amount Input */}
-          <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 6, textTransform: 'uppercase' }}>
+          <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: scale(6), textTransform: 'uppercase' }}>
             Amount to {mode === 'add' ? 'Add' : 'Reduce'}
           </Text>
-          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: 18 }} />
+          <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(18) }} />
 
-          <TouchableOpacity disabled={isSaving} onPress={handleConfirm} style={{ backgroundColor: (isSaving) ? theme.colors.accent : (mode === 'add' ? theme.colors.primary : theme.colors.error), borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: 16 }}>
+          <TouchableOpacity disabled={isSaving} onPress={handleConfirm} style={{ backgroundColor: (isSaving) ? theme.colors.accent : (mode === 'add' ? theme.colors.primary : theme.colors.error), borderRadius: scale(12), paddingVertical: moderateScale(12), alignItems: 'center', marginBottom: moderateScale(16) }}>
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 }}>
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(15) }}>
                 {mode === 'add' ? 'Add to Envelope' : 'Return to Ready to Assign'}
               </Text>
             )}
@@ -2580,6 +2596,7 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
           <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Budget updated!" />
         </View>
       </View>
+
     </Modal>
   );
 };
