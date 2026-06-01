@@ -147,13 +147,17 @@ export function deleteEnvelopeAndCleanup(params) {
     newList
   );
 
-  // Also delete all spent history tied to this envelope so money returns to Ready to Assign
-  if (params.userHistory && params.mutateDeleteHistory) {
+  // Senior Developer Fix: Instead of deleting spent history, we just UNLINK it.
+  // This ensures wallet balances stay accurate and money doesn't "roll back" magically.
+  if (params.userHistory && params.mutateUpdateHistory) {
     var relatedHistory = params.userHistory.filter(function(h) {
       return h.category === envelopeId && (h.expense_type === 'One-Time' || h.expense_type === 'Recurring');
     });
     relatedHistory.forEach(function(h) {
-      cleanup.push(params.mutateDeleteHistory({ id: h.id }));
+      cleanup.push(params.mutateUpdateHistory({
+        id: h.id,
+        data: { category: null, notes: (h.notes || '') + ' [From deleted envelope: ' + (target ? target.name : 'Unknown') + ']' }
+      }));
     });
   }
 

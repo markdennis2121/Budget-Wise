@@ -37,6 +37,8 @@ export function useDashboardState(userId) {
   var mutateDeleteRecurring = deleteRecurring.mutate;
   var deleteHistory = useMutation('expense_history', 'delete');
   var mutateDeleteHistory = deleteHistory.mutate;
+  var updateHistory = useMutation('expense_history', 'update');
+  var mutateUpdateHistory = updateHistory.mutate;
 
   var [showAddModal, setShowAddModal] = useState(false);
   var [showOnboarding, setShowOnboarding] = useState(false);
@@ -156,12 +158,55 @@ export function useDashboardState(userId) {
     historyQuery.refetch();
   }, [settingsQuery, recurringQuery, historyQuery]);
 
+  /**
+   * Senior Developer: Monthly Sweep Logic.
+   * Moves all leftover available funds from envelopes back to Ready to Assign.
+   */
+  var performMonthlySweep = useCallback(function() {
+    if (!userSettings || !envelopes.length) return Promise.resolve();
+
+    var curMonth = getCurrentMonthStr();
+    var balances = computeEnvelopeBalances(envelopes, userHistory, recurringExpenses, curMonth);
+
+    var updatedEnvelopes = envelopes.map(function(env) {
+      var bal = balances.find(function(b) { return b.id === env.id; });
+      if (!bal) return env;
+
+      // Reduce the 'assigned' amount by the 'available' amount.
+      // This effectively brings the available balance to 0 and returns the money to the RTA pool.
+      var leftover = bal.available;
+      if (leftover <= 0) return env;
+
+      return {
+        ...env,
+        assigned: (parseFloat(env.assigned) || 0) - leftover
+      };
+    });
+
+    return mutateUpdateSettings({
+      id: userSettings.id,
+      data: {
+        envelopes: updatedEnvelopes,
+        last_settled_month: curMonth
+      }
+    }).then(refetchAll);
+  }, [userSettings, envelopes, userHistory, recurringExpenses, mutateUpdateSettings, refetchAll]);
+
+  var skipMonthlySweep = useCallback(function() {
+    if (!userSettings) return Promise.resolve();
+    return mutateUpdateSettings({
+      id: userSettings.id,
+      data: { last_settled_month: getCurrentMonthStr() }
+    }).then(refetchAll);
+  }, [userSettings, mutateUpdateSettings, refetchAll]);
+
   return {
     userSettings, incomeSources, envelopes, envelopeBalances,
     totalIncome, totalAssigned, readyToAssign, orphanPendingTotal, totalExpenses, upcomingBills,
     showAddModal, setShowAddModal,
     showOnboarding, setShowOnboarding,
-    mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, mutateDeleteHistory, refetchAll,
+    mutateUpdateSettings, mutateUpdateRecurring, mutateDeleteRecurring, mutateDeleteHistory, mutateUpdateHistory, refetchAll,
+    performMonthlySweep, skipMonthlySweep,
     oneTimeExpenses,
     totalSaved,
     accounts,

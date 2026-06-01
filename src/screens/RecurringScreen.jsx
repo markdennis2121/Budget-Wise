@@ -49,6 +49,7 @@ const RecurringScreen = function(props) {
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
   var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
+  var isSimpleMode = userSettings && userSettings.budgeting_style === 'simple';
 
   var curMonth = getCurrentMonthStr();
   var oneTimeQuery = useQuery('one_time_expenses');
@@ -123,14 +124,17 @@ const RecurringScreen = function(props) {
   
   var handlePayPress = function(expense) {
     var amt = parseFloat(expense.amount) || 0;
+
+    // In Simple Mode, we only care if the WALLET has enough money (if selected).
+    // The envelope guard is skipped.
     var payCheck = validateSpendOperation({
       amount: amt,
-      categoryId: expense.category,
-      envelopeBalances: envelopeBalances,
-      isRecurringPayment: true
+      categoryId: isSimpleMode ? null : expense.category,
+      envelopeBalances: isSimpleMode ? [] : envelopeBalances,
+      isRecurringPayment: !isSimpleMode // In simple mode, it's not a "recurring envelope payment"
     });
 
-    if (!payCheck.ok) {
+    if (!isSimpleMode && !payCheck.ok) {
       if (Platform.OS === 'web') {
         window.alert(payCheck.message);
       } else {
@@ -239,7 +243,7 @@ const RecurringScreen = function(props) {
       [...filtered.slice(0, visibleCount).map(function(expense, idx) {
         var overdue = isOverdue(expense.due_date) && expense.status === 'Pending';
         var upcoming = isWithin5Days(expense.due_date) && !overdue && expense.status === 'Pending';
-        var missingEnvelope = expense.status === 'Pending' && !findEnvelopeForCategory(envelopes, expense.category);
+        var missingEnvelope = !isSimpleMode && expense.status === 'Pending' && !findEnvelopeForCategory(envelopes, expense.category);
         return React.createElement(View, { testID: 'View-52', key: expense.id,
           style: { backgroundColor: theme.colors.card, borderRadius: scale(14), padding: moderateScale(16), marginBottom: moderateScale(12), shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, borderLeftWidth: overdue ? scale(4) : (upcoming ? scale(4) : 0), borderLeftColor: overdue ? theme.colors.error : theme.colors.warning },
           componentId: 'recurring-item-' + idx
@@ -288,7 +292,7 @@ const RecurringScreen = function(props) {
     ),
     React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-22', onPress: function() {
         triggerImpactHaptic('Medium');
-        if (!hasUserEnvelopes(userSettings)) {
+        if (!isSimpleMode && !hasUserEnvelopes(userSettings)) {
           showEnvelopeRequiredAlert();
           return;
         }

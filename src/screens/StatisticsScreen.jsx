@@ -63,6 +63,8 @@ const StatisticsScreen = function(props) {
     return [{ id: 'main-salary', name: 'Main Salary', amount: parseFloat(userSettings.monthly_salary) || 0 }];
   }, [userSettings]);
 
+  var isSimpleMode = userSettings && userSettings.budgeting_style === 'simple';
+
   var incomeHistory = useMemo(function() {
     return userHistory.filter(function(h) {
       return (h.expense_type === 'Income' || h.expense_type === 'Adjustment') &&
@@ -144,11 +146,36 @@ const StatisticsScreen = function(props) {
     });
   }, [userHistory, userOneTime, envelopes, curMonth, recurringByName]);
 
-  var totalMonthSpent = useMemo(function() {
-    return envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
-  }, [envelopeSpending]);
+  var spendingByAccount = useMemo(function() {
+    var spent = {};
+    userHistory.forEach(function(h) {
+      if (getMonthStr(h.date) === curMonth && (h.expense_type === 'One-Time' || h.expense_type === 'Recurring')) {
+        var accountId = h.account_id || 'unlinked';
+        spent[accountId] = (spent[accountId] || 0) + (parseFloat(h.amount) || 0);
+      }
+    });
 
-  var maxEnvSpent = envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1;
+    return Object.keys(spent).map(function(accountId) {
+      var acc = accounts.find(function(a) { return a.id === accountId; });
+      return {
+        id: accountId,
+        name: acc ? acc.name : (accountId === 'unlinked' ? 'Unlinked Cash' : 'Unknown'),
+        spent: spent[accountId],
+        color: acc ? acc.color : '#9CA3AF'
+      };
+    }).sort(function(a, b) { return b.spent - a.spent; });
+  }, [accounts, userHistory, curMonth]);
+
+  var totalMonthSpent = useMemo(function() {
+    if (isSimpleMode) {
+      return spendingByAccount.reduce(function(s, a) { return s + a.spent; }, 0);
+    }
+    return envelopeSpending.reduce(function(s, e) { return s + e.spent; }, 0);
+  }, [envelopeSpending, spendingByAccount, isSimpleMode]);
+
+  var maxSpentItem = isSimpleMode
+    ? (spendingByAccount.length > 0 ? spendingByAccount[0].spent : 1)
+    : (envelopeSpending.length > 0 ? envelopeSpending[0].spent : 1);
   var savings = totalMonthlyIncome - totalMonthSpent;
 
   var dailyAvg = useMemo(function() {
@@ -280,13 +307,21 @@ const StatisticsScreen = function(props) {
   ];
 
   var coloredSpending = useMemo(function() {
+    if (isSimpleMode) {
+      return spendingByAccount.map(function(acc, idx) {
+        return {
+          ...acc,
+          color: acc.color || SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
+        };
+      });
+    }
     return envelopeSpending.map(function(env, idx) {
       return {
         ...env,
         color: env.isOrphan ? '#9CA3AF' : SEGMENT_COLORS[idx % SEGMENT_COLORS.length]
       };
     });
-  }, [envelopeSpending]);
+  }, [envelopeSpending, spendingByAccount, isSimpleMode]);
 
   var svgSegments = useMemo(function() {
     var radius = 35;
@@ -327,7 +362,7 @@ const StatisticsScreen = function(props) {
     });
   }, [coloredSpending, selectedEnvIndex, totalMonthSpent]);
 
-  var centerLabel = selectedEnvIndex !== null ? coloredSpending[selectedEnvIndex].name : 'Total Spent';
+  var centerLabel = selectedEnvIndex !== null ? coloredSpending[selectedEnvIndex].name : (isSimpleMode ? 'Total Expenses' : 'Total Spent');
   var centerValue = selectedEnvIndex !== null ? maskAmount(coloredSpending[selectedEnvIndex].spent) : maskAmount(totalMonthSpent);
 
   // 6-month trend
@@ -357,13 +392,51 @@ const StatisticsScreen = function(props) {
 
   var maxTrendValue = Math.max.apply(null, monthlyTotals.map(function(m) { return Math.max(m.spent, m.income); }).concat([1]));
 
+  var netWorthTrend = useMemo(function() {
+    // 1. Get current total net worth
+    var currentNetWorth = accounts.reduce(function(s, a) { return s + a.balance; }, 0);
+
+    // 2. We need to work backwards from newest to oldest
+    // monthlyTotals is oldest -> newest [M-5, M-4, M-3, M-2, M-1, M-now]
+    var trend = [];
+    var runningNetWorth = currentNetWorth;
+
+    // Start from the latest (current) month
+    for (var i = monthlyTotals.length - 1; i >= 0; i--) {
+      var m = monthlyTotals[i];
+      trend.unshift({
+        label: m.label,
+        value: runningNetWorth,
+        key: m.key
+      });
+
+      // Calculate net change for this month to find the previous month's ending balance
+      var netChange = m.income - m.spent;
+      runningNetWorth -= netChange;
+    }
+
+    return trend;
+  }, [accounts, monthlyTotals]);
+
+  var maxNetWorth = Math.max.apply(null, netWorthTrend.map(function(t) { return t.value; }).concat([1]));
+  var minNetWorth = Math.min.apply(null, netWorthTrend.map(function(t) { return t.value; }).concat([0]));
+  // Buffer for visual headroom
+  var chartMax = maxNetWorth * 1.15;
+  var chartMin = minNetWorth * 0.85;
+  if (chartMin < 0) chartMin = 0;
+
   var monthlyInsight = useMemo(function() {
-    return buildMonthlyInsight({
+    var base = buildMonthlyInsight({
       monthlyTotals: monthlyTotals,
       curMonthKey: curMonth,
       envelopeSpending: envelopeSpending
     });
-  }, [monthlyTotals, curMonth, envelopeSpending]);
+    if (isSimpleMode) {
+      // Sanitize text for simple mode (remove envelope references)
+      base.text = base.text.replace(/envelopes/gi, 'wallets').replace(/envelope/gi, 'account');
+    }
+    return base;
+  }, [monthlyTotals, curMonth, envelopeSpending, isSimpleMode]);
 
   var [showInsight, setShowInsight] = useState(true);
 
@@ -420,6 +493,111 @@ const StatisticsScreen = function(props) {
           </View>
         )}
 
+        {/* ── Net Worth Growth Chart (Line Chart) ── */}
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
+                <MaterialIcons name='show-chart' size={scale(20)} color={theme.colors.primary} />
+              </View>
+              <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Asset Growth Trend</Text>
+            </View>
+            <View style={{ backgroundColor: theme.isDark ? '#374151' : '#F3F4F6', paddingHorizontal: scale(10), paddingVertical: scale(4), borderRadius: scale(8) }}>
+              <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, fontWeight: 'bold' }}>TOTAL ASSETS</Text>
+            </View>
+          </View>
+
+          <View style={{ height: scale(180), width: '100%', marginBottom: 10 }}>
+            {netWorthTrend.length > 1 ? (
+              <svg viewBox="0 0 300 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={theme.colors.primary} stopOpacity="0.3" />
+                    <stop offset="100%" stopColor={theme.colors.primary} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {/* Grid Lines */}
+                <line x1="0" y1="0" x2="300" y2="0" stroke={theme.colors.border} strokeWidth="0.5" strokeDasharray="4 4" />
+                <line x1="0" y1="60" x2="300" y2="60" stroke={theme.colors.border} strokeWidth="0.5" strokeDasharray="4 4" />
+                <line x1="0" y1="120" x2="300" y2="120" stroke={theme.colors.border} strokeWidth="1" />
+
+                {(() => {
+                  var points = netWorthTrend.map((t, i) => {
+                    var x = (i / (netWorthTrend.length - 1)) * 300;
+                    var y = 120 - ((t.value - chartMin) / (chartMax - chartMin)) * 120;
+                    if (isNaN(y)) y = 120;
+                    return { x, y };
+                  });
+
+                  // Create Smooth Curve (Cubic Bezier)
+                  var pathData = `M ${points[0].x} ${points[0].y}`;
+                  for (var i = 0; i < points.length - 1; i++) {
+                    var p0 = points[i];
+                    var p1 = points[i + 1];
+                    var cp1x = p0.x + (p1.x - p0.x) / 2;
+                    var cp1y = p0.y;
+                    var cp2x = p0.x + (p1.x - p0.x) / 2;
+                    var cp2y = p1.y;
+                    pathData += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+                  }
+
+                  var areaData = pathData + ` L ${points[points.length-1].x} 120 L ${points[0].x} 120 Z`;
+
+                  return (
+                    <>
+                      <path d={areaData} fill="url(#areaGradient)" />
+                      <path d={pathData} fill="transparent" stroke={theme.colors.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      {points.map((p, i) => (
+                        <circle key={i} cx={p.x} cy={p.y} r="4" fill={theme.colors.card} stroke={theme.colors.primary} strokeWidth="2" />
+                      ))}
+                    </>
+                  );
+                })()}
+              </svg>
+            ) : (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: theme.colors.textSecondary }}>Insufficient history for trend</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 5 }}>
+            {netWorthTrend.map((t, i) => (
+              <View key={i} style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: normalize(9), fontWeight: 'bold', color: i === netWorthTrend.length - 1 ? theme.colors.primary : theme.colors.textSecondary }}>{t.label}</Text>
+                <Text style={{ fontSize: normalize(8), color: theme.colors.textSecondary, marginTop: 2 }}>{balancesVisible ? (t.value >= 10000 ? (t.value / 1000).toFixed(0) + 'k' : t.value.toFixed(0)) : '•••'}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: moderateScale(16) }} />
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, fontWeight: '600' }}>Current Liquid Worth</Text>
+              <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginTop: 2 }}>{maskAmount(netWorthTrend[netWorthTrend.length-1].value)}</Text>
+            </View>
+            {netWorthTrend.length > 1 && (
+              <View style={{ alignItems: 'flex-end' }}>
+                {(() => {
+                  var current = netWorthTrend[netWorthTrend.length-1].value;
+                  var prev = netWorthTrend[netWorthTrend.length-2].value;
+                  var diff = current - prev;
+                  var pct = prev !== 0 ? ((diff / Math.abs(prev)) * 100).toFixed(1) : '100';
+                  var isUp = diff >= 0;
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isUp ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
+                      <MaterialIcons name={isUp ? 'trending-up' : 'trending-down'} size={14} color={isUp ? '#16A34A' : '#DC2626'} style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: normalize(11), fontWeight: 'bold', color: isUp ? '#16A34A' : '#DC2626' }}>{isUp ? '+' : ''}{pct}%</Text>
+                    </View>
+                  );
+                })()}
+                <Text style={{ fontSize: normalize(9), color: theme.colors.textSecondary, marginTop: 4, fontWeight: '600' }}>vs last month</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* ── Professional Summary Grid ── */}
         <View style={{ flexDirection: 'row', marginBottom: moderateScale(20), gap: moderateScale(10) }}>
           <TouchableOpacity activeOpacity={0.8} onPress={handleIncomeInfo} style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.05)' : '#F0FDF4', borderRadius: scale(20), padding: moderateScale(14), borderWidth: 1, borderColor: theme.isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7', justifyContent: 'space-between', minHeight: scale(100) }}>
@@ -432,7 +610,7 @@ const StatisticsScreen = function(props) {
 
           <TouchableOpacity activeOpacity={0.8} onPress={handleSpentInfo} style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(239, 68, 68, 0.05)' : '#FEF2F2', borderRadius: scale(20), padding: moderateScale(14), borderWidth: 1, borderColor: theme.isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2', justifyContent: 'space-between', minHeight: scale(100) }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ fontSize: normalize(10), color: '#DC2626', fontWeight: '800', letterSpacing: 0.5 }}>SPENT</Text>
+              <Text style={{ fontSize: normalize(10), color: '#DC2626', fontWeight: '800', letterSpacing: 0.5 }}>{isSimpleMode ? 'EXPENSES' : 'SPENT'}</Text>
               <MaterialIcons name="shopping-cart" size={scale(14)} color="#DC2626" />
             </View>
             <Text style={{ fontSize: normalize(18), fontWeight: '800', color: theme.colors.textPrimary }}>{maskAmount(totalMonthSpent)}</Text>
@@ -552,46 +730,16 @@ const StatisticsScreen = function(props) {
           }
         </View>
 
-        {/* ── Daily Average Card ── */}
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(12) }}>
-            <TouchableOpacity onPress={() => setInfoModalConfig({
-                visible: true,
-                title: 'Daily Spending Average',
-                content: (
-                  <View>
-                    <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, marginBottom: 12, lineHeight: normalize(22) }}>
-                      This is your total spending this month divided by the number of days passed so far.
-                    </Text>
-                    <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: scale(12), padding: moderateScale(14), flexDirection: 'row', alignItems: 'center' }}>
-                      <MaterialIcons name="speed" size={scale(20)} color="#3B82F6" style={{ marginRight: 10 }} />
-                      <Text style={{ fontSize: normalize(13), color: '#1D4ED8', fontWeight: 'bold', flex: 1 }}>
-                        Knowing your daily pace helps you decide if you can afford that extra treat today!
-                      </Text>
-                    </View>
-                  </View>
-                )
-              })} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>Daily Average</Text>
-              <MaterialIcons name="info-outline" size={scale(16)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={{ fontSize: normalize(16), fontWeight: '800', color: theme.colors.primary }}>{maskAmount(dailyAvg)}</Text>
-          </View>
-          <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, fontWeight: '600' }}>
-            On average, you spend {maskAmount(dailyAvg)} every day this month.
-          </Text>
-        </View>
-
-        {/* ── Spending by Envelope ── */}
+        {/* ── Spending Chart (Dynamic) ── */}
         <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(20) }}>
             <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
               <MaterialIcons name='pie-chart' size={scale(20)} color={theme.colors.primary} />
             </View>
-            <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Spending by Envelope</Text>
+            <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>{isSimpleMode ? 'Spending by Wallet' : 'Spending by Envelope'}</Text>
           </View>
 
-          {envelopeSpending.length === 0
+          {coloredSpending.length === 0
             ? <View style={{ alignItems: 'center', paddingVertical: moderateScale(40) }}>
                 <MaterialIcons name="inbox" size={scale(48)} color={theme.colors.border} />
                 <Text style={{ color: theme.colors.textSecondary, marginTop: moderateScale(12), fontSize: normalize(14) }}>No spending recorded yet</Text>
@@ -627,11 +775,11 @@ const StatisticsScreen = function(props) {
                 </View>
 
                 <View style={{ marginTop: moderateScale(20) }}>
-                  {coloredSpending.map(function(env, i) {
+                  {coloredSpending.map(function(item, i) {
                     var isSelected = selectedEnvIndex === i;
                     var isAnySelected = selectedEnvIndex !== null;
-                    var pct = maxEnvSpent > 0 ? Math.round((env.spent / maxEnvSpent) * 100) : 0;
-                    var sharePct = totalMonthSpent > 0 ? Math.round((env.spent / totalMonthSpent) * 100) : 0;
+                    var pct = maxSpentItem > 0 ? Math.round((item.spent / maxSpentItem) * 100) : 0;
+                    var sharePct = totalMonthSpent > 0 ? Math.round((item.spent / totalMonthSpent) * 100) : 0;
 
                     return (
                       <TouchableOpacity
@@ -649,16 +797,16 @@ const StatisticsScreen = function(props) {
                       >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(8) }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={{ width: scale(10), height: scale(10), borderRadius: scale(5), backgroundColor: env.color, marginRight: moderateScale(10) }} />
-                            <Text style={{ fontSize: normalize(14), fontWeight: '600', color: theme.colors.textPrimary }}>{env.name}</Text>
+                            <View style={{ width: scale(10), height: scale(10), borderRadius: scale(5), backgroundColor: item.color, marginRight: moderateScale(10) }} />
+                            <Text style={{ fontSize: normalize(14), fontWeight: '600', color: theme.colors.textPrimary }}>{item.name}</Text>
                           </View>
                           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <Text style={{ fontSize: normalize(14), fontWeight: '800', color: theme.colors.textPrimary }}>{maskAmount(env.spent)}</Text>
+                            <Text style={{ fontSize: normalize(14), fontWeight: '800', color: theme.colors.textPrimary }}>{maskAmount(item.spent)}</Text>
                             <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, marginLeft: moderateScale(8) }}>({sharePct}%)</Text>
                           </View>
                         </View>
                         <View style={{ height: scale(6), backgroundColor: theme.colors.border, borderRadius: scale(3), overflow: 'hidden' }}>
-                          <View style={{ width: pct + '%', height: '100%', backgroundColor: env.color, borderRadius: scale(3) }} />
+                          <View style={{ width: pct + '%', height: '100%', backgroundColor: item.color, borderRadius: scale(3) }} />
                         </View>
                       </TouchableOpacity>
                     );
@@ -667,6 +815,37 @@ const StatisticsScreen = function(props) {
               </View>
           }
         </View>
+
+        {!isSimpleMode && (
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(12) }}>
+              <TouchableOpacity onPress={() => setInfoModalConfig({
+                  visible: true,
+                  title: 'Daily Spending Average',
+                  content: (
+                    <View>
+                      <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, marginBottom: 12, lineHeight: normalize(22) }}>
+                        This is your total spending this month divided by the number of days passed so far.
+                      </Text>
+                      <View style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: scale(12), padding: moderateScale(14), flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialIcons name="speed" size={scale(20)} color="#3B82F6" style={{ marginRight: 10 }} />
+                        <Text style={{ fontSize: normalize(13), color: '#1D4ED8', fontWeight: 'bold', flex: 1 }}>
+                          Knowing your daily pace helps you decide if you can afford that extra treat today!
+                        </Text>
+                      </View>
+                    </View>
+                  )
+                })} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary, marginRight: 6 }}>Daily Average</Text>
+                <MaterialIcons name="info-outline" size={scale(16)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: normalize(16), fontWeight: '800', color: theme.colors.primary }}>{maskAmount(dailyAvg)}</Text>
+            </View>
+            <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, fontWeight: '600' }}>
+              On average, you spend {maskAmount(dailyAvg)} every day this month.
+            </Text>
+          </View>
+        )}
 
         {/* ── 6-Month Trend ── */}
         <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>

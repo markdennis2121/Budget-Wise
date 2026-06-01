@@ -83,7 +83,8 @@ const SettingsScreen = function(props) {
         id: generateId(),
         user_id: userId,
         pin_code: null,
-        biometrics_enabled: false
+        biometrics_enabled: false,
+        budgeting_style: 'envelope'
       }).then(() => refetch());
     }
   }, [userId, settingsQuery.loading, userSettings]);
@@ -287,6 +288,34 @@ const SettingsScreen = function(props) {
           )
         )
       ) : null,
+
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
+          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
+            React.createElement(MaterialIcons, { name: 'tune', size: 22, color: theme.colors.primary })
+          ),
+          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Budgeting Style')
+        ),
+        React.createElement(View, { style: { flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: theme.colors.border } },
+          React.createElement(TouchableOpacity, {
+            onPress: () => mutateUpdate({ id: userSettings.id, data: { budgeting_style: 'envelope' } }).then(() => refetch()),
+            style: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', backgroundColor: (userSettings?.budgeting_style !== 'simple') ? theme.colors.primary : 'transparent' }
+          },
+            React.createElement(Text, { style: { fontWeight: 'bold', color: (userSettings?.budgeting_style !== 'simple') ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 14 } }, 'Envelope Mode')
+          ),
+          React.createElement(TouchableOpacity, {
+            onPress: () => mutateUpdate({ id: userSettings.id, data: { budgeting_style: 'simple' } }).then(() => refetch()),
+            style: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', backgroundColor: (userSettings?.budgeting_style === 'simple') ? theme.colors.primary : 'transparent' }
+          },
+            React.createElement(Text, { style: { fontWeight: 'bold', color: (userSettings?.budgeting_style === 'simple') ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 14 } }, 'Simple Mode')
+          )
+        ),
+        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 12, lineHeight: 18 } },
+          userSettings?.budgeting_style === 'simple'
+            ? 'Busy Mode: Hides envelopes and focuses on your wallets and accounts. Perfect for quick expense tracking.'
+            : 'Detailed Mode: Use the envelope system to assign every peso a job and plan your spending.'
+        )
+      ),
 
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
         React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },

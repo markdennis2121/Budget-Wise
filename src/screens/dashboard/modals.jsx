@@ -2153,6 +2153,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
   var [isSaving, setIsSaving] = useState(false);
+  var [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!visible) {
@@ -2162,6 +2163,7 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
       setShowSaveSuccess(false);
       setSuccessMessage('Saved!');
       setIsSaving(false);
+      setSearchQuery('');
     }
   }, [visible]);
 
@@ -2204,9 +2206,19 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
     }, []);
 
     var combined = oneTimes.concat(recurrings);
-    if (!filter) return combined;
-    return combined.filter(function (o) { return o.category === filter; });
-  }, [oneTimeExpenses, userHistory, recurringExpenses, filter]);
+    var result = filter ? combined.filter(function (o) { return o.category === filter; }) : combined;
+
+    if (searchQuery.trim()) {
+      var q = searchQuery.toLowerCase().trim();
+      result = result.filter(function (exp) {
+        var env = envelopes.find(function (e) { return e.id === exp.category; });
+        var envName = env ? env.name.toLowerCase() : '';
+        return exp.name.toLowerCase().includes(q) || envName.includes(q);
+      });
+    }
+
+    return result;
+  }, [oneTimeExpenses, userHistory, recurringExpenses, filter, searchQuery, envelopes]);
 
   var handleStartEdit = function (exp) {
     setEditingId(exp.id);
@@ -2331,9 +2343,41 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
           {/* Handle */}
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(15) }}>
             <Text style={{ fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary }}>{title}</Text>
-            <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
+            <TouchableOpacity onPress={onClose} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
+          </View>
+
+          {/* Intelligent Search Bar - Premium Aesthetic */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : '#F3F4F6',
+            borderRadius: scale(16),
+            paddingHorizontal: moderateScale(14),
+            marginBottom: moderateScale(20),
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            height: scale(46),
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.03,
+            shadowRadius: 4,
+            elevation: 1
+          }}>
+            <MaterialIcons name="search" size={scale(20)} color={theme.colors.primary} style={{ marginRight: 8 }} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Find a transaction..."
+              placeholderTextColor={theme.colors.textSecondary}
+              style={{ flex: 1, color: theme.colors.textPrimary, fontSize: normalize(15), fontWeight: '500', paddingVertical: 0 }}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setSearchQuery(''); }} style={{ padding: 4 }}>
+                <MaterialIcons name="close" size={scale(18)} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            )}
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: scale(400) }}>

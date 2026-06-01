@@ -114,8 +114,21 @@ const AddExpenseModal = function (props) {
     return parseUserEnvelopes(userSettings);
   }, [userSettings]);
 
-  var spendBlocked = rawEnvelopes.length === 0;
-  var typeHelp = getExpenseHelp(expType);
+  var isSimpleMode = userSettings && userSettings.budgeting_style === 'simple';
+  var spendBlocked = !isSimpleMode && rawEnvelopes.length === 0;
+
+  var typeHelp = useMemo(() => {
+    var base = getExpenseHelp(expType);
+    if (isSimpleMode) {
+      return {
+        ...base,
+        hint: expType === 'one_time'
+          ? 'Record something you bought. Pick the wallet you paid with and save.'
+          : 'Bills that repeat each month. You pay them later from the Bills tab.'
+      };
+    }
+    return base;
+  }, [expType, isSimpleMode]);
 
   var curMonth = getCurrentMonthStr();
 
@@ -203,7 +216,7 @@ const AddExpenseModal = function (props) {
       return;
     }
 
-    if (expenseTypeRequiresEnvelope(expType)) {
+    if (expenseTypeRequiresEnvelope(expType, userSettings)) {
       if (!selectedFund || envelopes.length === 0) {
         setErrorMsg('Select an envelope. Create one on the Dashboard if you have none.');
         return;
@@ -435,72 +448,74 @@ const AddExpenseModal = function (props) {
               </View>
             )}
 
-            <View style={{ marginTop: moderateScale(16) }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(10) }}>
-                <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>WHICH ENVELOPE PAYS FOR THIS?</Text>
-                {rawEnvelopes.length > 3 && <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary }}>Scroll →</Text>}
+            {!isSimpleMode && (
+              <View style={{ marginTop: moderateScale(16) }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(10) }}>
+                  <Text style={{ fontSize: normalize(13), fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>WHICH ENVELOPE PAYS FOR THIS?</Text>
+                  {rawEnvelopes.length > 3 && <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary }}>Scroll →</Text>}
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: moderateScale(20) }}>
+                  {optionsList.map(opt => {
+                    var isSelected = selectedFund === opt.id;
+                    var previewAmt = parseAmount(expAmount);
+                    if (expAmount && /[+\-*/]/.test(expAmount)) {
+                      var ev = evaluateAmountExpression(expAmount);
+                      if (!isNaN(ev)) previewAmt = ev;
+                    }
+                    var isExceeded = opt.available < previewAmt;
+                    var icon = getEnvelopeIcon(opt.name);
+
+                    return (
+                      <TouchableOpacity
+                        key={opt.id}
+                        onPress={() => { triggerImpactHaptic('Light'); setSelectedFund(opt.id); }}
+                        style={{
+                          paddingHorizontal: moderateScale(16),
+                          paddingVertical: moderateScale(12),
+                          borderRadius: scale(16),
+                          borderWidth: 2,
+                          borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border),
+                          backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : (isExceeded ? (theme.isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2') : theme.colors.background),
+                          alignItems: 'center',
+                          marginRight: moderateScale(10),
+                          flexDirection: 'row',
+                          minWidth: scale(140),
+                          shadowColor: isSelected ? theme.colors.primary : '#000',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: isSelected ? 0.2 : 0.05,
+                          shadowRadius: 4,
+                          elevation: isSelected ? 3 : 1
+                        }}
+                      >
+                        <View style={{
+                          width: scale(32),
+                          height: scale(32),
+                          borderRadius: scale(16),
+                          backgroundColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border + '40'),
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: moderateScale(10)
+                        }}>
+                          <MaterialIcons name={icon} size={scale(18)} color={isSelected ? '#FFFFFF' : (isExceeded ? '#FFFFFF' : theme.colors.textSecondary)} />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textPrimary) }} numberOfLines={1}>
+                            {opt.name}
+                          </Text>
+                          <Text style={{ fontSize: normalize(11), color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textSecondary), fontWeight: '700', marginTop: 1 }}>
+                            ₱{opt.available.toLocaleString()}
+                          </Text>
+                        </View>
+                        {isExceeded && (
+                          <MaterialIcons name="warning" size={scale(16)} color={theme.colors.error} style={{ marginLeft: moderateScale(8) }} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }} contentContainerStyle={{ paddingRight: moderateScale(20) }}>
-                {optionsList.map(opt => {
-                  var isSelected = selectedFund === opt.id;
-                  var previewAmt = parseAmount(expAmount);
-                  if (expAmount && /[+\-*/]/.test(expAmount)) {
-                    var ev = evaluateAmountExpression(expAmount);
-                    if (!isNaN(ev)) previewAmt = ev;
-                  }
-                  var isExceeded = opt.available < previewAmt;
-                  var icon = getEnvelopeIcon(opt.name);
-
-                  return (
-                    <TouchableOpacity
-                      key={opt.id}
-                      onPress={() => { triggerImpactHaptic('Light'); setSelectedFund(opt.id); }}
-                      style={{
-                        paddingHorizontal: moderateScale(16),
-                        paddingVertical: moderateScale(12),
-                        borderRadius: scale(16),
-                        borderWidth: 2,
-                        borderColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border),
-                        backgroundColor: isSelected ? (theme.isDark ? theme.colors.primary + '25' : '#FFEDD5') : (isExceeded ? (theme.isDark ? 'rgba(239,68,68,0.1)' : '#FEF2F2') : theme.colors.background),
-                        alignItems: 'center',
-                        marginRight: moderateScale(10),
-                        flexDirection: 'row',
-                        minWidth: scale(140),
-                        shadowColor: isSelected ? theme.colors.primary : '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: isSelected ? 0.2 : 0.05,
-                        shadowRadius: 4,
-                        elevation: isSelected ? 3 : 1
-                      }}
-                    >
-                      <View style={{
-                        width: scale(32),
-                        height: scale(32),
-                        borderRadius: scale(16),
-                        backgroundColor: isSelected ? theme.colors.primary : (isExceeded ? theme.colors.error : theme.colors.border + '40'),
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: moderateScale(10)
-                      }}>
-                        <MaterialIcons name={icon} size={scale(18)} color={isSelected ? '#FFFFFF' : (isExceeded ? '#FFFFFF' : theme.colors.textSecondary)} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textPrimary) }} numberOfLines={1}>
-                          {opt.name}
-                        </Text>
-                        <Text style={{ fontSize: normalize(11), color: isExceeded ? theme.colors.error : (isSelected ? theme.colors.primary : theme.colors.textSecondary), fontWeight: '700', marginTop: 1 }}>
-                          ₱{opt.available.toLocaleString()}
-                        </Text>
-                      </View>
-                      {isExceeded && (
-                        <MaterialIcons name="warning" size={scale(16)} color={theme.colors.error} style={{ marginLeft: moderateScale(8) }} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
+            )}
 
             {accounts.length > 0 && (
               <View style={{ marginTop: moderateScale(20) }}>

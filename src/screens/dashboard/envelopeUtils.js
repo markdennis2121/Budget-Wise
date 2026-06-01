@@ -11,13 +11,29 @@ export function promptDeleteEnvelope(opts) {
 
   var pending = getPendingBillsForEnvelope(opts.recurringExpenses || [], targetEnv);
   var newList = (opts.envelopes || []).filter(function (e) { return e.id !== opts.envelopeId; });
+  var history = (opts.userHistory || []).filter(function(h) {
+    return h.category === opts.envelopeId && (h.expense_type === 'One-Time' || h.expense_type === 'Recurring');
+  });
 
-  // Calculate total money that will return (Assigned amount)
+  var hasHistory = history.length > 0;
+  var totalSpent = history.reduce(function(sum, h) { return sum + (parseFloat(h.amount) || 0); }, 0);
+
+  // Calculate total money that will return (Assigned amount minus what was already spent)
   var assignedAmt = targetEnv.assigned || 0;
+  var remainingInEnv = assignedAmt - totalSpent;
 
-  var msg = 'Delete "' + targetEnv.name + '" envelope?\n\n' +
-            'This will delete all spending history and transactions linked to this category. ' +
-            'The entire assigned amount (' + formatCurrency(assignedAmt) + ') will be returned to your Ready to Assign balance.';
+  var title = hasHistory ? 'Archive Envelope' : 'Delete Envelope';
+  var actionVerb = hasHistory ? 'Archive' : 'Delete';
+
+  var msg = actionVerb + ' "' + targetEnv.name + '" envelope?\n\n';
+
+  if (hasHistory) {
+    msg += 'This envelope has ' + history.length + ' past transaction(s) totaling ' + formatCurrency(totalSpent) + '. ' +
+           'Archiving it will keep your spending records but hide this category from your Dashboard. ' +
+           'The remaining ' + formatCurrency(remainingInEnv) + ' will return to your Ready to Assign pool.';
+  } else {
+    msg += 'This envelope is empty. It will be permanently removed, and its assigned amount (' + formatCurrency(assignedAmt) + ') will return to your Ready to Assign pool.';
+  }
 
   if (pending.length) {
     var fallback = newList[0];
@@ -31,9 +47,9 @@ export function promptDeleteEnvelope(opts) {
   if (Platform.OS === 'web') {
     if (window.confirm(msg)) opts.onPerformDelete();
   } else {
-    Alert.alert('Delete Envelope', msg, [
+    Alert.alert(title, msg, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: opts.onPerformDelete }
+      { text: actionVerb, style: hasHistory ? 'default' : 'destructive', onPress: opts.onPerformDelete }
     ]);
   }
 }

@@ -18,6 +18,14 @@ export var ONBOARDING_STEPS = [
     showLogo: true
   },
   {
+    id: 'mode_selection',
+    icon: 'tune',
+    accent: '#E0F2FE',
+    title: 'Choose your style',
+    subtitle: 'How do you want to track?',
+    isModeSelection: true
+  },
+  {
     id: 'envelopes',
     icon: 'all-inbox',
     accent: '#DBEAFE',
@@ -289,6 +297,63 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
                     </View>
                   );
                 })}
+              </View>
+            ) : null}
+
+            {current.isModeSelection ? (
+              <View style={{ width: '100%', marginTop: moderateScale(10) }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerSuccessHaptic();
+                    mutateUpdateSettings({ id: userSettings.id, data: { budgeting_style: 'simple' } });
+                    goNext();
+                  }}
+                  style={{
+                    backgroundColor: theme.colors.background,
+                    borderRadius: scale(16),
+                    padding: moderateScale(16),
+                    marginBottom: moderateScale(12),
+                    borderWidth: 2,
+                    borderColor: userSettings?.budgeting_style === 'simple' ? theme.colors.primary : theme.colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                >
+                  <View style={{ width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <MaterialIcons name="speed" size={24} color="#0369A1" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Busy Tracker (Simple)</Text>
+                    <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>Focus on wallets and quick spending.</Text>
+                  </View>
+                  {userSettings?.budgeting_style === 'simple' && <MaterialIcons name="check-circle" size={24} color={theme.colors.primary} />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    triggerSuccessHaptic();
+                    mutateUpdateSettings({ id: userSettings.id, data: { budgeting_style: 'envelope' } });
+                    goNext();
+                  }}
+                  style={{
+                    backgroundColor: theme.colors.background,
+                    borderRadius: scale(16),
+                    padding: moderateScale(16),
+                    borderWidth: 2,
+                    borderColor: userSettings?.budgeting_style !== 'simple' ? theme.colors.primary : theme.colors.border,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                >
+                  <View style={{ width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <MaterialIcons name="all-inbox" size={24} color="#15803D" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Detailed Planner (Envelopes)</Text>
+                    <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>Plan every peso with the envelope system.</Text>
+                  </View>
+                  {userSettings?.budgeting_style !== 'simple' && <MaterialIcons name="check-circle" size={24} color={theme.colors.primary} />}
+                </TouchableOpacity>
               </View>
             ) : null}
           </ScrollView>

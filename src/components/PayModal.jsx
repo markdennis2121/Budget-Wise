@@ -60,6 +60,8 @@ const PayModal = function(props) {
   var [errorMsg, setErrorMsg] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
+  var isSimpleMode = userSettings && userSettings.budgeting_style === 'simple';
+
   useEffect(function () {
     if (visible) {
       setErrorMsg('');
@@ -86,11 +88,11 @@ const PayModal = function(props) {
 
     var spendCheck = validateSpendOperation({
       amount: amt,
-      categoryId: expense.category,
-      envelopeBalances: props.envelopeBalances,
+      categoryId: isSimpleMode ? null : expense.category,
+      envelopeBalances: isSimpleMode ? [] : props.envelopeBalances,
       accountId: selectedAccount,
       accounts: accounts,
-      isRecurringPayment: true
+      isRecurringPayment: !isSimpleMode
     });
 
     if (!spendCheck.ok) {
@@ -157,11 +159,11 @@ const PayModal = function(props) {
 
   var payValidation = validateSpendOperation({
     amount: parseFloat(expense.amount) || 0,
-    categoryId: expense.category,
-    envelopeBalances: props.envelopeBalances,
+    categoryId: isSimpleMode ? null : expense.category,
+    envelopeBalances: isSimpleMode ? [] : props.envelopeBalances,
     accountId: selectedAccount,
     accounts: accounts,
-    isRecurringPayment: true
+    isRecurringPayment: !isSimpleMode
   });
   var cannotPay = !payValidation.ok;
   

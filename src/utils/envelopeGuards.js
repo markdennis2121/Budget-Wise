@@ -26,7 +26,11 @@ export function hasUserEnvelopes(userSettings) {
 }
 
 /** Spending types that must target a real envelope. */
-export function expenseTypeRequiresEnvelope(expType) {
+export function expenseTypeRequiresEnvelope(expType, userSettings) {
+  // If user is in Simple Mode, envelopes are optional.
+  if (userSettings && userSettings.budgeting_style === 'simple') {
+    return false;
+  }
   return expType === 'one_time' || expType === 'recurring';
 }
 
@@ -99,35 +103,39 @@ export function validateSpendOperation(params) {
   var isEdit = !!params.isEdit;
   var oldAmount = params.oldAmount || 0;
 
-  // 1. Envelope Guard
-  var env = envelopeBalances.find(function(e) { return e.id === categoryId; });
-  if (!env) {
-    return { ok: false, message: 'Please select a valid budget envelope.' };
-  }
+  // 1. Envelope Guard (Skip if no category provided, e.g. Simple Mode)
+  if (categoryId) {
+    var env = envelopeBalances.find(function(e) { return e.id === categoryId; });
+    if (!env) {
+      return { ok: false, message: 'Please select a valid budget envelope.' };
+    }
 
-  // If editing, we only care about the INCREASE in amount
-  var effectiveAmount = isEdit ? (amount - oldAmount) : amount;
+    // If editing, we only care about the INCREASE in amount
+    var effectiveAmount = isEdit ? (amount - oldAmount) : amount;
 
-  if (effectiveAmount > 0) {
-    if (isRecurringPayment) {
-      // If paying a bill, the money is ALREADY reserved.
-      // "Insufficient" means the envelope available balance is negative (you spent the reserved money elsewhere).
-      if (env.available < 0) {
-        return {
-          ok: false,
-          message: 'Insufficient funds in "' + env.name + '". You are overspent by ₱' + Math.abs(env.available).toFixed(2) + '. You must return money to this envelope before paying this bill.'
-        };
-      }
-    } else {
-      // For new Quick Spend or Edit increase, check if we have enough available balance.
-      if (env.available < effectiveAmount) {
-        return {
-          ok: false,
-          message: 'Insufficient funds in "' + env.name + '". Available: ₱' + env.available.toFixed(2) + (isEdit ? ' (Need ₱' + effectiveAmount.toFixed(2) + ' more)' : '')
-        };
+    if (effectiveAmount > 0) {
+      if (isRecurringPayment) {
+        // If paying a bill, the money is ALREADY reserved.
+        // "Insufficient" means the envelope available balance is negative (you spent the reserved money elsewhere).
+        if (env.available < 0) {
+          return {
+            ok: false,
+            message: 'Insufficient funds in "' + env.name + '". You are overspent by ₱' + Math.abs(env.available).toFixed(2) + '. You must return money to this envelope before paying this bill.'
+          };
+        }
+      } else {
+        // For new Quick Spend or Edit increase, check if we have enough available balance.
+        if (env.available < effectiveAmount) {
+          return {
+            ok: false,
+            message: 'Insufficient funds in "' + env.name + '". Available: ₱' + env.available.toFixed(2) + (isEdit ? ' (Need ₱' + effectiveAmount.toFixed(2) + ' more)' : '')
+          };
+        }
       }
     }
   }
+
+  var effectiveAmount = isEdit ? (amount - oldAmount) : amount;
 
   // 2. Wallet Guard
   if (accountId && accountId !== 'unlinked' && effectiveAmount > 0) {
