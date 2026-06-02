@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from 'platform-hooks';
 import { getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue } from '../../utils/helpers';
-import { getOrphanPendingBills, sumBillAmounts } from '../../utils/envelopeBudget';
+import { getOrphanPendingBills, sumBillAmounts, isEnvelopeArchived } from '../../utils/envelopeBudget';
 import { parseUserEnvelopes, computeEnvelopeBalances } from '../../utils/envelopeGuards';
 import { buildAccountsWithBalances } from '../../utils/accountBalances';
 
@@ -65,6 +65,14 @@ export function useDashboardState(userId) {
     return parseUserEnvelopes(userSettings);
   }, [userSettings]);
 
+  var activeEnvelopes = useMemo(function() {
+    return envelopes.filter(function(e) { return !isEnvelopeArchived(e); });
+  }, [envelopes]);
+
+  var archivedEnvelopes = useMemo(function() {
+    return envelopes.filter(isEnvelopeArchived);
+  }, [envelopes]);
+
   var accounts = useMemo(function () {
     return buildAccountsWithBalances({
       userSettings: userSettings,
@@ -94,16 +102,16 @@ export function useDashboardState(userId) {
   }, [userHistory, curMonth]);
 
   var totalAssigned = useMemo(function () {
-    return envelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
-  }, [envelopes]);
+    return activeEnvelopes.reduce(function (sum, env) { return sum + (parseFloat(env.assigned) || 0); }, 0);
+  }, [activeEnvelopes]);
 
   var envelopeBalances = useMemo(function () {
-    return computeEnvelopeBalances(envelopes, userHistory, recurringExpenses, curMonth);
-  }, [envelopes, recurringExpenses, userHistory, curMonth]);
+    return computeEnvelopeBalances(activeEnvelopes, userHistory, recurringExpenses, curMonth);
+  }, [activeEnvelopes, recurringExpenses, userHistory, curMonth]);
 
   var orphanPendingTotal = useMemo(function () {
-    return sumBillAmounts(getOrphanPendingBills(recurringExpenses, envelopes));
-  }, [recurringExpenses, envelopes]);
+    return sumBillAmounts(getOrphanPendingBills(recurringExpenses, activeEnvelopes));
+  }, [recurringExpenses, activeEnvelopes]);
 
   var totalExpenses = useMemo(function () {
     var oneTimeTotal = oneTimeExpenses.reduce(function (sum, o) {
@@ -201,7 +209,7 @@ export function useDashboardState(userId) {
   }, [userSettings, mutateUpdateSettings, refetchAll]);
 
   return {
-    userSettings, incomeSources, envelopes, envelopeBalances,
+    userSettings, incomeSources, envelopes, activeEnvelopes, archivedEnvelopes, envelopeBalances,
     totalIncome, totalAssigned, readyToAssign, orphanPendingTotal, totalExpenses, upcomingBills,
     showAddModal, setShowAddModal,
     showOnboarding, setShowOnboarding,

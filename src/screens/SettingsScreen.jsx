@@ -21,8 +21,9 @@ import {
 } from '../utils/dataBackup';
 import { parseUserEnvelopes } from '../utils/envelopeGuards';
 import { getStoredAccountsList } from '../utils/accountBalances';
+import { calculateArchiveRollup, applyArchiveToDatabase } from '../utils/dataArchive';
 
-const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
+const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 
@@ -180,51 +181,76 @@ const SettingsScreen = function(props) {
       });
   };
 
-  var handleRepairData = function () {
-    var msg = "This will attempt to fix 'messy' data by recalculating all wallet balances from your transaction history. No data will be deleted. Continue?";
-    var performRepair = function () {
-      var db = getDatabase();
-      if (!db) return;
+  var handleArchiveData = function () {
+    if (!userId) {
+      showAlert('Error', 'Sign in to use this feature.');
+      return;
+    }
 
-      if (db.user_settings) {
-        db.user_settings = db.user_settings.map(s => ({
-          ...s,
-          monthly_salary: parseFloat(s.monthly_salary) || 0,
-          accounts: (s.accounts || []).map(a => {
-            var sBal = a.starting_balance !== undefined ? a.starting_balance : (a.startingBalance !== undefined ? a.startingBalance : 0);
-            return {
-              ...a,
-              starting_balance: parseFloat(sBal) || 0
-            };
-          }),
-          envelopes: (s.envelopes || []).map(e => ({
-            ...e,
-            assigned: parseFloat(e.assigned) || 0
-          }))
-        }));
+    var startCompressionFlow = function (monthsAgo) {
+      var cutoffDate = new Date();
+      cutoffDate.setMonth(cutoffDate.getMonth() - monthsAgo);
+      var cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+      var envs = parseUserEnvelopes(userSettings);
+      var accs = getStoredAccountsList(userSettings);
+      
+      var rollupResult = calculateArchiveRollup(userHistory, cutoffStr, userId);
+      
+      if (rollupResult.historyIdsToDelete.length === 0) {
+        showAlert('No Old Data', 'You do not have any transaction history older than ' + monthsAgo + ' months to clean up.');
+        return;
       }
 
-      if (db.expense_history) {
-        db.expense_history = db.expense_history.map(h => ({
-          ...h,
-          amount: parseFloat(h.amount) || 0
-        }));
-      }
+      var msg = `This will permanently compress ${rollupResult.historyIdsToDelete.length} transactions older than ${monthsAgo} months into ${rollupResult.summaryTransactions.length} monthly summary records, and download your raw data as an Excel file. Your live wallet balances and analytics charts will remain completely accurate. Continue?`;
+      
+      var performArchive = function () {
+        setBackupBusy(true);
+        downloadCsvFile(rollupResult.archivedHistory, envs, accs)
+          .then(function () {
+            var success = applyArchiveToDatabase(userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
+            if (success) {
+              refetch();
+              historyQuery.refetch();
+              showAlert('Compression Complete', `${rollupResult.historyIdsToDelete.length} old transactions were safely compressed to save space, while preserving all analytics.`);
+            } else {
+              showAlert('Error', 'Failed to update database.');
+            }
+          })
+          .catch(function () {
+            showAlert('Export failed', 'Could not export the backup file, so the compression was cancelled for your safety.');
+          })
+          .finally(function () {
+            setBackupBusy(false);
+          });
+      };
 
-      persistDatabase(db);
-      refetch();
-      showAlert('Repair Complete', 'Your balances have been recalculated and sanitized.');
+      if (Platform.OS === 'web') {
+        if (window.confirm(msg)) performArchive();
+      } else {
+        Alert.alert('Compress Old History', msg, [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Compress Data', onPress: performArchive, style: 'destructive' }
+        ]);
+      }
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) performRepair();
+      var val = window.prompt('Enter timeframe to keep in months (e.g. 3, 6, 12). Everything older will be compressed:', '12');
+      if (val) {
+        var months = parseInt(val, 10);
+        if (!isNaN(months) && months > 0) startCompressionFlow(months);
+      }
     } else {
-      Alert.alert('Repair & Resync Data', msg, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Repair Now', onPress: performRepair }
+      Alert.alert('Select Timeframe', 'Compress transactions older than:', [
+        { text: '3 Months', onPress: () => startCompressionFlow(3) },
+        { text: '6 Months', onPress: () => startCompressionFlow(6) },
+        { text: '1 Year', onPress: () => startCompressionFlow(12) },
+        { text: 'Cancel', style: 'cancel' }
       ]);
     }
   };
+
 
   var handleLogout = function() {
     var msg = 'Are you sure you want to sign out?';
@@ -431,19 +457,6 @@ const SettingsScreen = function(props) {
           ),
           React.createElement(MaterialIcons, { name: 'chevron-right', size: 22, color: theme.colors.textSecondary })
         ),
-        React.createElement(TouchableOpacity, {
-          onPress: handleRepairData,
-          style: { padding: 16, flexDirection: 'row', alignItems: 'center' }
-        },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
-            React.createElement(MaterialIcons, { name: 'build-circle', size: 22, color: theme.colors.error })
-          ),
-          React.createElement(View, { style: { flex: 1 } },
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Repair & Resync Data'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, 'Recalculate balances and fix "messy" historical data')
-          ),
-          React.createElement(MaterialIcons, { name: 'sync', size: 22, color: theme.colors.textSecondary })
-        )
       ),
 
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'data-backup-card' },
@@ -494,9 +507,20 @@ const SettingsScreen = function(props) {
                 React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)')
               )
         ),
+        React.createElement(TouchableOpacity, {
+          onPress: handleArchiveData,
+          disabled: backupBusy,
+          style: { backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+        },
+          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+            React.createElement(MaterialIcons, { name: 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
+            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, 'Compress Old Data')
+          )
+        ),
         React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
           'Your data is private and stays on this device.'
         )
+
       ),
 
       React.createElement(View, { testID: 'View-83', style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'app-info-card' },
@@ -509,7 +533,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.4.1')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.4.2')
         ),
         React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),

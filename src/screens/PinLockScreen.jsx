@@ -155,7 +155,8 @@ var PinLockScreen = function (props) {
         {/* LOGO */}
         <Image
           source={logoImg}
-          style={{ width: scale(100), height: scale(100), borderRadius: scale(24), marginBottom: moderateScale(16), resizeMode: 'contain' }}
+          resizeMode="contain"
+          style={{ width: scale(100), height: scale(100), borderRadius: scale(24), marginBottom: moderateScale(16) }}
         />
 
         <Text style={{ fontSize: normalize(22), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(28) }}>Enter PIN</Text>

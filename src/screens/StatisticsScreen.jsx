@@ -13,7 +13,7 @@ import { parseUserEnvelopes } from '../utils/envelopeGuards';
 import { triggerImpactHaptic } from '../utils/feedback';
 import { scale, moderateScale, normalize } from '../utils/responsive';
 
-const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
+const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const WEB_TAB_MENU_PADDING = 90;
 
 const StatisticsScreen = function(props) {

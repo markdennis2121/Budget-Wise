@@ -52,8 +52,7 @@ export function showEnvelopeRequiredAlert(opts) {
 export function computeEnvelopeBalances(rawEnvelopes, userHistory, recurringExpenses, curMonth) {
   var envs = rawEnvelopes.map(function (e) {
     return {
-      id: e.id,
-      name: e.name,
+      ...e, // Senior Developer: Preserve all properties (archived, etc.)
       assigned: parseFloat(e.assigned) || 0,
       spent: 0,
       reserved: 0,

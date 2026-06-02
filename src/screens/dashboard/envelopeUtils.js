@@ -29,10 +29,10 @@ export function promptDeleteEnvelope(opts) {
 
   if (hasHistory) {
     msg += 'This envelope has ' + history.length + ' past transaction(s) totaling ' + formatCurrency(totalSpent) + '. ' +
-           'Archiving it will keep your spending records but hide this category from your Dashboard. ' +
-           'The remaining ' + formatCurrency(remainingInEnv) + ' will return to your Ready to Assign pool.';
+           'Archiving it will hide this category from your Dashboard but keep your transaction history intact. ' +
+           'The remaining assigned budget of ' + formatCurrency(targetEnv.assigned) + ' will return to your Ready to Assign pool.';
   } else {
-    msg += 'This envelope is empty. It will be permanently removed, and its assigned amount (' + formatCurrency(assignedAmt) + ') will return to your Ready to Assign pool.';
+    msg += 'This envelope is empty. It will be permanently removed, and its assigned amount (' + formatCurrency(targetEnv.assigned) + ') will return to your Ready to Assign pool.';
   }
 
   if (pending.length) {

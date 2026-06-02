@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-export const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
+export const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 export const SCROLL_EXTRA_PADDING = 16;
 export const WEB_TAB_MENU_PADDING = 90;
 export const FAB_SPACING = 16;
@@ -34,7 +34,7 @@ export const WALLET_STYLES = {
   Landbank: { color: '#4CAF50', name: 'Landbank', logo: 'account-balance' },
   Vybe: { color: '#7C3AED', name: 'Vybe', logo: 'account-balance-wallet' },
   Cash: { color: '#4B5563', name: 'Cash Wallet', logo: 'money' },
-  Custom: { color: '#0F766E', name: 'Wallet/Bank', logo: 'credit-card' }
+  Custom: { color: '#0F766E', name: 'Custom Bank', logo: 'credit-card' }
 };
 
 export const DEFAULT_ENVELOPES = [

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image, Animated, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Pressable, Platform, Modal, Image, Animated, Alert, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -40,10 +40,14 @@ import {
   SavingsManagerModal,
   AddAccountModal,
   EditAccountModal,
-  NotificationCenterModal
+  NotificationCenterModal,
+  ArchiveManagerModal
 } from './dashboard/modals';
 
 const DashboardScreen = function (props) {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width > 1024;
+
   var themeCtx = useTheme();
   var theme = themeCtx.theme;
   var userCtx = useUser();
@@ -219,6 +223,7 @@ const DashboardScreen = function (props) {
   var [selectedAccount, setSelectedAccount] = useState(null);
   var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
   var [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  var [showArchiveModal, setShowArchiveModal] = useState(false);
 
   // High-End Alert Persistence: Track how many alerts the user has already acknowledged
   var [lastSeenAlertCount, setLastSeenAlertCount] = useState(function() {
@@ -422,7 +427,7 @@ const DashboardScreen = function (props) {
       <Animated.View style={{ marginBottom: 24, opacity: walletsFade, transform: [{ translateX: walletsFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <TouchableOpacity onPress={handleWalletsInfo} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 6 }}>{isSimpleMode ? 'My Wallets & Bank Accounts' : 'Wallets & Accounts'}</Text>
+            <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 6 }}>{isSimpleMode ? 'Wallets & Bank Accounts' : 'Wallets & Accounts'}</Text>
             <MaterialIcons name="info-outline" size={18} color={theme.colors.textSecondary} />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
@@ -471,7 +476,7 @@ const DashboardScreen = function (props) {
                   <Animated.View key={acc.id} style={{ opacity: walletsFade }}>
                     <Pressable
                       onPress={openWalletEditor}
-                      style={function (pressed) {
+                      style={function ({ pressed }) {
                         var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
                         var mainColor = acc.color || styleInfo.color;
 
@@ -526,7 +531,7 @@ const DashboardScreen = function (props) {
                             {acc.name || 'Wallet'}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: scale(19), color: '#FFFFFF', fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2 }}>
+                        <Text style={[{ fontSize: scale(19), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.1)' } : { textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>
                           {maskAmount(acc.balance)}
                         </Text>
                       </View>
@@ -550,7 +555,7 @@ const DashboardScreen = function (props) {
                       <Pressable
                         key={acc.id}
                         onPress={openWalletEditor}
-                        style={function (pressed) {
+                        style={function ({ pressed }) {
                           return {
                             width: '48%',
                             height: isSimpleMode ? scale(120) : scale(100),
@@ -597,7 +602,7 @@ const DashboardScreen = function (props) {
                               {acc.name}
                             </Text>
                           </View>
-                          <Text style={{ fontSize: scale(isSimpleMode ? 19 : 16), color: '#FFFFFF', fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2 }}>
+                          <Text style={[{ fontSize: scale(isSimpleMode ? 19 : 16), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.1)' } : { textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>
                             {maskAmount(acc.balance)}
                           </Text>
                         </View>
@@ -630,31 +635,31 @@ const DashboardScreen = function (props) {
           {/* Income Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setShowIncomeModal(true); }}
-            style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.05)' : '#F0FDF4', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7' }}
+            style={{ flex: 1, backgroundColor: '#10B981', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
           >
-            <Text style={{ fontSize: scale(10), color: '#16A34A', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>INCOME</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
-            <MaterialIcons name="add-circle" size={scale(14)} color="#16A34A" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>INCOME</Text>
+            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
+            <MaterialIcons name="add-circle" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
           </TouchableOpacity>
 
           {/* Spent Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}
-            style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(239, 68, 68, 0.05)' : '#FEF2F2', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2' }}
+            style={{ flex: 1, backgroundColor: '#EF4444', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
           >
-            <Text style={{ fontSize: scale(10), color: '#DC2626', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SPENT</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
-            <MaterialIcons name="visibility" size={scale(14)} color="#DC2626" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SPENT</Text>
+            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
+            <MaterialIcons name="visibility" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
           </TouchableOpacity>
 
           {/* Savings Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setShowSavingsManagerModal(true); }}
-            style={{ flex: 1, backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.05)' : '#EFF6FF', borderRadius: scale(16), padding: moderateScale(12), borderWidth: 1, borderColor: theme.isDark ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE' }}
+            style={{ flex: 1, backgroundColor: '#3B82F6', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
           >
-            <Text style={{ fontSize: scale(10), color: '#2563EB', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SAVINGS</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
-            <MaterialIcons name="account-balance-wallet" size={scale(14)} color="#2563EB" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.6 }} />
+            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SAVINGS</Text>
+            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
+            <MaterialIcons name="account-balance-wallet" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
           </TouchableOpacity>
         </View>
 
@@ -908,7 +913,17 @@ const DashboardScreen = function (props) {
                 onLayout={function (e) { envelopeRowY.current = e.nativeEvent.layout.y; }}
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, opacity: envelopesFade, transform: [{ translateX: envelopesFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
               >
-                <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>Envelopes</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 8 }}>Envelopes</Text>
+                  {state.archivedEnvelopes.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setShowArchiveModal(true)}
+                      style={{ backgroundColor: theme.colors.primary + '25', padding: 8, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.primary + '40' }}
+                    >
+                      <MaterialIcons name="archive" size={20} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity onPress={toggleEnvelopeView} style={{ padding: 4, marginRight: 12 }}>
                     <MaterialIcons name={envelopeViewMode === 'grid' ? "view-carousel" : "grid-view"} size={20} color={theme.colors.primary} />
@@ -953,7 +968,7 @@ const DashboardScreen = function (props) {
                               setQuickAddEnv(actualEnv);
                               setShowQuickAddModal(true);
                             }}
-                            style={function (pressed) {
+                            style={function ({ pressed }) {
                               return {
                                 width: scale(200),
                                 height: scale(130),
@@ -978,11 +993,51 @@ const DashboardScreen = function (props) {
                                <View style={{ backgroundColor: isOverspent ? theme.colors.error + '15' : theme.colors.primary + '15', padding: scale(8), borderRadius: scale(12) }}>
                                  <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(22)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
                                </View>
-                               {isOverspent && (
-                                 <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(8) }}>
-                                   <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: 'bold' }}>OVERSPENT</Text>
-                                 </View>
-                               )}
+                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <TouchableOpacity
+                                    onPress={function (e) {
+                                      triggerImpactHaptic('Light');
+                                      e.stopPropagation();
+                                      promptDeleteEnvelope({
+                                        envelopeId: env.id,
+                                        envelopes: state.envelopes,
+                                        recurringExpenses: state.recurringExpenses,
+                                        userHistory: state.userHistory,
+                                        onPerformDelete: function () {
+                                          if (!state.userSettings) return;
+                                          runSaveWithFeedback(
+                                            deleteEnvelopeAndCleanup({
+                                              envelopeId: env.id,
+                                              envelopes: state.envelopes,
+                                              recurringExpenses: state.recurringExpenses,
+                                              userSettings: state.userSettings,
+                                              mutateUpdateSettings: state.mutateUpdateSettings,
+                                              mutateUpdateRecurring: state.mutateUpdateRecurring,
+                                              mutateDeleteRecurring: state.mutateDeleteRecurring,
+                                              userHistory: state.userHistory,
+                                              mutateUpdateHistory: state.mutateUpdateHistory
+                                            }),
+                                            {
+                                              onSaved: state.refetchAll,
+                                              setShowSuccess: setShowScreenSaveSuccess,
+                                              setSuccessMessage: setScreenSuccessMessage,
+                                              message: 'Archived!',
+                                              errorMessage: 'Could not archive envelope. Please try again.'
+                                            }
+                                          );
+                                        }
+                                      });
+                                    }}
+                                    style={{ padding: scale(6), backgroundColor: isOverspent ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.2)', borderRadius: scale(8) }}
+                                  >
+                                    <MaterialIcons name="archive" size={scale(16)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                                  </TouchableOpacity>
+                                  {isOverspent && (
+                                    <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(8) }}>
+                                      <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: 'bold' }}>OVERSPENT</Text>
+                                    </View>
+                                  )}
+                               </View>
                             </View>
 
                             <View>
@@ -1061,8 +1116,8 @@ const DashboardScreen = function (props) {
                                     );
                                   }
                                 });
-                              }} style={{ padding: scale(4), backgroundColor: '#FEF2F2', borderRadius: scale(6) }}>
-                                <MaterialIcons name="archive" size={scale(14)} color={theme.colors.error} />
+                              }} style={{ padding: scale(4), backgroundColor: isOverspent ? 'rgba(239,68,68,0.1)' : theme.colors.primary + '15', borderRadius: scale(6) }}>
+                                <MaterialIcons name="archive" size={scale(14)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -1129,7 +1184,7 @@ const DashboardScreen = function (props) {
         onClose={function () { setShowSpentModal(false); }}
         filter={spentFilter}
         oneTimeExpenses={state.oneTimeExpenses}
-        envelopes={state.envelopeBalances}
+        envelopes={state.envelopes}
         userId={userId}
         theme={theme}
         insetsTop={insets.top}
@@ -1139,7 +1194,7 @@ const DashboardScreen = function (props) {
         recurringExpenses={state.recurringExpenses}
         accounts={state.accounts}
       />
-      <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopeBalances} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
+      <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
       <IncomeManagerModal
         visible={showIncomeModal}
         onClose={function () { setShowIncomeModal(false); }}
@@ -1159,7 +1214,7 @@ const DashboardScreen = function (props) {
         mutateUpdateSettings={state.mutateUpdateSettings}
       />
       <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
-      <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} />
+      <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} userHistory={state.userHistory} mutateUpdateHistory={state.mutateUpdateHistory} />
       <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function () { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <TransferWalletModal visible={showTransferWalletModal} onClose={function () { setShowTransferWalletModal(false); }} accounts={state.accounts} userHistory={state.userHistory} onSaved={state.refetchAll} theme={theme} insetsBottom={insets.bottom} userId={userId} />
       <SavingsManagerModal visible={showSavingsManagerModal} onClose={function () { setShowSavingsManagerModal(false); }} state={state} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
@@ -1167,6 +1222,7 @@ const DashboardScreen = function (props) {
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
       <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} envelopeBalances={state.envelopeBalances} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} userHistory={state.userHistory} />
       <NotificationCenterModal visible={showNotificationCenter} onClose={function () { setShowNotificationCenter(false); }} state={state} theme={theme} insets={insets} smartInsights={smartInsights} />
+      <ArchiveManagerModal visible={showArchiveModal} onClose={() => setShowArchiveModal(false)} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} />
 
       <Modal visible={infoModalConfig.visible} animationType="fade" transparent={true} onRequestClose={() => setInfoModalConfig({ ...infoModalConfig, visible: false })}>
         <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 }}>

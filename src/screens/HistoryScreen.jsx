@@ -9,7 +9,7 @@ import { formatCurrency, formatDate } from '../utils/helpers';
 import { scale, moderateScale, normalize } from '../utils/responsive';
 import emptyHistoryImg from '../assets/empty_history.png';
 
-const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 49;
+const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 

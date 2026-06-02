@@ -237,13 +237,18 @@ const sanitizeDb = (db) => {
       let goalAmt = e.goal_amount ? parseFloat(e.goal_amount) : null;
       if (goalAmt !== null && (isNaN(goalAmt) || goalAmt < 0)) goalAmt = null;
 
+      const isArchived = e.isArchived === true || e.isArchived === 'true' ||
+                         e.archived === true || e.archived === 'true' ||
+                         e.is_archived === true || e.is_archived === 'true';
+
       return {
         id,
         name,
         assigned,
         goal_amount: goalAmt,
         goal_date: e.goal_date || null,
-        icon: e.icon || null
+        icon: e.icon || null,
+        isArchived: isArchived
       };
     }).filter(e => !!e.id); // STRICT: Must have ID
 

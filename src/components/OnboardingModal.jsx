@@ -13,8 +13,8 @@ export var ONBOARDING_STEPS = [
     icon: 'celebration',
     accent: '#FFEDD5',
     title: 'Welcome to Penny',
-    subtitle: 'Your envelope budget, on your device.',
-    body: 'Give every peso a job, track wallets and bills, and see where your money goes — without sending data to the cloud.',
+    subtitle: 'High-end wealth tracking.',
+    body: 'A premium, private budgeting experience designed to adapt to your lifestyle—whether you are a detailed planner or a busy tracker.',
     showLogo: true
   },
   {
@@ -26,44 +26,36 @@ export var ONBOARDING_STEPS = [
     isModeSelection: true
   },
   {
+    id: 'visuals',
+    icon: 'account-balance-wallet',
+    accent: '#EDE9FE',
+    title: 'Elite Wallet Visuals',
+    subtitle: 'Beauty meets function.',
+    body: 'Your wallets now feature premium mesh gradients and glassmorphism. See your balances across GCash, BPI, Maya, and more in a stunning interface.'
+  },
+  {
     id: 'envelopes',
     icon: 'all-inbox',
     accent: '#DBEAFE',
-    title: 'Envelope budgeting',
-    subtitle: 'Three moves, every month.',
-    bullets: [
-      { icon: 'payments', text: 'Income lands in Ready to Assign.' },
-      { icon: 'move-to-inbox', text: 'Drag or assign cash into envelopes (Groceries, Bills, etc.).' },
-      { icon: 'shopping-cart', text: 'Spending comes out of the envelope you chose.' }
-    ]
+    title: 'Smart Envelopes',
+    subtitle: 'Detailed mode only.',
+    body: 'Give every peso a job. Assign income to categories, track monthly spending, and enjoy automatic rollover assistants when a new month begins.'
   },
   {
     id: 'insights',
-    icon: 'touch-app',
+    icon: 'show-chart',
     accent: '#F3E8FF',
-    title: 'Tap for breakdowns',
-    subtitle: 'Numbers should explain themselves.',
-    body: 'Tap balances like Total Current Money, Budget Used, or chart bars for instant breakdowns. Check Statistics for monthly insights.'
+    title: 'Asset Growth Charts',
+    subtitle: 'Visualize your progress.',
+    body: 'Watch your wealth grow with our new smooth Beziér line charts. Track your total net worth and spending trends month-over-month.'
   },
   {
     id: 'privacy',
     icon: 'shield',
     accent: '#D1FAE5',
     title: 'Private & offline',
-    subtitle: 'Your data stays on this device.',
-    body: 'Budgets, bills, and transactions are stored locally. Export a JSON backup from Settings anytime — especially before uninstalling or clearing browser data.'
-  },
-  {
-    id: 'start',
-    icon: 'rocket-launch',
-    accent: '#FEF3C7',
-    title: 'You\'re set',
-    subtitle: 'A quick start checklist',
-    checklist: [
-      { icon: 'account-balance-wallet', text: 'Add income under Ready to Assign' },
-      { icon: 'folder-special', text: 'Create or fund your envelopes' },
-      { icon: 'add-circle-outline', text: 'Log an expense with the + button' }
-    ]
+    subtitle: 'Your data, your device.',
+    body: 'Everything is stored locally. No cloud, no tracking. Export your history to Excel anytime to keep your own records safe.'
   }
 ];
 
@@ -163,9 +155,19 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             <TouchableOpacity
               onPress={handleSkip}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityLabel="Skip tour"
+              accessibilityLabel="Close"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: theme.colors.background,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border
+              }}
             >
-              <Text style={{ fontSize: normalize(14), fontWeight: '600', color: theme.colors.textSecondary }}>Skip</Text>
+              <MaterialIcons name="close" size={18} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -177,8 +179,8 @@ const OnboardingModal = function ({ visible, onClose, userSettings, mutateUpdate
             {current.showLogo ? (
               <Image
                 source={logoImg}
-                style={{ width: scale(72), height: scale(72), borderRadius: scale(18), marginBottom: moderateScale(16) }}
                 resizeMode="contain"
+                style={{ width: scale(72), height: scale(72), borderRadius: scale(18), marginBottom: moderateScale(16) }}
               />
             ) : (
               <View

@@ -78,7 +78,8 @@ const RegisterScreen = function(props) {
       React.createElement(View, { testID: 'View-9', style: { alignItems: 'center', marginBottom: moderateScale(32) }, componentId: 'register-logo' },
         React.createElement(Image, { 
           source: logoImg, 
-          style: { width: scale(100), height: scale(100), borderRadius: scale(24), resizeMode: 'contain', marginBottom: moderateScale(12) }
+          resizeMode: 'contain',
+          style: { width: scale(100), height: scale(100), borderRadius: scale(24), marginBottom: moderateScale(12) }
         }),
         React.createElement(Text, { 
           style: { fontSize: normalize(26), fontWeight: 'bold', color: theme.colors.primary, letterSpacing: 1.2, marginBottom: moderateScale(4) }

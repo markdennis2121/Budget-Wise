@@ -4,8 +4,12 @@ import ComponentFunction from './ComponentFunction';
 // Suppress harmless react-native-web deprecation warnings for a clean console
 const originalWarn = console.warn;
 console.warn = (...args) => {
-  if (args[0] && typeof args[0] === 'string' && args[0].includes('"shadow*" style props are deprecated')) return;
-  if (args[0] && typeof args[0] === 'string' && args[0].includes('props.pointerEvents is deprecated')) return;
+  if (args[0] && typeof args[0] === 'string' && (
+    args[0].includes('"shadow*" style props are deprecated') ||
+    args[0].includes('"textShadow*" style props are deprecated') ||
+    args[0].includes('style.resizeMode is deprecated') ||
+    args[0].includes('props.pointerEvents is deprecated')
+  )) return;
   originalWarn(...args);
 };
 

@@ -96,7 +96,8 @@ const ForgotPasswordScreen = function (props) {
       React.createElement(View, { style: { alignItems: 'center', marginBottom: 28 } },
         React.createElement(Image, {
           source: logoImg,
-          style: { width: 80, height: 80, borderRadius: 20, resizeMode: 'contain', marginBottom: 10 }
+          resizeMode: 'contain',
+          style: { width: 80, height: 80, borderRadius: 20, marginBottom: 10 }
         }),
         React.createElement(Text, { style: { fontSize: 22, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Reset Password'),
         React.createElement(Text, {

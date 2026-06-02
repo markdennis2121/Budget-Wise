@@ -132,34 +132,47 @@ export function buildPendingBillCleanupPromises(mutateUpdateRecurring, mutateDel
   });
 }
 
-/** Remove envelope from settings and fix pending bills that pointed at it. */
+export function isEnvelopeArchived(e) {
+  if (!e) return false;
+  return e.isArchived === true || e.isArchived === 'true' ||
+         e.archived === true || e.archived === 'true' ||
+         e.is_archived === true || e.is_archived === 'true';
+}
+
+/** Archive envelope in settings and fix pending bills that pointed at it. */
 export function deleteEnvelopeAndCleanup(params) {
   var envelopeId = params.envelopeId;
   var envelopes = params.envelopes || [];
   var target = envelopes.find(function (e) { return e.id === envelopeId; });
   var pending = target ? getPendingBillsForEnvelope(params.recurringExpenses || [], target) : [];
-  var newList = envelopes.filter(function (e) { return e.id !== envelopeId; });
+
+  // Senior Developer Fix: Instead of removing, we mark as archived.
+  var newList = envelopes.map(function (e) {
+    if (e.id === envelopeId) {
+      return {
+        ...e,
+        isArchived: true,
+        archived: true,
+        is_archived: true,
+        assigned: 0
+      };
+    }
+    return e;
+  });
+
+  var activeEnvelopes = newList.filter(function(e) {
+    return !isEnvelopeArchived(e);
+  });
 
   var cleanup = buildPendingBillCleanupPromises(
     params.mutateUpdateRecurring,
     params.mutateDeleteRecurring,
     pending,
-    newList
+    activeEnvelopes
   );
 
-  // Senior Developer Fix: Instead of deleting spent history, we just UNLINK it.
-  // This ensures wallet balances stay accurate and money doesn't "roll back" magically.
-  if (params.userHistory && params.mutateUpdateHistory) {
-    var relatedHistory = params.userHistory.filter(function(h) {
-      return h.category === envelopeId && (h.expense_type === 'One-Time' || h.expense_type === 'Recurring');
-    });
-    relatedHistory.forEach(function(h) {
-      cleanup.push(params.mutateUpdateHistory({
-        id: h.id,
-        data: { category: null, notes: (h.notes || '') + ' [From deleted envelope: ' + (target ? target.name : 'Unknown') + ']' }
-      }));
-    });
-  }
+  // Instead of unlinking, we keep the link because the envelope still exists in the "Archive"
+  // This keeps history browsing accurate.
 
   return Promise.all(cleanup).then(function () {
     if (!params.userSettings || !params.mutateUpdateSettings) return;

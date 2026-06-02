@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Modal, ScrollView, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Modal, ScrollView, Alert, Platform, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useQuery, useMutation } from 'platform-hooks';
 import { generateId, getTodayStr, getCurrentMonthStr, getMonthStr, parseAmount } from '../utils/helpers';
@@ -69,6 +69,9 @@ function getExpenseHelp(expType) {
 }
 
 const AddExpenseModal = function (props) {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width > 1024;
+
   var visible = props.visible;
   var onClose = props.onClose;
   var onSaved = props.onSaved;
@@ -296,20 +299,29 @@ const AddExpenseModal = function (props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)', position: 'relative' }}>
+      <View style={{
+        flex: 1,
+        justifyContent: isDesktopWeb ? 'center' : 'flex-end',
+        alignItems: isDesktopWeb ? 'center' : 'stretch',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        position: 'relative'
+      }}>
         <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={saveMessage} />
         <View style={{
           backgroundColor: theme.colors.card,
           borderTopLeftRadius: scale(28),
           borderTopRightRadius: scale(28),
+          borderBottomLeftRadius: isDesktopWeb ? scale(28) : 0,
+          borderBottomRightRadius: isDesktopWeb ? scale(28) : 0,
           paddingHorizontal: moderateScale(24),
           paddingTop: moderateScale(10),
           paddingBottom: insetsBottom + moderateScale(24),
-          maxHeight: '92%',
+          maxHeight: isDesktopWeb ? '80%' : '92%',
+          width: isDesktopWeb ? 500 : '100%',
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 10,
+          shadowOffset: { width: 0, height: isDesktopWeb ? 10 : -4 },
+          shadowOpacity: isDesktopWeb ? 0.25 : 0.1,
+          shadowRadius: 15,
           elevation: 20
         }}>
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
