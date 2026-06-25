@@ -8,7 +8,6 @@ import AddExpenseModal from '../components/AddExpenseModal';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
 import EmptyStateCard from '../components/EmptyStateCard';
 import RtaNudgeBanner from '../components/RtaNudgeBanner';
-import TrialCountdownBanner from '../components/TrialCountdownBanner';
 import OnboardingModal from '../components/OnboardingModal';
 import BrandLogo from '../components/BrandLogo';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
@@ -41,7 +40,8 @@ import {
   AddAccountModal,
   EditAccountModal,
   NotificationCenterModal,
-  ArchiveManagerModal
+  ArchiveManagerModal,
+  PremiumPaywallModal
 } from './dashboard/modals';
 
 const DashboardScreen = function (props) {
@@ -224,6 +224,16 @@ const DashboardScreen = function (props) {
   var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
   var [showNotificationCenter, setShowNotificationCenter] = useState(false);
   var [showArchiveModal, setShowArchiveModal] = useState(false);
+  var [showPremiumModal, setShowPremiumModal] = useState(false);
+
+  // UI/UX Hook: Allow other screens to trigger the paywall
+  useEffect(() => {
+    if (props.route?.params?.showPremium) {
+      setShowPremiumModal(true);
+      // Clear the param so it doesn't pop up again on re-focus
+      props.navigation.setParams({ showPremium: undefined });
+    }
+  }, [props.route?.params]);
 
   // High-End Alert Persistence: Track how many alerts the user has already acknowledged
   var [lastSeenAlertCount, setLastSeenAlertCount] = useState(function() {
@@ -701,7 +711,7 @@ const DashboardScreen = function (props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) }}>
               <Image source={logoImg} style={{ width: scale(44), height: scale(44), borderRadius: scale(22), borderWidth: 1, borderColor: theme.colors.border }} />
               <View>
-                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>PENNY BUDGETING</Text>
+                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>BUDGET-WISE ₱</Text>
                 <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{greeting}, {userName}!</Text>
               </View>
             </View>
@@ -1216,13 +1226,31 @@ const DashboardScreen = function (props) {
       <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
       <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} userHistory={state.userHistory} mutateUpdateHistory={state.mutateUpdateHistory} />
       <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function () { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
-      <TransferWalletModal visible={showTransferWalletModal} onClose={function () { setShowTransferWalletModal(false); }} accounts={state.accounts} userHistory={state.userHistory} onSaved={state.refetchAll} theme={theme} insetsBottom={insets.bottom} userId={userId} />
+      <TransferWalletModal
+        visible={showTransferWalletModal}
+        onClose={function () { setShowTransferWalletModal(false); }}
+        accounts={state.accounts}
+        userHistory={state.userHistory}
+        onSaved={state.refetchAll}
+        theme={theme}
+        insetsBottom={insets.bottom}
+        userId={userId}
+        userSettings={state.userSettings}
+      />
       <SavingsManagerModal visible={showSavingsManagerModal} onClose={function () { setShowSavingsManagerModal(false); }} state={state} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
 
-      <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
+      <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} setShowPremiumModal={setShowPremiumModal} />
       <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} envelopeBalances={state.envelopeBalances} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} userHistory={state.userHistory} />
       <NotificationCenterModal visible={showNotificationCenter} onClose={function () { setShowNotificationCenter(false); }} state={state} theme={theme} insets={insets} smartInsights={smartInsights} />
       <ArchiveManagerModal visible={showArchiveModal} onClose={() => setShowArchiveModal(false)} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} />
+      <PremiumPaywallModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+        theme={theme}
+        userSettings={state.userSettings}
+        mutateUpdateSettings={state.mutateUpdateSettings}
+        onSaved={state.refetchAll}
+      />
 
       <Modal visible={infoModalConfig.visible} animationType="fade" transparent={true} onRequestClose={() => setInfoModalConfig({ ...infoModalConfig, visible: false })}>
         <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 }}>

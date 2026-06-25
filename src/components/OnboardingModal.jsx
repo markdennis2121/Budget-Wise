@@ -12,8 +12,8 @@ export var ONBOARDING_STEPS = [
     id: 'welcome',
     icon: 'celebration',
     accent: '#FFEDD5',
-    title: 'Welcome to Penny',
-    subtitle: 'High-end wealth tracking.',
+    title: 'Welcome to Budget-Wise ₱',
+    subtitle: 'Luxe Financial Command Center.',
     body: 'A premium, private budgeting experience designed to adapt to your lifestyle—whether you are a detailed planner or a busy tracker.',
     showLogo: true
   },
@@ -22,40 +22,45 @@ export var ONBOARDING_STEPS = [
     icon: 'tune',
     accent: '#E0F2FE',
     title: 'Choose your style',
-    subtitle: 'How do you want to track?',
+    subtitle: 'Adaptive experience.',
     isModeSelection: true
   },
   {
     id: 'visuals',
     icon: 'account-balance-wallet',
     accent: '#EDE9FE',
-    title: 'Elite Wallet Visuals',
+    title: 'Modern Luxe UI',
     subtitle: 'Beauty meets function.',
-    body: 'Your wallets now feature premium mesh gradients and glassmorphism. See your balances across GCash, BPI, Maya, and more in a stunning interface.'
+    body: 'Your wallets now feature premium mesh gradients. Experience our new mobile-first vertical Transfer flow with smart logo detection and real-time balance previews.'
   },
   {
     id: 'envelopes',
     icon: 'all-inbox',
     accent: '#DBEAFE',
     title: 'Smart Envelopes',
-    subtitle: 'Detailed mode only.',
+    subtitle: 'Core Budgeting System.',
     body: 'Give every peso a job. Assign income to categories, track monthly spending, and enjoy automatic rollover assistants when a new month begins.'
   },
   {
     id: 'insights',
     icon: 'show-chart',
     accent: '#F3E8FF',
-    title: 'Asset Growth Charts',
-    subtitle: 'Visualize your progress.',
-    body: 'Watch your wealth grow with our new smooth Beziér line charts. Track your total net worth and spending trends month-over-month.'
+    title: 'Luxe Analytics',
+    subtitle: 'Visualize your wealth.',
+    body: 'Watch your wealth grow with smooth Beziér line charts. Track total net worth and compare 6-month trends to master your cash flow.'
   },
   {
-    id: 'privacy',
-    icon: 'shield',
-    accent: '#D1FAE5',
-    title: 'Private & offline',
-    subtitle: 'Your data, your device.',
-    body: 'Everything is stored locally. No cloud, no tracking. Export your history to Excel anytime to keep your own records safe.'
+    id: 'premium',
+    icon: 'workspace-premium',
+    accent: '#FEF3C7',
+    title: 'Unlock Premium',
+    subtitle: 'One-time upgrade, lifetime power.',
+    bullets: [
+      { icon: 'palette', text: 'Exclusive themes like Rose Gold and Cosmic Purple' },
+      { icon: 'security', text: 'Biometric Login (Fingerprint & FaceID)' },
+      { icon: 'file-download', text: 'Excel & CSV Data Exports' },
+      { icon: 'all-inclusive', text: 'Unlimited Wallets & Advanced Archive tools' }
+    ]
   }
 ];
 

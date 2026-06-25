@@ -28,6 +28,7 @@ const StatisticsScreen = function(props) {
   var settingsQuery = useQuery('user_settings');
   var allSettings = settingsQuery.data || [];
   var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
+  var isPremium = userSettings?.is_premium || false;
 
   var recurringQuery = useQuery('recurring_expenses');
   var userRecurring = (recurringQuery.data || []).filter(function(r) { return r.user_id === userId; });
@@ -494,7 +495,7 @@ const StatisticsScreen = function(props) {
         )}
 
         {/* ── Net Worth Growth Chart (Line Chart) ── */}
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
@@ -508,7 +509,19 @@ const StatisticsScreen = function(props) {
           </View>
 
           <View style={{ height: scale(180), width: '100%', marginBottom: 10 }}>
-            {netWorthTrend.length > 1 ? (
+            {!isPremium ? (
+               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background + '88', borderRadius: 16 }}>
+                  <MaterialIcons name="lock" size={32} color={theme.colors.primary} style={{ marginBottom: 12 }} />
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center' }}>Premium Feature</Text>
+                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>Upgrade to Luxe to visualize your net worth growth over time.</Text>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } })}
+                    style={{ marginTop: 14, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>Unlock Trends</Text>
+                  </TouchableOpacity>
+               </View>
+            ) : netWorthTrend.length > 1 ? (
               <svg viewBox="0 0 300 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 <defs>
                   <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
@@ -561,14 +574,16 @@ const StatisticsScreen = function(props) {
             )}
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 5 }}>
-            {netWorthTrend.map((t, i) => (
-              <View key={i} style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: normalize(9), fontWeight: 'bold', color: i === netWorthTrend.length - 1 ? theme.colors.primary : theme.colors.textSecondary }}>{t.label}</Text>
-                <Text style={{ fontSize: normalize(8), color: theme.colors.textSecondary, marginTop: 2 }}>{balancesVisible ? (t.value >= 10000 ? (t.value / 1000).toFixed(0) + 'k' : t.value.toFixed(0)) : '•••'}</Text>
-              </View>
-            ))}
-          </View>
+          {isPremium && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 5 }}>
+              {netWorthTrend.map((t, i) => (
+                <View key={i} style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: normalize(9), fontWeight: 'bold', color: i === netWorthTrend.length - 1 ? theme.colors.primary : theme.colors.textSecondary }}>{t.label}</Text>
+                  <Text style={{ fontSize: normalize(8), color: theme.colors.textSecondary, marginTop: 2 }}>{balancesVisible ? (t.value >= 10000 ? (t.value / 1000).toFixed(0) + 'k' : t.value.toFixed(0)) : '•••'}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: moderateScale(16) }} />
 
@@ -577,7 +592,7 @@ const StatisticsScreen = function(props) {
               <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, fontWeight: '600' }}>Current Liquid Worth</Text>
               <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginTop: 2 }}>{maskAmount(netWorthTrend[netWorthTrend.length-1].value)}</Text>
             </View>
-            {netWorthTrend.length > 1 && (
+            {isPremium && netWorthTrend.length > 1 && (
               <View style={{ alignItems: 'flex-end' }}>
                 {(() => {
                   var current = netWorthTrend[netWorthTrend.length-1].value;
@@ -848,7 +863,7 @@ const StatisticsScreen = function(props) {
         )}
 
         {/* ── 6-Month Trend ── */}
-        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
@@ -890,24 +905,38 @@ const StatisticsScreen = function(props) {
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: scale(160), paddingBottom: moderateScale(10) }}>
-            {monthlyTotals.map(function(m, i) {
-              var spentPct = maxTrendValue > 0 ? (m.spent / maxTrendValue) : 0;
-              var incomePct = maxTrendValue > 0 ? (m.income / maxTrendValue) : 0;
-              var spentHeight = Math.max(scale(6), Math.round(spentPct * scale(120)));
-              var incomeHeight = Math.max(scale(6), Math.round(incomePct * scale(120)));
-              var isCurrent = m.key === curMonth;
-              return (
-                <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: moderateScale(10) }}>
-                    <View style={{ width: '25%', height: incomeHeight, backgroundColor: '#10B981', borderTopLeftRadius: scale(4), borderTopRightRadius: scale(4), marginRight: 2, shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 3, elevation: 2 }} />
-                    <View style={{ width: '25%', height: spentHeight, backgroundColor: '#EF4444', borderTopLeftRadius: scale(4), borderTopRightRadius: scale(4), shadowColor: '#EF4444', shadowOpacity: 0.3, shadowRadius: 3, elevation: 2 }} />
+          {!isPremium ? (
+            <View style={{ height: scale(160), alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background + '88', borderRadius: 16 }}>
+              <MaterialIcons name="insights" size={32} color={theme.colors.primary} style={{ marginBottom: 12 }} />
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>Luxe Analytics</Text>
+              <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 30 }}>Unlock your income vs. spending comparison for the last 6 months.</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } })}
+                style={{ marginTop: 14, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>Upgrade to Luxe</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: scale(160), paddingBottom: moderateScale(10) }}>
+              {monthlyTotals.map(function(m, i) {
+                var spentPct = maxTrendValue > 0 ? (m.spent / maxTrendValue) : 0;
+                var incomePct = maxTrendValue > 0 ? (m.income / maxTrendValue) : 0;
+                var spentHeight = Math.max(scale(6), Math.round(spentPct * scale(120)));
+                var incomeHeight = Math.max(scale(6), Math.round(incomePct * scale(120)));
+                var isCurrent = m.key === curMonth;
+                return (
+                  <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', width: '100%', marginBottom: moderateScale(10) }}>
+                      <View style={{ width: '25%', height: incomeHeight, backgroundColor: '#10B981', borderTopLeftRadius: scale(4), borderTopRightRadius: scale(4), marginRight: 2, shadowColor: '#10B981', shadowOpacity: 0.3, shadowRadius: 3, elevation: 2 }} />
+                      <View style={{ width: '25%', height: spentHeight, backgroundColor: '#EF4444', borderTopLeftRadius: scale(4), borderTopRightRadius: scale(4), shadowColor: '#EF4444', shadowOpacity: 0.3, shadowRadius: 3, elevation: 2 }} />
+                    </View>
+                    <Text style={{ fontSize: normalize(10), fontWeight: isCurrent ? 'bold' : '600', color: isCurrent ? theme.colors.primary : theme.colors.textSecondary }}>{m.label}</Text>
                   </View>
-                  <Text style={{ fontSize: normalize(10), fontWeight: isCurrent ? 'bold' : '600', color: isCurrent ? theme.colors.primary : theme.colors.textSecondary }}>{m.label}</Text>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
 
@@ -923,6 +952,10 @@ const StatisticsScreen = function(props) {
           <View>
             {monthlyTotals.slice().reverse().map(function(m, i) {
               var isCurrent = m.key === curMonth;
+
+              // UX: In basic mode, only show the current month in the list.
+              if (!isPremium && !isCurrent) return null;
+
               var savings = m.income - m.spent;
               return (
                 <View key={i} style={{
@@ -956,6 +989,15 @@ const StatisticsScreen = function(props) {
                 </View>
               );
             })}
+
+            {!isPremium && (
+               <TouchableOpacity
+                 onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } })}
+                 style={{ padding: 16, backgroundColor: theme.colors.background, borderRadius: 18, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}
+               >
+                  <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' }}>View Audit History in Premium</Text>
+               </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>

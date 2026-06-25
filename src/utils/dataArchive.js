@@ -93,19 +93,17 @@ export function calculateArchiveRollup(history, cutoffDate, userId) {
   };
 }
 
-export function applyArchiveToDatabase(userId, summaryTransactions, historyIdsToDelete) {
-  const { getDatabase, persistDatabase } = require('../platform-hooks');
-  const db = getDatabase();
-  
+/**
+ * Atomic Application of Archive to the Local Database.
+ * This is a low-level operation that should be used with care.
+ */
+export function applyArchiveToDatabase(db, userId, summaryTransactions, historyIdsToDelete) {
   if (!db) return false;
 
-  // 1. Bulk delete old history
+  // 1. Bulk delete old history for this specific user
   if (db.expense_history && historyIdsToDelete.length > 0) {
     const idsSet = new Set(historyIdsToDelete);
     db.expense_history = db.expense_history.filter(h => !idsSet.has(h.id));
-  } else {
-    // If expense_history is completely missing for some reason
-    db.expense_history = [];
   }
 
   // 2. Insert summary transactions
@@ -113,7 +111,5 @@ export function applyArchiveToDatabase(userId, summaryTransactions, historyIdsTo
     db.expense_history = db.expense_history.concat(summaryTransactions);
   }
 
-  // 3. Persist atomically
-  persistDatabase(db);
-  return true;
+  return db;
 }

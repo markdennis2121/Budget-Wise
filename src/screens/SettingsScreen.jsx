@@ -8,9 +8,7 @@ import { useUser } from '../contexts/UserContext';
 import { formatDate, generateId } from '../utils/helpers';
 import { getDatabase, persistDatabase } from '../platform-hooks';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
-import TrialCountdownBanner from '../components/TrialCountdownBanner';
 import OnboardingModal from '../components/OnboardingModal';
-import { BETA_EXPIRATION_DATE } from '../utils/trial';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { NativeBiometric } from 'capacitor-native-biometric';
 import { Capacitor } from '@capacitor/core';
@@ -30,20 +28,19 @@ const WEB_TAB_MENU_PADDING = 90;
 const PIN_LENGTH = 6;
 
 const THEME_COLORS = [
-  { name: 'Copper Penny', color: '#D97706' },
-  { name: 'Midnight Royal', color: '#EAB308' },
-  { name: 'Cyber Mint', color: '#2DD4BF' },
-  { name: 'Forest Green', color: '#059669' },
   { name: 'Penny Classic', color: '#10B981' },
   { name: 'Corporate Blue', color: '#2563EB' },
-  { name: 'Rose Gold', color: '#FB7185' },
-  { name: 'Lavender Dream', color: '#8B5CF6' },
+  { name: 'Forest Green', color: '#059669' },
   { name: 'Stealth Black', color: '#111827' },
-  { name: 'Latte Neutral', color: '#D4A373' },
-  { name: 'Messenger Vibe', color: ['#00C6FF', '#0072FF'] },
-  { name: 'Sunset Blend', color: ['#FF512F', '#F09819'] },
-  { name: 'Cosmic Purple', color: ['#8E2DE2', '#4A00E0'] },
-  { name: 'Mint Glow', color: ['#11998E', '#38EF7D'] }
+  { name: 'Copper Penny', color: '#D97706', premium: true },
+  { name: 'Midnight Royal', color: '#EAB308', premium: true },
+  { name: 'Cyber Mint', color: '#2DD4BF', premium: true },
+  { name: 'Rose Gold', color: '#FB7185', premium: true },
+  { name: 'Lavender Dream', color: '#8B5CF6', premium: true },
+  { name: 'Latte Neutral', color: '#D4A373', premium: true },
+  { name: 'Sunset Blend', color: ['#FF512F', '#F09819'], premium: true },
+  { name: 'Cosmic Purple', color: ['#8E2DE2', '#4A00E0'], premium: true },
+  { name: 'Mint Glow', color: ['#11998E', '#38EF7D'], premium: true }
 ];
 
 const SettingsScreen = function(props) {
@@ -149,6 +146,13 @@ const SettingsScreen = function(props) {
       showAlert('Error', 'Sign in to export your data.');
       return;
     }
+
+    // UI/UX Nudge: Check Premium for Exports
+    if (!userSettings?.is_premium) {
+      navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
+      return;
+    }
+
     setBackupBusy(true);
     setBackupNote('');
 
@@ -187,6 +191,12 @@ const SettingsScreen = function(props) {
       return;
     }
 
+    // UI/UX Nudge: Check Premium for Archive/Compression
+    if (!userSettings?.is_premium) {
+      navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
+      return;
+    }
+
     var startCompressionFlow = function (monthsAgo) {
       var cutoffDate = new Date();
       cutoffDate.setMonth(cutoffDate.getMonth() - monthsAgo);
@@ -208,8 +218,11 @@ const SettingsScreen = function(props) {
         setBackupBusy(true);
         downloadCsvFile(rollupResult.archivedHistory, envs, accs)
           .then(function () {
-            var success = applyArchiveToDatabase(userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
-            if (success) {
+            var db = getDatabase();
+            var updatedDb = applyArchiveToDatabase(db, userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
+
+            if (updatedDb) {
+              persistDatabase(updatedDb);
               refetch();
               historyQuery.refetch();
               showAlert('Compression Complete', `${rollupResult.historyIdsToDelete.length} old transactions were safely compressed to save space, while preserving all analytics.`);
@@ -270,6 +283,12 @@ const SettingsScreen = function(props) {
       showAlert('Not Supported', 'Biometrics are only available on the mobile app.');
       return;
     }
+
+    if (!userSettings?.is_premium) {
+      navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
+      return;
+    }
+
     try {
       const result = await NativeBiometric.isAvailable();
       if (!result.isAvailable) {
@@ -386,7 +405,12 @@ const SettingsScreen = function(props) {
         ) : null,
         userSettings?.pin_code ? React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 16 } },
           React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Biometric Lock'),
+            React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
+              React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Biometric Lock'),
+              !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 } },
+                React.createElement(Text, { style: { color: '#B45309', fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
+              ) : null
+            ),
             React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, 'Fingerprint / Face ID authentication')
           ),
           React.createElement(TouchableOpacity, { 
@@ -424,16 +448,26 @@ const SettingsScreen = function(props) {
               var isSelected = theme.colors.primary === baseStr;
               var isBlackLightMode = (baseStr === '#111827' && !theme.isDark);
               var checkColor = isBlackLightMode ? '#FFFFFF' : (baseStr === '#FFFFFF' ? '#000000' : '#FFFFFF');
-              
+              var isPremiumLocked = c.premium && !userSettings?.is_premium;
+
               return React.createElement(TouchableOpacity, { 
                 key: baseStr, 
-                onPress: () => setPrimaryColor(c.color),
+                onPress: () => {
+                  if (isPremiumLocked) {
+                    navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
+                  } else {
+                    setPrimaryColor(c.color);
+                  }
+                },
                 style: { width: 50, height: 50, borderRadius: 25, backgroundColor: isArr ? 'transparent' : baseStr, overflow: 'hidden', marginRight: 12, alignItems: 'center', justifyContent: 'center', shadowColor: baseStr, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }
               },
                 isArr ? React.createElement(View, {
                   style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 25, backgroundImage: 'linear-gradient(135deg, ' + c.color[0] + ', ' + c.color[1] + ')' }
                 }) : null,
-                isSelected ? React.createElement(MaterialIcons, { name: 'check', size: 24, color: checkColor, style: { zIndex: 1 } }) : null
+                isSelected ? React.createElement(MaterialIcons, { name: 'check', size: 24, color: checkColor, style: { zIndex: 1 } }) : null,
+                isPremiumLocked ? React.createElement(View, { style: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.3)', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' } },
+                  React.createElement(MaterialIcons, { name: 'workspace-premium', size: 18, color: '#F59E0B' })
+                ) : null
               )
             })
           )
@@ -504,7 +538,10 @@ const SettingsScreen = function(props) {
             ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
             : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
                 React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
-                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)')
+                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)'),
+                !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF' } },
+                  React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' } }, 'LUXE')
+                ) : null
               )
         ),
         React.createElement(TouchableOpacity, {
@@ -514,7 +551,10 @@ const SettingsScreen = function(props) {
         },
           React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
             React.createElement(MaterialIcons, { name: 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
-            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, 'Compress Old Data')
+            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, 'Compress Old Data'),
+            !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: theme.colors.error } },
+              React.createElement(Text, { style: { color: theme.colors.error, fontSize: 10, fontWeight: 'bold' } }, 'LUXE')
+            ) : null
           )
         ),
         React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
@@ -529,17 +569,92 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-85', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-102', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'App Name'),
-          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Penny Budgeting')
+          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Budget-Wise ₱')
         ),
-        React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
+        React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.4.2')
-        ),
-        React.createElement(View, { style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
-          React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Beta access ends'),
-          React.createElement(Text, { style: { color: theme.colors.textSecondary, fontSize: 15 } }, formatDate(BETA_EXPIRATION_DATE))
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.0')
         )
       ),
+      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
+          React.createElement(MaterialIcons, { name: 'report-problem', size: 22, color: theme.colors.error, style: { marginRight: 12 } }),
+          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Danger Zone')
+        ),
+
+        React.createElement(TouchableOpacity, {
+          onPress: function() {
+            var msg = "This will clear all your Wallets, Envelopes, and Transaction History for this account. Your login will remain active. This cannot be undone! Continue?";
+            var performReset = function() {
+              var db = getDatabase();
+              if (db) {
+                db.expense_history = (db.expense_history || []).filter(function(h) { return h.user_id !== userId; });
+                db.recurring_expenses = (db.recurring_expenses || []).filter(function(r) { return r.user_id !== userId; });
+                db.one_time_expenses = (db.one_time_expenses || []).filter(function(o) { return o.user_id !== userId; });
+                db.user_settings = (db.user_settings || []).map(function(s) {
+                  if (s.user_id === userId) {
+                    return Object.assign({}, s, { envelopes: [], accounts: [], accounts_customized: false, savings: [], monthly_salary: 0 });
+                  }
+                  return s;
+                });
+                persistDatabase(db);
+                refetch();
+                historyQuery.refetch();
+                if (Platform.OS === 'web') window.alert("Account cleared.");
+                else Alert.alert("Reset Complete", "Your account has been cleared.");
+              }
+            };
+            if (Platform.OS === 'web') {
+              if (window.confirm(msg)) performReset();
+            } else {
+              Alert.alert("Factory Reset?", msg, [{ text: "Cancel" }, { text: "Reset", style: "destructive", onPress: performReset }]);
+            }
+          },
+          style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border }
+        },
+          React.createElement(MaterialIcons, { name: 'refresh', size: 20, color: theme.colors.error, style: { marginRight: 14 } }),
+          React.createElement(View, null,
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Factory Reset Data'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Wipe everything & start fresh')
+          )
+        ),
+
+        React.createElement(TouchableOpacity, {
+          onPress: function() {
+            userCtx.setCurrentUser(null);
+            navigation.replace('Register');
+          },
+          style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginTop: 4 }
+        },
+          React.createElement(MaterialIcons, { name: 'person-add', size: 20, color: theme.colors.textPrimary, style: { marginRight: 14 } }),
+          React.createElement(View, null,
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Create New Account'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Sign up with a different email')
+          )
+        )
+      ),
+
+      React.createElement(View, { style: { backgroundColor: theme.isDark ? '#1E293B' : '#F8FAFC', borderRadius: 16, padding: 20, marginBottom: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: '#CBD5E1' } },
+        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
+          React.createElement(MaterialIcons, { name: 'bug-report', size: 22, color: '#64748B', style: { marginRight: 12 } }),
+          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Developer Testing Center')
+        ),
+        React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
+          React.createElement(View, { style: { flex: 1 } },
+            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Premium Status'),
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Toggle Basic vs Luxe UI')
+          ),
+          React.createElement(TouchableOpacity, {
+            onPress: () => {
+              mutateUpdate({ id: userSettings?.id, data: { is_premium: !userSettings?.is_premium } }).then(() => refetch());
+            },
+            style: { backgroundColor: userSettings?.is_premium ? '#F59E0B' : '#E2E8F0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }
+          },
+            React.createElement(Text, { style: { color: userSettings?.is_premium ? '#FFFFFF' : '#475569', fontWeight: 'bold', fontSize: 13 } }, userSettings?.is_premium ? 'PREMIUM ACTIVE' : 'SWITCH TO PREMIUM')
+          )
+        )
+      ),
+
       React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-26', onPress: handleLogout,
         style: { backgroundColor: '#FEF2F2', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA' },
         componentId: 'logout-btn'

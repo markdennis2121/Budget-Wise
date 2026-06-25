@@ -13,15 +13,25 @@ function getScreen() {
 
 /**
  * Scales size based on screen width. Always uses live dimensions.
+ * Adjusted to handle capped width on Tablets and Desktop.
  */
 export const scale = (size) => {
   const { width } = getScreen();
-  const screenWidth = Platform.OS === 'web' ? Math.min(width, 1200) : width;
-  if (Platform.OS === 'web') {
-    const factor = width > 1024 ? 0.8 : 1;
-    return (screenWidth / guidelineBaseWidth) * size * factor;
+  const isLargeScreen = width > 600;
+  const isWebDesktop = Platform.OS === 'web' && width > 1024;
+
+  // If we are on Desktop Web with a sidebar, we use a fixed comfortable scaling.
+  if (isWebDesktop) {
+    return size * 1.1;
   }
-  return (screenWidth / guidelineBaseWidth) * size;
+
+  // If we are on a Tablet (native or web), we are centered in a 480px box.
+  if (isLargeScreen) {
+    return (480 / guidelineBaseWidth) * size;
+  }
+
+  // Standard mobile scaling
+  return (width / guidelineBaseWidth) * size;
 };
 
 /**

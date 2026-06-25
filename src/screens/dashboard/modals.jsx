@@ -805,7 +805,7 @@ const NotificationCenterModal = function ({ visible, onClose, state, theme, inse
   );
 };
 
-const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mutateUpdateSettings, onSaved, userId }) {
+const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mutateUpdateSettings, onSaved, userId, setShowPremiumModal }) {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width > 1024;
 
@@ -831,10 +831,19 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   var handleCreate = function () {
     var finalName = type === 'Custom' ? name.trim() : (WALLET_STYLES[type] ? WALLET_STYLES[type].name : name.trim());
     if (isSaving || !finalName) return;
+
+    // Senior Developer: Enforce Freemium 5-Account Limit
+    var currentAccounts = getStoredAccountsList(userSettings);
+    var isPremium = userSettings?.is_premium || false;
+
+    if (currentAccounts.length >= 5 && !isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     var startingBal = parseAmount(balance);
     var newId = 'acc-' + generateId();
     var newAcc = { id: newId, name: finalName, starting_balance: startingBal, type: type };
-    var currentAccounts = getStoredAccountsList(userSettings);
     var newList = currentAccounts.concat(newAcc);
     if (userSettings) {
       setIsSaving(true);
@@ -964,6 +973,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var handleSave = () => {
     if (isSaving || !name.trim()) return;
     var val = parseAmount(amount);
+    var liveBal = parseFloat(account.balance) || 0;
 
     if (userSettings && account) {
       setIsSaving(true);
@@ -975,33 +985,36 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
 
       var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } }).then(() => {
         var today = new Date().toISOString().split('T')[0];
-        if (val <= 0) return Promise.resolve();
 
-        if (mode === 'add') {
-          return mutateInsertHistory({
-            id: generateId(),
-            user_id: userId,
-            expense_name: 'Balance Correction (Add): ' + name.trim(),
-            amount: val,
-            date: today,
-            expense_type: 'Adjustment',
-            category: 'Income',
-            account_id: account.id,
-            notes: 'Manual balance adjustment'
-          });
+        // Calculate the actual adjustment amount based on mode
+        var finalAdjustmentAmount = 0;
+        var adjustmentType = 'Income'; // Default to income (Add)
+
+        if (mode === 'reconcile') {
+          // In reconcile mode, 'val' is the target balance.
+          finalAdjustmentAmount = Math.abs(val - liveBal);
+          adjustmentType = val >= liveBal ? 'Income' : 'Adjustment';
         } else {
-          return mutateInsertHistory({
-            id: generateId(),
-            user_id: userId,
-            expense_name: 'Balance Correction (Reduce): ' + name.trim(),
-            amount: val,
-            date: today,
-            expense_type: 'Adjustment',
-            category: 'Adjustment',
-            account_id: account.id,
-            notes: 'Manual balance adjustment'
-          });
+          // Standard Add/Reduce mode
+          finalAdjustmentAmount = val;
+          adjustmentType = mode === 'add' ? 'Income' : 'Adjustment';
         }
+
+        if (finalAdjustmentAmount <= 0) return Promise.resolve();
+
+        return mutateInsertHistory({
+          id: generateId(),
+          user_id: userId,
+          expense_name: 'Balance Correction: ' + name.trim(),
+          amount: finalAdjustmentAmount,
+          date: today,
+          expense_type: 'Adjustment',
+          category: adjustmentType,
+          account_id: account.id,
+          notes: mode === 'reconcile'
+            ? `Reconciled from ${formatCurrency(liveBal)} to ${formatCurrency(val)}`
+            : 'Manual balance adjustment'
+        });
       });
 
       runSaveWithFeedback(savePromise, {
@@ -1009,7 +1022,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
         onSaved: onSaved,
         setShowSuccess: setShowSaveSuccess,
         setSuccessMessage: setSuccessMessage,
-        message: 'Wallet updated!',
+        message: 'Wallet reconciled!',
         errorMessage: 'Could not save changes.',
         onError: () => setIsSaving(false)
       }).then(() => setIsSaving(false));
@@ -1059,7 +1072,11 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
 
   var valInput = parseAmount(amount) || 0;
   var liveBal = parseFloat(account.balance) || 0;
-  var previewBal = mode === 'add' ? (liveBal + valInput) : (liveBal - valInput);
+
+  // Senior Developer Fix: Handle reconcile mode in preview calculation
+  var previewBal = mode === 'reconcile'
+    ? valInput
+    : (mode === 'add' ? (liveBal + valInput) : (liveBal - valInput));
 
   var otherWalletsTotal = (accounts || []).filter(a => a.id !== account.id).reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
   var projectedTotalCash = otherWalletsTotal + previewBal;
@@ -1124,22 +1141,36 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
             </View>
 
             <View style={{ marginBottom: moderateScale(20) }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(12) }}>
-                <MaterialIcons name="tune" size={scale(16)} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
-                <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>BALANCE ADJUSTMENT</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: moderateScale(12) }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="tune" size={scale(16)} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 0.5 }}>BALANCE ADJUSTMENT</Text>
+                </View>
+                {mode === 'reconcile' && (
+                   <View style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                     <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: 'bold' }}>SMART SYNC</Text>
+                   </View>
+                )}
               </View>
 
               <View style={{ flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: scale(12), padding: 4, marginBottom: moderateScale(14), borderWidth: 1, borderColor: theme.colors.border }}>
+                <TouchableOpacity onPress={() => setMode('reconcile')} style={{ flex: 1.2, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'reconcile' ? theme.colors.primary : 'transparent', borderRadius: 8 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: normalize(11), color: mode === 'reconcile' ? '#FFFFFF' : theme.colors.textSecondary }}>RECONCILE</Text>
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMode('add')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'add' ? theme.colors.primary : 'transparent', borderRadius: 8 }}>
-                  <Text style={{ fontWeight: 'bold', color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD</Text>
+                  <Text style={{ fontWeight: 'bold', fontSize: normalize(11), color: mode === 'add' ? '#FFFFFF' : theme.colors.textSecondary }}>ADD</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => setMode('reduce')} style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: mode === 'reduce' ? theme.colors.error : 'transparent', borderRadius: 8 }}>
-                  <Text style={{ fontWeight: 'bold', color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE</Text>
+                  <Text style={{ fontWeight: 'bold', fontSize: normalize(11), color: mode === 'reduce' ? '#FFFFFF' : theme.colors.textSecondary }}>REDUCE</Text>
                 </TouchableOpacity>
               </View>
 
-              <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(10) }} />
-              <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, fontStyle: 'italic' }}>Adjustment will be logged in transaction history.</Text>
+              <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(10) }} placeholder={mode === 'reconcile' ? "How much cash do you have?" : "0.00"} />
+              <Text style={{ fontSize: normalize(11), color: theme.colors.textSecondary, fontStyle: 'italic' }}>
+                {mode === 'reconcile'
+                  ? "Enter the actual total amount currently in your wallet."
+                  : "Adjustment will be logged in transaction history."}
+              </Text>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -1421,9 +1452,10 @@ const TransferEnvelopeModal = function ({ visible, onClose, envelopes, userSetti
   );
 };
 
-const TransferWalletModal = function ({ visible, onClose, accounts, userHistory, onSaved, theme, insetsBottom, userId }) {
+const TransferWalletModal = function ({ visible, onClose, accounts, userHistory, onSaved, theme, insetsBottom, userId, userSettings }) {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width > 1024;
+  const isPremium = userSettings?.is_premium || false;
 
   var [amount, setAmount] = useState('');
   var [sourceId, setSourceId] = useState('');
@@ -1494,11 +1526,11 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
         backgroundColor: 'rgba(0,0,0,0.5)'
       }}>
         <View style={{
-          backgroundColor: theme.colors.card,
-          borderTopLeftRadius: scale(28),
-          borderTopRightRadius: scale(28),
-          borderBottomLeftRadius: isDesktopWeb ? scale(28) : 0,
-          borderBottomRightRadius: isDesktopWeb ? scale(28) : 0,
+          backgroundColor: isPremium ? (theme.isDark ? '#111827' : '#FFFFFF') : theme.colors.card,
+          borderTopLeftRadius: scale(32),
+          borderTopRightRadius: scale(32),
+          borderBottomLeftRadius: isDesktopWeb ? scale(32) : 0,
+          borderBottomRightRadius: isDesktopWeb ? scale(32) : 0,
           paddingHorizontal: moderateScale(24),
           paddingTop: moderateScale(10),
           paddingBottom: insetsBottom + moderateScale(40),
@@ -1510,45 +1542,183 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
           shadowOffset: { width: 0, height: isDesktopWeb ? 10 : -4 },
           shadowOpacity: isDesktopWeb ? 0.25 : 0.1,
           shadowRadius: 15,
-          elevation: 20
+          elevation: 20,
+          borderWidth: isPremium ? 1 : 0,
+          borderColor: isPremium ? 'rgba(245, 158, 11, 0.3)' : 'transparent'
         }}>
+          {/* Premium Mesh Gradient Top Decoration */}
+          {isPremium && Platform.OS === 'web' && (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: scale(6), backgroundImage: `linear-gradient(90deg, #F59E0B, #D97706, #F59E0B)` }} />
+          )}
+
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
-            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Wallet Transfer</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: normalize(20), fontWeight: '900', color: theme.colors.textPrimary }}>Wallet Transfer</Text>
+              {isPremium && (
+                <View style={{ marginLeft: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F59E0B' }}>
+                   <Text style={{ color: '#B45309', fontSize: 10, fontWeight: 'bold' }}>LUXE</Text>
+                </View>
+              )}
+            </View>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>AMOUNT</Text>
+          <Text style={{ fontSize: normalize(11), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 1, textTransform: 'uppercase' }}>AMOUNT TO TRANSFER</Text>
           <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(20) }} />
 
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: moderateScale(30) }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>FROM</Text>
-              <ScrollView style={{ maxHeight: scale(150), backgroundColor: theme.colors.background, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+          {/* Mobile-First Vertical Stack Selector */}
+          <View style={{ marginBottom: moderateScale(25) }}>
+
+            {/* FROM SECTION */}
+            <View style={{ backgroundColor: isPremium ? (theme.isDark ? 'rgba(255,255,255,0.03)' : '#FFFBEB') : theme.colors.background, borderRadius: 20, borderWidth: 1, borderColor: sourceId ? (isPremium ? '#F59E0B' : theme.colors.primary) : theme.colors.border, padding: 12 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>FROM WALLET</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
                 {accounts.map(a => (
-                  <TouchableOpacity key={a.id} onPress={() => setSourceId(a.id)} style={{ padding: 12, backgroundColor: sourceId === a.id ? theme.colors.primary : 'transparent', borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-                    <Text style={{ fontSize: normalize(13), fontWeight: '600', color: sourceId === a.id ? '#FFFFFF' : theme.colors.textPrimary }}>{a.name}</Text>
-                    <Text style={{ fontSize: normalize(11), color: sourceId === a.id ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary }}>{formatCurrency(a.balance)}</Text>
+                  <TouchableOpacity
+                    key={a.id}
+                    onPress={() => { triggerImpactHaptic('Light'); setSourceId(a.id); }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 14,
+                      backgroundColor: sourceId === a.id ? (isPremium ? '#F59E0B' : theme.colors.primary) : (theme.isDark ? '#374151' : '#F3F4F6'),
+                      marginRight: 10,
+                      minWidth: scale(115),
+                      borderWidth: isPremium && sourceId === a.id ? 1.5 : 0,
+                      borderColor: '#FFFFFF'
+                    }}
+                  >
+                    <View style={{ marginRight: 8, backgroundColor: 'rgba(255,255,255,0.2)', padding: 2, borderRadius: 6 }}>
+                       <BrandLogo type={a.type} size={22} />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: sourceId === a.id ? '#FFFFFF' : theme.colors.textPrimary }} numberOfLines={1}>{a.name}</Text>
+                      <Text style={{ fontSize: 9, color: sourceId === a.id ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }}>{formatCurrency(a.balance)}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>TO</Text>
-              <ScrollView style={{ maxHeight: scale(150), backgroundColor: theme.colors.background, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+
+            {/* TRANSITION ARROW */}
+            <View style={{ alignItems: 'center', marginVertical: -12, zIndex: 2 }}>
+               <TouchableOpacity
+                onPress={() => {
+                  triggerImpactHaptic('Medium');
+                  var oldSrc = sourceId;
+                  setSourceId(destId);
+                  setDestId(oldSrc);
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: isPremium ? '#F59E0B' : theme.colors.card,
+                  borderWidth: 2,
+                  borderColor: theme.colors.background,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: isPremium ? '#F59E0B' : '#000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 5,
+                  elevation: 6
+                }}
+              >
+                <MaterialIcons name="swap-vert" size={24} color={isPremium ? '#FFFFFF' : theme.colors.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* TO SECTION */}
+            <View style={{ backgroundColor: isPremium ? (theme.isDark ? 'rgba(255,255,255,0.03)' : '#FFFBEB') : theme.colors.background, borderRadius: 20, borderWidth: 1, borderColor: destId ? (isPremium ? '#F59E0B' : theme.colors.primary) : theme.colors.border, padding: 12 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 8, letterSpacing: 0.5 }}>TO WALLET</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
                 {accounts.map(a => (
-                  <TouchableOpacity key={a.id} onPress={() => setDestId(a.id)} style={{ padding: 12, backgroundColor: destId === a.id ? theme.colors.primary : 'transparent', borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-                    <Text style={{ fontSize: normalize(13), fontWeight: '600', color: destId === a.id ? '#FFFFFF' : theme.colors.textPrimary }}>{a.name}</Text>
-                    <Text style={{ fontSize: normalize(11), color: destId === a.id ? 'rgba(255,255,255,0.7)' : theme.colors.textSecondary }}>{formatCurrency(a.balance)}</Text>
+                  <TouchableOpacity
+                    key={a.id}
+                    onPress={() => { triggerImpactHaptic('Light'); setDestId(a.id); }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderRadius: 14,
+                      backgroundColor: destId === a.id ? (isPremium ? '#F59E0B' : theme.colors.primary) : (theme.isDark ? '#374151' : '#F3F4F6'),
+                      marginRight: 10,
+                      minWidth: scale(115),
+                      borderWidth: isPremium && destId === a.id ? 1.5 : 0,
+                      borderColor: '#FFFFFF'
+                    }}
+                  >
+                    <View style={{ marginRight: 8, backgroundColor: 'rgba(255,255,255,0.2)', padding: 2, borderRadius: 6 }}>
+                       <BrandLogo type={a.type} size={22} />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 12, fontWeight: 'bold', color: destId === a.id ? '#FFFFFF' : theme.colors.textPrimary }} numberOfLines={1}>{a.name}</Text>
+                      <Text style={{ fontSize: 9, color: destId === a.id ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }}>{formatCurrency(a.balance)}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
+
           </View>
 
-          <TouchableOpacity onPress={handleTransfer} disabled={isSaving || !sourceId || !destId || !amount} style={{ backgroundColor: (isSaving || !sourceId || !destId || !amount) ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center' }}>
-            {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(16) }}>Complete Transfer</Text>}
+          {/* Real-time Preview Card (Enhanced for Premium) */}
+          {sourceId && destId && amount > 0 && (
+            <View style={{
+              backgroundColor: isPremium ? (theme.isDark ? 'rgba(245, 158, 11, 0.08)' : '#FFFBEB') : (theme.isDark ? 'rgba(16, 185, 129, 0.05)' : '#F0FDF4'),
+              borderRadius: 20,
+              padding: 18,
+              marginBottom: 25,
+              borderWidth: 1.5,
+              borderColor: isPremium ? '#F59E0B' : theme.colors.primary + '33',
+              shadowColor: isPremium ? '#F59E0B' : 'transparent',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                   <Text style={{ fontSize: 9, color: isPremium ? '#B45309' : theme.colors.textSecondary, fontWeight: '900', letterSpacing: 0.5 }}>NEW {accounts.find(a => a.id === sourceId)?.name.toUpperCase()} BALANCE</Text>
+                   <Text style={{ fontSize: 16, fontWeight: '900', color: theme.colors.textPrimary, marginTop: 4 }}>{formatCurrency(accounts.find(a => a.id === sourceId).balance - parseAmount(amount))}</Text>
+                </View>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isPremium ? '#F59E0B' : theme.colors.primary, alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 }}>
+                   <MaterialIcons name="trending-flat" size={18} color="#FFFFFF" />
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                   <Text style={{ fontSize: 9, color: isPremium ? '#B45309' : theme.colors.textSecondary, fontWeight: '900', letterSpacing: 0.5 }}>NEW {accounts.find(a => a.id === destId)?.name.toUpperCase()} BALANCE</Text>
+                   <Text style={{ fontSize: 16, fontWeight: '900', color: isPremium ? '#D97706' : theme.colors.primary, marginTop: 4 }}>{formatCurrency(accounts.find(a => a.id === destId).balance + parseAmount(amount))}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={handleTransfer}
+            disabled={isSaving || !sourceId || !destId || !amount}
+            style={{
+              backgroundColor: (isSaving || !sourceId || !destId || !amount) ? theme.colors.border : (isPremium ? '#F59E0B' : theme.colors.primary),
+              borderRadius: 20,
+              paddingVertical: moderateScale(16),
+              alignItems: 'center',
+              shadowColor: isPremium ? '#F59E0B' : theme.colors.primary,
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.3,
+              shadowRadius: 10,
+              elevation: 8
+            }}
+          >
+            {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {isPremium && <MaterialIcons name="workspace-premium" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />}
+                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: normalize(16), letterSpacing: 0.5 }}>{isPremium ? 'CONFIRM LUXE TRANSFER' : 'Complete Transfer'}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -2440,6 +2610,110 @@ const ArchiveManagerModal = function ({ visible, onClose, envelopes, userSetting
   );
 };
 
+const PremiumPaywallModal = function ({ visible, onClose, theme, userSettings, mutateUpdateSettings, onSaved }) {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width > 1024;
+  const insets = useSafeAreaInsets();
+  const [isActivating, setIsActivating] = useState(false);
+
+  if (!visible) return null;
+
+  const handleTestActivation = async () => {
+    if (!userSettings) return;
+    setIsActivating(true);
+
+    // Developer Backdoor: Instantly grant premium for testing
+    try {
+      await mutateUpdateSettings({
+        id: userSettings.id,
+        data: { is_premium: true }
+      });
+      if (onSaved) onSaved();
+      triggerImpactHaptic('Heavy');
+      Alert.alert("Premium Unlocked!", "Developer mode: You now have full access to Luxe features.");
+      onClose();
+    } catch (e) {
+      Alert.alert("Error", "Could not unlock premium.");
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const features = [
+    { icon: 'account-balance-wallet', text: 'Unlimited Wallets & Bank Accounts', sub: 'Track every single account you own.' },
+    { icon: 'insert-chart', text: 'Advanced Analytics', sub: 'Deep dive into your spending habits.' },
+    { icon: 'security', text: 'Biometric Security', sub: 'Lock your data with Fingerprint/FaceID.' },
+    { icon: 'file-download', text: 'PDF & Excel Exports', sub: 'Professional reports for your finances.' },
+    { icon: 'palette', text: 'Exclusive Premium Themes', sub: 'Emerald, Gold, and Midnight designs.' }
+  ];
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
+      <View style={{ flex: 1, justifyContent: isDesktopWeb ? 'center' : 'flex-end', alignItems: isDesktopWeb ? 'center' : 'stretch', backgroundColor: 'rgba(0,0,0,0.7)' }}>
+        <View style={{
+          backgroundColor: '#064E3B', // Deep Emerald Green
+          borderTopLeftRadius: scale(32),
+          borderTopRightRadius: scale(32),
+          borderBottomLeftRadius: isDesktopWeb ? scale(32) : 0,
+          borderBottomRightRadius: isDesktopWeb ? scale(32) : 0,
+          paddingHorizontal: moderateScale(24),
+          paddingTop: moderateScale(10),
+          paddingBottom: insets.bottom + moderateScale(30),
+          maxHeight: isDesktopWeb ? '85%' : '95%',
+          width: isDesktopWeb ? 500 : '100%',
+          overflow: 'hidden'
+        }}>
+          {/* Gold Decorative Gradient Background */}
+          <View style={{ position: 'absolute', top: -100, right: -100, width: 300, height: 300, borderRadius: 150, backgroundColor: '#B45309', opacity: 0.2 }} />
+
+          <View style={{ width: scale(40), height: scale(5), backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(20) }} />
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ alignItems: 'center', marginBottom: 24 }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F59E0B', alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10 }}>
+                <MaterialIcons name="workspace-premium" size={48} color="#FFFFFF" />
+              </View>
+              <Text style={{ fontSize: normalize(24), fontWeight: '900', color: '#FFFFFF', textAlign: 'center' }}>Upgrade to Premium</Text>
+              <Text style={{ fontSize: normalize(14), color: '#D1FAE5', textAlign: 'center', marginTop: 4 }}>Unlock the full potential of Budget-Wise</Text>
+            </View>
+
+            {features.map((f, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                  <MaterialIcons name={f.icon} size={20} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#FFFFFF' }}>{f.text}</Text>
+                  <Text style={{ fontSize: 12, color: '#A7F3D0' }}>{f.sub}</Text>
+                </View>
+              </View>
+            ))}
+
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 20, marginVertical: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center' }}>
+               <Text style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: 18 }}>₱99.00 / Lifetime</Text>
+               <Text style={{ color: '#D1FAE5', fontSize: 12, marginTop: 4 }}>One-time payment. No subscriptions.</Text>
+            </View>
+          </ScrollView>
+
+          <View style={{ marginTop: 20 }}>
+            <TouchableOpacity
+              onPress={handleTestActivation}
+              disabled={isActivating}
+              style={{ backgroundColor: '#F59E0B', borderRadius: 16, paddingVertical: 16, alignItems: 'center', shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 }}
+            >
+              {isActivating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' }}>GET PREMIUM ACCESS</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onClose} style={{ marginTop: 16, alignItems: 'center' }}>
+              <Text style={{ color: '#D1FAE5', fontSize: 14, fontWeight: '600' }}>Not now, I'll stay with Basic</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 export {
   AssignMoneyModal,
   AddEnvelopeModal,
@@ -2454,5 +2728,6 @@ export {
   EditSalaryModal,
   IncomeManagerModal,
   SpentManagerModal,
-  QuickAddBudgetModal
+  QuickAddBudgetModal,
+  PremiumPaywallModal
 };

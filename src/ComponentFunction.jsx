@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { View, Text, StatusBar, ScrollView, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StatusBar, ScrollView, TouchableOpacity, AppState, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -40,10 +40,10 @@ const TrialExpiredScreen = function() {
       ),
       React.createElement(Text, {
         style: { fontSize: 22, fontWeight: 'bold', color: '#111827', textAlign: 'center', marginBottom: 12 }
-      }, 'Beta Trial Expired'),
+      }, 'Beta Build Expired'),
       React.createElement(Text, {
         style: { fontSize: 14, color: '#6B7280', textAlign: 'center', lineHeight: 22 }
-      }, 'Thank you for testing Penny! This beta build expired on ' + formatDate(BETA_EXPIRATION_DATE) + '. Please contact the developer to get the lifetime version of the application.')
+      }, 'This beta version of Budget-Wise expired on ' + formatDate(BETA_EXPIRATION_DATE) + '. To continue tracking your finances, please contact the developer for the official release build or a new beta key.')
     )
   );
 };
@@ -132,7 +132,7 @@ const TermsAndConditionsScreen = function(props) {
         ),
         React.createElement(Text, {
           style: { fontSize: 20, fontWeight: 'bold', color: '#111827' }
-        }, 'Welcome to Penny!'),
+        }, 'Welcome to Budget-Wise ₱!'),
         React.createElement(Text, {
           style: { fontSize: 13, color: '#6B7280', marginTop: 4 }
         }, 'Please agree to our terms to get started')
@@ -142,16 +142,16 @@ const TermsAndConditionsScreen = function(props) {
         style: { flex: 1, borderWidth: 1, borderColor: '#FED7AA', borderRadius: 12, padding: 14, backgroundColor: '#FFFDFB', marginBottom: 16 }
       },
         React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '1. Local Data Privacy'),
-        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Penny stores all your budgeting data, income sources, accounts, and transactions locally on your device. We do not upload, track, or share your financial data with any remote servers. Your data is entirely yours and remains strictly private.'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Budget-Wise stores all your budgeting data, income sources, accounts, and transactions locally on your device. We do not upload, track, or share your financial data with any remote servers. Your data is entirely yours and remains strictly private.'),
         
         React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '2. Native Security'),
-        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'If you enable the PIN lock or Biometric lock, your fingerprint or Face ID is verified directly by your phone\'s local hardware using native OS-level prompts. Penny never accesses or stores your actual biometric print details.'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'If you enable the PIN lock or Biometric lock, your fingerprint or Face ID is verified directly by your phone\'s local hardware using native OS-level prompts. Budget-Wise never accesses or stores your actual biometric print details.'),
         
         React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '3. Permission and Notifications'),
-        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Penny requests Local Notification permissions to schedule daily reminder prompts and alerts for upcoming bills. These alerts are handled locally by your device\'s system alarm scheduler.'),
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 16 } }, 'Budget-Wise requests Local Notification permissions to schedule daily reminder prompts and alerts for upcoming bills. These alerts are handled locally by your device\'s system alarm scheduler.'),
         
         React.createElement(Text, { style: { fontSize: 14, fontWeight: 'bold', color: '#111827', marginBottom: 8 } }, '4. Disclaimer of Liability'),
-        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 8 } }, 'Penny is a personal ledger tool provided "as is". The user is responsible for backing up their data. We are not responsible for any financial decisions or data loss occurring due to hardware failure, device loss, or manual app deletion.')
+        React.createElement(Text, { style: { fontSize: 13, color: '#4B5563', lineHeight: 18, marginBottom: 8 } }, 'Budget-Wise is a personal ledger tool provided "as is". The user is responsible for backing up their data. We are not responsible for any financial decisions or data loss occurring due to hardware failure, device loss, or manual app deletion.')
       ),
 
       React.createElement(View, null,
@@ -195,6 +195,12 @@ const TermsAndConditionsScreen = function(props) {
 };
 
 const ComponentFunction = function() {
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width > 600;
+  const isWebDesktop = Platform.OS === 'web' && width > 1024;
+
+  const trialExpired = isTrialExpired();
+
   var [termsAccepted, setTermsAccepted] = useState(function() {
     try {
       return localStorage.getItem('penny_terms_accepted') === 'true';
@@ -214,16 +220,38 @@ const ComponentFunction = function() {
     setTermsAccepted(true);
   };
 
+  const appContent = trialExpired
+    ? React.createElement(TrialExpiredScreen)
+    : (!termsAccepted
+      ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
+      : React.createElement(AppContent));
+
   return React.createElement(UserProvider, { testID: 'UserProvider-1' },
     React.createElement(ThemeProvider, { testID: 'ThemeProvider-1' },
-      React.createElement(SafeAreaProvider, { style: { flex: 1 } },
-        React.createElement(View, { testID: 'View-88', style: { flex: 1, width: '100%', height: '100%' } },
+      React.createElement(SafeAreaProvider, { style: { flex: 1, backgroundColor: isLargeScreen ? '#F3F4F6' : 'transparent' } },
+        React.createElement(View, {
+          testID: 'Root-Wrapper',
+          style: {
+            flex: 1,
+            // If it's a web desktop with a sidebar, we allow more width, otherwise we cap it to 480 for mobile-first look
+            width: isWebDesktop ? '100%' : (isLargeScreen ? 480 : '100%'),
+            maxWidth: isWebDesktop ? 1440 : 480,
+            alignSelf: 'center',
+            backgroundColor: '#FFFFFF',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: isLargeScreen ? 0.1 : 0,
+            shadowRadius: 20,
+            elevation: isLargeScreen ? 10 : 0,
+            // On desktop/tablet, we want a slight margin to make it look like a phone
+            marginTop: isLargeScreen && !isWebDesktop ? 20 : 0,
+            marginBottom: isLargeScreen && !isWebDesktop ? 20 : 0,
+            borderRadius: isLargeScreen && !isWebDesktop ? 32 : 0,
+            overflow: 'hidden'
+          }
+        },
           React.createElement(ThemeAwareStatusBar),
-          isTrialExpired()
-            ? React.createElement(TrialExpiredScreen)
-            : !termsAccepted
-              ? React.createElement(TermsAndConditionsScreen, { onAccept: handleAcceptTerms })
-              : React.createElement(AppContent)
+          appContent
         )
       )
     )
