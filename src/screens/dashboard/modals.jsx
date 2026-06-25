@@ -818,6 +818,9 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
 
+  var insertHistory = useMutation('expense_history', 'insert');
+  var mutateInsertHistory = insertHistory.mutate;
+
   useEffect(() => {
     if (visible) {
       setName('');
@@ -830,7 +833,10 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
 
   var handleCreate = function () {
     var finalName = type === 'Custom' ? name.trim() : (WALLET_STYLES[type] ? WALLET_STYLES[type].name : name.trim());
-    if (isSaving || !finalName) return;
+    if (isSaving || !finalName) {
+       if (!finalName) Alert.alert("Error", "Please provide a name for this wallet.");
+       return;
+    }
 
     // Senior Developer: Enforce Freemium 5-Account Limit
     var currentAccounts = getStoredAccountsList(userSettings);
@@ -843,11 +849,34 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
 
     var startingBal = parseAmount(balance);
     var newId = 'acc-' + generateId();
-    var newAcc = { id: newId, name: finalName, starting_balance: startingBal, type: type };
+
+    // Architect: We set starting_balance to 0 and create a History Entry instead.
+    // This ensures the initial cash counts as "Income" in the Monthly Snapshot.
+    var newAcc = { id: newId, name: finalName, starting_balance: 0, type: type };
     var newList = currentAccounts.concat(newAcc);
+
     if (userSettings) {
       setIsSaving(true);
-      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+
+      // We wrap the whole operation in a single chain to ensure integrity
+      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } })
+        .then(function() {
+          if (startingBal > 0) {
+            return mutateInsertHistory({
+              id: generateId(),
+              user_id: userId,
+              expense_name: 'Opening Balance: ' + finalName,
+              amount: startingBal,
+              date: new Date().toISOString().split('T')[0],
+              expense_type: 'Income',
+              category: 'Income',
+              account_id: newId,
+              notes: 'Initial account setup'
+            });
+          }
+          return Promise.resolve();
+        });
+
       runSaveWithFeedback(savePromise, {
         onClose: onClose,
         onSaved: onSaved,
@@ -912,17 +941,47 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
             <AmountInput value={balance} onChangeText={setBalance} theme={theme} containerStyle={{ marginBottom: moderateScale(20) }} />
 
             <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(12), letterSpacing: 0.5 }}>ACCOUNT TYPE</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: moderateScale(30) }}>
-              {Object.keys(WALLET_STYLES).map(k => {
-                var isSelected = type === k;
-                return (
-                  <TouchableOpacity key={k} onPress={() => setType(k)} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isSelected ? theme.colors.primary : theme.colors.background, paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(8), borderRadius: scale(10), borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border }}>
-                    <BrandLogo type={k} size={14} style={{ marginRight: 6 }} />
-                    <Text style={{ fontSize: normalize(12), fontWeight: '600', color: isSelected ? '#FFFFFF' : theme.colors.textPrimary }}>{WALLET_STYLES[k].name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+
+            {/* Improved Grouped Account Type Selector */}
+            {(function() {
+              const categories = [
+                { title: 'Popular E-Wallets', keys: ['GCash', 'Maya', 'PayPal', 'Wise', 'Vybe'] },
+                { title: 'Major Banks', keys: ['BPI', 'BDO', 'Metrobank', 'GoTyme', 'RCBC', 'SecurityBank', 'EastWest', 'PNB', 'Landbank', 'Tonik', 'SeaBank', 'MariBank'] },
+                { title: 'Other', keys: ['Cash', 'Custom'] }
+              ];
+
+              return categories.map(cat => (
+                <View key={cat.title} style={{ marginBottom: moderateScale(20) }}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: theme.colors.textSecondary, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{cat.title}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {cat.keys.map(k => {
+                      var isSelected = type === k;
+                      return (
+                        <TouchableOpacity
+                          key={k}
+                          onPress={() => { triggerImpactHaptic('Light'); setType(k); }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
+                            paddingHorizontal: moderateScale(12),
+                            paddingVertical: moderateScale(8),
+                            borderRadius: scale(10),
+                            borderWidth: 1,
+                            borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                            minWidth: '30%',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <BrandLogo type={k} size={14} style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: normalize(11), fontWeight: '700', color: isSelected ? '#FFFFFF' : theme.colors.textPrimary }}>{WALLET_STYLES[k].name.split(' ')[0]}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ));
+            })()}
 
             <TouchableOpacity disabled={isSaving} onPress={handleCreate} style={{ backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center', marginBottom: moderateScale(10) }}>
               {isSaving ? (
@@ -1558,7 +1617,7 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
               <Text style={{ fontSize: normalize(20), fontWeight: '900', color: theme.colors.textPrimary }}>Wallet Transfer</Text>
               {isPremium && (
                 <View style={{ marginLeft: 10, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#F59E0B' }}>
-                   <Text style={{ color: '#B45309', fontSize: 10, fontWeight: 'bold' }}>LUXE</Text>
+                   <Text style={{ color: '#B45309', fontSize: 10, fontWeight: 'bold' }}>PREMIUM</Text>
                 </View>
               )}
             </View>
@@ -1702,21 +1761,42 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
             onPress={handleTransfer}
             disabled={isSaving || !sourceId || !destId || !amount}
             style={{
-              backgroundColor: (isSaving || !sourceId || !destId || !amount) ? theme.colors.border : (isPremium ? '#F59E0B' : theme.colors.primary),
+              backgroundColor: (isSaving || !sourceId || !destId || !amount)
+                ? (theme.isDark ? 'rgba(255,255,255,0.1)' : '#E5E7EB')
+                : (isPremium ? '#F59E0B' : theme.colors.primary),
               borderRadius: 20,
               paddingVertical: moderateScale(16),
               alignItems: 'center',
               shadowColor: isPremium ? '#F59E0B' : theme.colors.primary,
               shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.3,
-              shadowRadius: 10,
-              elevation: 8
+              shadowOpacity: (isSaving || !sourceId || !destId || !amount) ? 0 : (isPremium ? 0.45 : 0.3),
+              shadowRadius: 14,
+              elevation: (isSaving || !sourceId || !destId || !amount) ? 0 : 10,
+              borderWidth: isPremium && !(isSaving || !sourceId || !destId || !amount) ? 1.5 : 0,
+              borderColor: '#B45309'
             }}
           >
-            {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : (
+            {isSaving ? <ActivityIndicator color={isPremium ? "#111827" : "#FFFFFF"} size="small" /> : (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {isPremium && <MaterialIcons name="workspace-premium" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />}
-                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: normalize(16), letterSpacing: 0.5 }}>{isPremium ? 'CONFIRM LUXE TRANSFER' : 'Complete Transfer'}</Text>
+                {isPremium && (
+                  <MaterialIcons
+                    name="workspace-premium"
+                    size={20}
+                    color={(isSaving || !sourceId || !destId || !amount) ? theme.colors.textSecondary : "#111827"}
+                    style={{ marginRight: 8 }}
+                  />
+                )}
+                <Text style={{
+                  color: (isSaving || !sourceId || !destId || !amount)
+                    ? theme.colors.textSecondary
+                    : (isPremium ? '#111827' : '#FFFFFF'),
+                  fontWeight: '900',
+                  fontSize: normalize(16),
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase'
+                }}>
+                  {isPremium ? 'Confirm Premium Transfer' : 'Complete Transfer'}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -2082,32 +2162,43 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
 
   var filteredExpenses = useMemo(function () {
     var curMonth = getCurrentMonthStr();
-    var oneTimes = (oneTimeExpenses || []).map(function (o) {
-      return { id: o.id, name: o.expense_name || o.name || 'Expense', amount: parseFloat(o.amount) || 0, category: o.category, date: o.date, type: 'One-Time' };
+
+    // Architect: Include ALL history types so the user can manage any transaction they click on.
+    var allHistoryItems = (userHistory || []).map(function (h) {
+      var rec = (recurringExpenses || []).find(function (r) { return r.name === h.expense_name; });
+      var category = h.category;
+      if (!category && h.expense_type === 'Recurring') {
+        category = rec ? rec.category : 'Other';
+      }
+
+      return {
+        id: h.id,
+        name: h.expense_name || h.name || 'Transaction',
+        amount: parseFloat(h.amount) || 0,
+        category: category,
+        date: h.date,
+        type: h.expense_type,
+        originalBillId: rec ? rec.id : null
+      };
     });
 
-    var recurrings = (userHistory || []).reduce(function (arr, h) {
-      if (h.expense_type === 'Recurring' && getMonthStr(h.date) === curMonth) {
-        var rec = (recurringExpenses || []).find(function (r) { return r.name === h.expense_name; });
-        var category = h.category;
-        if (!category) {
-          category = rec ? rec.category : 'Other';
-        }
-        arr.push({
-          id: h.id,
-          name: h.expense_name || h.name || 'Bill Payment',
-          amount: parseFloat(h.amount) || 0,
-          category: category,
-          date: h.date,
-          type: 'Recurring',
-          originalBillId: rec ? rec.id : null
-        });
-      }
-      return arr;
-    }, []);
+    var result = allHistoryItems;
 
-    var combined = oneTimes.concat(recurrings);
-    var result = filter ? combined.filter(function (o) { return o.category === filter; }) : combined;
+    // Handle Filters
+    if (filter) {
+      if (typeof filter === 'object' && filter.id) {
+        // If we came from "Recent History" clicking a specific item
+        result = allHistoryItems.filter(function (o) { return o.id === filter.id; });
+      } else if (typeof filter === 'string') {
+        // If we are filtering by a specific Envelope/Category
+        result = allHistoryItems.filter(function (o) { return o.category === filter; });
+      }
+    } else {
+      // Default view: Show only expenses for the current month
+      result = allHistoryItems.filter(function(h) {
+        return (h.type === 'One-Time' || h.type === 'Recurring') && getMonthStr(h.date) === curMonth;
+      });
+    }
 
     if (searchQuery.trim()) {
       var q = searchQuery.toLowerCase().trim();
@@ -2119,9 +2210,12 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
     }
 
     return result;
-  }, [oneTimeExpenses, userHistory, recurringExpenses, filter, searchQuery, envelopes]);
+  }, [userHistory, recurringExpenses, filter, searchQuery, envelopes]);
 
   var handleStartEdit = function (exp) {
+    if (exp.type === 'Transfer') {
+      return Alert.alert('Information', 'Transfers cannot be edited. Please delete and recreate the transfer if needed.');
+    }
     setEditingId(exp.id);
     setEditName(exp.name);
     setEditAmount(formatAmountForEdit(exp.amount));
@@ -2140,18 +2234,21 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
     var historyTxn = (userHistory || []).find(function (h) { return h.id === exp.id; });
     var accountId = historyTxn ? historyTxn.account_id : null;
 
-    var spendCheck = validateSpendOperation({
-      amount: amt,
-      categoryId: exp.category,
-      envelopeBalances: envelopes,
-      accountId: accountId,
-      accounts: accounts,
-      isEdit: true,
-      oldAmount: exp.amount
-    });
+    // Only validate budget if it's a spend operation
+    if (exp.type === 'One-Time' || exp.type === 'Recurring') {
+      var spendCheck = validateSpendOperation({
+        amount: amt,
+        categoryId: exp.category,
+        envelopeBalances: envelopes,
+        accountId: accountId,
+        accounts: accounts,
+        isEdit: true,
+        oldAmount: exp.amount
+      });
 
-    if (!spendCheck.ok) {
-      return Alert.alert('Error', spendCheck.message);
+      if (!spendCheck.ok) {
+        return Alert.alert('Error', spendCheck.message);
+      }
     }
 
     var updateData = {
@@ -2167,8 +2264,8 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
       onSaved: onSaved,
       setShowSuccess: setShowSaveSuccess,
       setSuccessMessage: setSuccessMessage,
-      message: 'Expense updated!',
-      errorMessage: 'Could not update expense.',
+      message: 'Transaction updated!',
+      errorMessage: 'Could not update transaction.',
       onError: () => setIsSaving(false)
     }).then(function () {
       setEditingId(null);
@@ -2178,34 +2275,52 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
 
   var handleDelete = function (exp) {
     if (isSaving) return;
-    var msg = 'Delete this expense? The amount (' + formatCurrency(exp.amount) + ') will be returned to your envelope balance.';
-    var doDelete = function () {
-      var deletePromise;
-      if (exp.type === 'One-Time') {
-        deletePromise = mutateDeleteHistory({ id: exp.id });
-      } else if (exp.type === 'Recurring') {
-        deletePromise = mutateDeleteHistory({ id: exp.id }).then(function () {
-          if (exp.originalBillId) {
-            return mutateUpdateRecurring({ id: exp.originalBillId, data: { status: 'Pending' } });
-          }
-        });
-      } else {
-        return;
-      }
+
+    var msg = 'Delete this transaction?';
+    if (exp.type === 'One-Time' || exp.type === 'Recurring') {
+      msg = 'Delete this expense? The amount (' + formatCurrency(exp.amount) + ') will be returned to your envelope balance.';
+    } else if (exp.type === 'Income') {
+      msg = 'Delete this income? Your wallet balance will be reduced by ' + formatCurrency(exp.amount) + '.';
+    }
+
+    var performDelete = function () {
       setIsSaving(true);
+
+      // Architect: To be safe, we attempt to delete from BOTH history and one_time_expenses
+      // as some legacy items might still reside there.
+      var deletePromise = Promise.all([
+        mutateDeleteHistory({ id: exp.id }),
+        mutateDeleteOneTime({ id: exp.id })
+      ]);
+
+      if (exp.type === 'Recurring' && exp.originalBillId) {
+        deletePromise = deletePromise.then(function () {
+          return mutateUpdateRecurring({ id: exp.originalBillId, data: { status: 'Pending' } });
+        });
+      }
+
       runSaveWithFeedback(deletePromise, {
         onSaved: onSaved,
         setShowSuccess: setShowSaveSuccess,
         setSuccessMessage: setSuccessMessage,
         message: 'Deleted!',
-        errorMessage: 'Could not delete expense.',
+        errorMessage: 'Could not delete transaction.',
         onError: () => setIsSaving(false)
-      }).then(() => setIsSaving(false));
+      }).then(() => {
+        setIsSaving(false);
+        // If we were viewing a single item via ID filter, close modal after deletion
+        if (filter && filter.id) onClose();
+      });
     };
-    Alert.alert('Delete Expense', msg, [
-      { text: 'Cancel' },
-      { text: 'Delete', style: 'destructive', onPress: doDelete }
-    ]);
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) performDelete();
+    } else {
+      Alert.alert('Delete Transaction', msg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: performDelete }
+      ]);
+    }
   };
 
   if (!visible) return null;
@@ -2288,6 +2403,9 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
               filteredExpenses.map(function (exp) {
                 var isEditing = editingId === exp.id;
                 var env = envelopes.find(function (e) { return e.id === exp.category; });
+                var isIncome = exp.type === 'Income' || (exp.type === 'Adjustment' && exp.category === 'Income');
+                var isTransfer = exp.type === 'Transfer';
+
                 return (
                   <View key={exp.id} style={{ backgroundColor: theme.colors.background, borderRadius: scale(12), padding: moderateScale(14), marginBottom: moderateScale(10), borderWidth: 1, borderColor: theme.colors.border }}>
                     {isEditing ? (
@@ -2314,7 +2432,9 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
                           <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(exp.date)} {env ? ' • ' + env.name : ''}</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: normalize(15), fontWeight: 'bold', color: '#DC2626', marginBottom: moderateScale(6) }}>-{formatCurrency(exp.amount)}</Text>
+                          <Text style={{ fontSize: normalize(15), fontWeight: 'bold', color: isIncome ? '#16A34A' : (isTransfer ? theme.colors.textPrimary : '#DC2626'), marginBottom: moderateScale(6) }}>
+                            {isIncome ? '+' : (isTransfer ? '' : '-')}{formatCurrency(exp.amount)}
+                          </Text>
                           <View style={{ flexDirection: 'row', gap: moderateScale(8) }}>
                             <TouchableOpacity onPress={() => handleStartEdit(exp)} style={{ padding: scale(4), backgroundColor: '#FFEDD5', borderRadius: scale(6) }}>
                               <MaterialIcons name="edit" size={scale(16)} color={theme.colors.primary} />
@@ -2674,7 +2794,7 @@ const PremiumPaywallModal = function ({ visible, onClose, theme, userSettings, m
                 <MaterialIcons name="workspace-premium" size={48} color="#FFFFFF" />
               </View>
               <Text style={{ fontSize: normalize(24), fontWeight: '900', color: '#FFFFFF', textAlign: 'center' }}>Upgrade to Premium</Text>
-              <Text style={{ fontSize: normalize(14), color: '#D1FAE5', textAlign: 'center', marginTop: 4 }}>Unlock the full potential of Budget-Wise</Text>
+              <Text style={{ fontSize: normalize(14), color: '#D1FAE5', textAlign: 'center', marginTop: 4 }}>Unlock the full potential of Penny</Text>
             </View>
 
             {features.map((f, i) => (

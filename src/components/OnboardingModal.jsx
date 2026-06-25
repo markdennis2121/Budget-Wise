@@ -12,7 +12,7 @@ export var ONBOARDING_STEPS = [
     id: 'welcome',
     icon: 'celebration',
     accent: '#FFEDD5',
-    title: 'Welcome to Budget-Wise ₱',
+    title: 'Welcome to Penny',
     subtitle: 'Luxe Financial Command Center.',
     body: 'A premium, private budgeting experience designed to adapt to your lifestyle—whether you are a detailed planner or a busy tracker.',
     showLogo: true

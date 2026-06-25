@@ -513,7 +513,7 @@ const StatisticsScreen = function(props) {
                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background + '88', borderRadius: 16 }}>
                   <MaterialIcons name="lock" size={32} color={theme.colors.primary} style={{ marginBottom: 12 }} />
                   <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center' }}>Premium Feature</Text>
-                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>Upgrade to Luxe to visualize your net worth growth over time.</Text>
+                  <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>Upgrade to Premium to visualize your net worth growth over time.</Text>
                   <TouchableOpacity
                     onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } })}
                     style={{ marginTop: 14, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
@@ -908,13 +908,13 @@ const StatisticsScreen = function(props) {
           {!isPremium ? (
             <View style={{ height: scale(160), alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background + '88', borderRadius: 16 }}>
               <MaterialIcons name="insights" size={32} color={theme.colors.primary} style={{ marginBottom: 12 }} />
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>Luxe Analytics</Text>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>Premium Analytics</Text>
               <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 30 }}>Unlock your income vs. spending comparison for the last 6 months.</Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } })}
                 style={{ marginTop: 14, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>Upgrade to Luxe</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' }}>Upgrade to Premium</Text>
               </TouchableOpacity>
             </View>
           ) : (

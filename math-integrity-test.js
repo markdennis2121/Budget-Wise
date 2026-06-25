@@ -1,5 +1,5 @@
 /**
- * PENNY BUDGET-WISE — COMPREHENSIVE MATH INTEGRITY TEST SUITE
+ * PENNY — COMPREHENSIVE MATH INTEGRITY TEST SUITE
  * ============================================================
  * Tests all financial math in the app against the EXACT production logic.
  *
@@ -1211,7 +1211,7 @@ console.log('  Failed:       ' + failed);
 
 if (failed === 0) {
   console.log('\n🌟 ALL ' + totalTests + ' TESTS PASSED 🌟');
-  console.log('The Penny Budget-Wise math engine is verified stable.\n');
+  console.log('The Penny math engine is verified stable.\n');
 } else {
   console.log('\n⚠️  ' + failed + ' TEST(S) FAILED ⚠️');
   console.log('─────────────────────────────────────');

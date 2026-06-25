@@ -711,7 +711,7 @@ const DashboardScreen = function (props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) }}>
               <Image source={logoImg} style={{ width: scale(44), height: scale(44), borderRadius: scale(22), borderWidth: 1, borderColor: theme.colors.border }} />
               <View>
-                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>BUDGET-WISE ₱</Text>
+                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>PENNY</Text>
                 <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{greeting}, {userName}!</Text>
               </View>
             </View>
@@ -853,7 +853,7 @@ const DashboardScreen = function (props) {
                   theme={theme}
                   icon="payments"
                   title="Set up your income"
-                  message="Add your salary or other monthly income so Budget-Wise can track spending against what you earn."
+                  message="Add your salary or other monthly income so Penny can track spending against what you earn."
                   actionLabel="Add income source"
                   onAction={function () { setShowIncomeModal(true); }}
                   compact={true}
@@ -880,19 +880,21 @@ const DashboardScreen = function (props) {
                     <Text style={{ marginTop: 12, color: theme.colors.textSecondary, textAlign: 'center' }}>No transactions recorded yet.</Text>
                   </View>
                 ) : (
-                  state.userHistory.slice(0, 5).map(function (h) {
+                  state.userHistory.slice(0, 10).map(function (h) {
                       var acc = state.accounts.find(a => a.id === h.account_id);
+                      var isPositive = h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income');
+
                       return (
                         <TouchableOpacity key={h.id} onPress={function () { triggerImpactHaptic('Light'); setSpentFilter({ id: h.id }); setShowSpentModal(true); }} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
-                          <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: h.expense_type === 'Income' ? '#DCFCE7' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                            <MaterialIcons name={h.expense_type === 'Income' ? 'trending-up' : 'trending-down'} size={20} color={h.expense_type === 'Income' ? '#16A34A' : '#DC2626'} />
+                          <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: isPositive ? '#DCFCE7' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <MaterialIcons name={isPositive ? 'trending-up' : 'trending-down'} size={20} color={isPositive ? '#16A34A' : '#DC2626'} />
                           </View>
                           <View style={{ flex: 1 }}>
                             <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{h.expense_name}</Text>
                             <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{h.date} • {acc ? acc.name : 'Wallet'}</Text>
                           </View>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: h.expense_type === 'Income' ? '#16A34A' : theme.colors.textPrimary }}>
-                            {h.expense_type === 'Income' ? '+' : '-'}{maskAmount(h.amount)}
+                          <Text style={{ fontSize: 16, fontWeight: '800', color: isPositive ? '#16A34A' : theme.colors.textPrimary }}>
+                            {isPositive ? '+' : '-'}{maskAmount(h.amount)}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -909,7 +911,7 @@ const DashboardScreen = function (props) {
                   theme={theme}
                   icon="payments"
                   title="Set up your income"
-                  message="Add your salary or other monthly income so Budget-Wise can track spending against what you earn."
+                  message="Add your salary or other monthly income so Penny can track spending against what you earn."
                   actionLabel="Add income source"
                   onAction={function () { setShowIncomeModal(true); }}
                   compact={true}

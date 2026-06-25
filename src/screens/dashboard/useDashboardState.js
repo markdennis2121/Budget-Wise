@@ -18,7 +18,19 @@ export function useDashboardState(userId) {
 
   var historyQuery = useQuery('expense_history');
   var allHistory = historyQuery.data || [];
-  var userHistory = allHistory.filter(function (h) { return h.user_id === userId; });
+
+  // Architect: We sort history by date (newest first) globally here
+  // so all screens (History, Dashboard, Analytics) have a consistent view.
+  var userHistory = useMemo(function() {
+    return allHistory
+      .filter(function (h) { return h.user_id === userId; })
+      .sort(function(a, b) {
+        // Primary sort: Date (newest first)
+        if (b.date !== a.date) return b.date > a.date ? 1 : -1;
+        // Secondary sort: Insertion order (ID) for items on the same day
+        return b.id > a.id ? 1 : -1;
+      });
+  }, [allHistory, userId]);
 
   // Source of Truth: All calculations now use userHistory instead of one_time_expenses table
   var userOneTimeAll = useMemo(function() {

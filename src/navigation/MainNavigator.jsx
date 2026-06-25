@@ -40,7 +40,7 @@ const WebSideBar = ({ state, navigation, theme, pendingCount }) => {
       height: '100%'
     }}>
       <View style={{ marginBottom: 40, paddingHorizontal: 12 }}>
-        <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.primary, letterSpacing: -1 }}>BUDGET-WISE ₱</Text>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.primary, letterSpacing: -1 }}>PENNY</Text>
         <Text style={{ fontSize: 11, fontWeight: 'bold', color: theme.colors.textSecondary, letterSpacing: 1, marginTop: -2 }}>FINANCIAL COMMAND CENTER</Text>
       </View>
 
@@ -92,7 +92,7 @@ const WebSideBar = ({ state, navigation, theme, pendingCount }) => {
       <View style={{ marginTop: 'auto', marginBottom: 30, paddingHorizontal: 12 }}>
         <View style={{ backgroundColor: theme.colors.background, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border }}>
           <Text style={{ fontSize: 12, color: theme.colors.textSecondary, fontWeight: 'bold' }}>VERSION</Text>
-          <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '800' }}>5.5.0 Release</Text>
+          <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '800' }}>5.5.1 Release</Text>
         </View>
       </View>
     </View>

@@ -1,6 +1,6 @@
-# Budget-Wise ₱
+# Penny
 
-A premium, highly aesthetic, cross-platform **Personal Budget Tracker** application built with React Native, React Native Web, Vite, and Capacitor.
+A premium, highly aesthetic, cross-platform **Personal Ledger & Envelope Budgeting** companion built with React Native, React Native Web, Vite, and Capacitor.
 
 ## Features 🚀
 

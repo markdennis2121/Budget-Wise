@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   BUDGET-WISE P - RELEASE APK GENERATOR
+echo   PENNY - RELEASE APK GENERATOR
 echo ===================================================
 echo.
 echo [1/3] Building Web Production Assets...

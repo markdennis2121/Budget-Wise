@@ -540,7 +540,7 @@ const SettingsScreen = function(props) {
                 React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
                 React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)'),
                 !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF' } },
-                  React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' } }, 'LUXE')
+                  React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
                 ) : null
               )
         ),
@@ -553,7 +553,7 @@ const SettingsScreen = function(props) {
             React.createElement(MaterialIcons, { name: 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
             React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, 'Compress Old Data'),
             !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: theme.colors.error } },
-              React.createElement(Text, { style: { color: theme.colors.error, fontSize: 10, fontWeight: 'bold' } }, 'LUXE')
+              React.createElement(Text, { style: { color: theme.colors.error, fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
             ) : null
           )
         ),
@@ -569,11 +569,11 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-85', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
           React.createElement(Text, { testID: 'Text-102', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'App Name'),
-          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Budget-Wise ₱')
+          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Penny')
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.0')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.1')
         )
       ),
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } },

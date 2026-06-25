@@ -173,12 +173,16 @@ const runVersionedMigrations = (db, fromVersion) => {
 
               if (!hasOpening) {
                 if (!db.expense_history) db.expense_history = [];
+
+                // UX Fix: Set date to today so opening balance appears in the current month snapshot
+                const today = new Date().toISOString().split('T')[0];
+
                 db.expense_history.push({
                   id: 'mig-v6-' + Math.random().toString(36).substr(2, 9),
                   user_id: userId,
                   expense_name: 'Opening Balance: ' + (acc.name || 'Wallet'),
                   amount: sBal,
-                  date: (Array.isArray(db.budget_users) ? (db.budget_users.find(u => u.id === userId) || {}).created_at : null) || new Date().toISOString().split('T')[0],
+                  date: today,
                   expense_type: 'Income',
                   category: 'Income',
                   account_id: acc.id,
