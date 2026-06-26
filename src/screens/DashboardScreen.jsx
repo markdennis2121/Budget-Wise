@@ -103,12 +103,12 @@ const DashboardScreen = function (props) {
     return balancesVisible ? formatCurrency(amt) : '••••••';
   };
 
+  var isStealthDark = theme.isDark && theme.colors.primary === '#111827';
+  var safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
+
   var smartInsights = useMemo(function () {
     var insights = [];
     var today = new Date().toISOString().split('T')[0];
-
-    var isStealthDark = theme.isDark && theme.colors.primary === '#111827';
-    var safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
 
     // 1. Low Envelopes warning
     state.envelopeBalances.forEach(function (env) {
@@ -443,16 +443,16 @@ const DashboardScreen = function (props) {
           <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
             {!isSimpleMode && (
               <TouchableOpacity onPress={toggleWalletView} style={{ padding: 4 }}>
-                <MaterialIcons name={walletViewMode === 'carousel' ? "grid-view" : "view-carousel"} size={20} color={theme.colors.primary} />
+                <MaterialIcons name={walletViewMode === 'carousel' ? "grid-view" : "view-carousel"} size={20} color={safePrimary} />
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={handleTransferWalletPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
+              <MaterialIcons name="swap-horiz" size={16} color={safePrimary} style={{ marginRight: 4 }} />
+              <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { triggerImpactHaptic('Light'); setShowAddAccountModal(true); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-              <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
+              <MaterialIcons name="add" size={16} color={safePrimary} style={{ marginRight: 4 }} />
+              <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -642,8 +642,8 @@ const DashboardScreen = function (props) {
       <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(18) }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: scale(32), height: scale(32), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: scale(10) }}>
-              <MaterialIcons name="auto-graph" size={scale(18)} color={theme.colors.primary} />
+            <View style={{ width: scale(32), height: scale(32), borderRadius: scale(10), backgroundColor: safePrimary + '15', alignItems: 'center', justifyContent: 'center', marginRight: scale(10) }}>
+              <MaterialIcons name="auto-graph" size={scale(18)} color={safePrimary} />
             </View>
             <Text style={{ fontSize: scale(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>{isSimpleMode ? 'Monthly Snapshot' : 'Money Manager'}</Text>
           </View>
@@ -698,9 +698,9 @@ const DashboardScreen = function (props) {
               <View style={{
                 width: (state.totalIncome > 0 ? Math.min(100, (state.totalExpenses / state.totalIncome) * 100) : 0) + '%',
                 height: '100%',
-                backgroundColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary,
+                backgroundColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : safePrimary,
                 borderRadius: scale(6),
-                shadowColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : theme.colors.primary,
+                shadowColor: state.totalIncome > 0 && (state.totalExpenses / state.totalIncome) > 0.9 ? theme.colors.error : safePrimary,
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: 0.5,
                 shadowRadius: 4
@@ -741,7 +741,7 @@ const DashboardScreen = function (props) {
                 onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
                 style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
               >
-                <MaterialIcons name="notifications-none" size={scale(22)} color={theme.colors.primary} />
+                <MaterialIcons name="notifications-none" size={scale(22)} color={safePrimary} />
                 {hasNewAlerts && (
                   <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: theme.colors.error, borderRadius: scale(9), minWidth: scale(18), height: scale(18), paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ color: '#FFFFFF', fontSize: scale(8), fontWeight: '900' }}>
@@ -879,11 +879,11 @@ const DashboardScreen = function (props) {
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 8 }}>Recent History</Text>
                     <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}>
-                      <MaterialIcons name="search" size={20} color={theme.colors.primary} />
+                      <MaterialIcons name="search" size={20} color={safePrimary} />
                     </TouchableOpacity>
                   </View>
                   <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}>
-                    <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>View All</Text>
+                    <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>View All</Text>
                   </TouchableOpacity>
                 </View>
                 {state.userHistory.length === 0 ? (
@@ -980,15 +980,15 @@ const DashboardScreen = function (props) {
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity onPress={toggleEnvelopeView} style={{ padding: 4, marginRight: 12 }}>
-                    <MaterialIcons name={envelopeViewMode === 'grid' ? "view-carousel" : "grid-view"} size={20} color={theme.colors.primary} />
+                    <MaterialIcons name={envelopeViewMode === 'grid' ? "view-carousel" : "grid-view"} size={20} color={safePrimary} />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={handleTransferEnvPress} style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
-                    <MaterialIcons name="swap-horiz" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                    <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
+                    <MaterialIcons name="swap-horiz" size={16} color={safePrimary} style={{ marginRight: 4 }} />
+                    <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>Transfer</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setShowAddEnvModal(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MaterialIcons name="add" size={16} color={theme.colors.primary} style={{ marginRight: 4 }} />
-                    <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
+                    <MaterialIcons name="add" size={16} color={safePrimary} style={{ marginRight: 4 }} />
+                    <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>Add</Text>
                   </TouchableOpacity>
                 </View>
               </Animated.View>
@@ -1273,6 +1273,7 @@ const DashboardScreen = function (props) {
         userHistory={state.userHistory}
         recurringExpenses={state.recurringExpenses}
         accounts={state.accounts}
+        isSimpleMode={isSimpleMode}
       />
       <QuickAddBudgetModal visible={showQuickAddModal} onClose={function () { setShowQuickAddModal(false); }} envelope={quickAddEnv} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} setSelectedEnvelope={setSelectedEnvelope} setShowEditEnvModal={setShowEditEnvModal} userId={userId} />
       <IncomeManagerModal

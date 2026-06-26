@@ -226,6 +226,9 @@ const StatisticsScreen = function(props) {
   var [selectedEnvIndex, setSelectedEnvIndex] = useState(null);
   var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
 
+  var isStealthDark = theme.isDark && theme.colors.primary === '#111827';
+  var safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
+
   var handleIncomeInfo = function() {
     var templateIncome = 0;
     var manualIncome = 0;
@@ -502,8 +505,8 @@ const StatisticsScreen = function(props) {
         <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
-                <MaterialIcons name='show-chart' size={scale(20)} color={theme.colors.primary} />
+              <View style={{ width: scale(36), height: scale(36), borderRadius: scale(10), backgroundColor: safePrimary + '15', alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
+                <MaterialIcons name='show-chart' size={scale(20)} color={safePrimary} />
               </View>
               <Text style={{ fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary }}>Asset Growth Trend</Text>
             </View>
@@ -515,7 +518,7 @@ const StatisticsScreen = function(props) {
           <View style={{ height: scale(180), width: '100%', marginBottom: 10 }}>
             {!isPremium ? (
                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background + '88', borderRadius: 16 }}>
-                  <MaterialIcons name="lock" size={32} color={theme.colors.primary} style={{ marginBottom: 12 }} />
+                  <MaterialIcons name="lock" size={32} color={safePrimary} style={{ marginBottom: 12 }} />
                   <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center' }}>Premium Feature</Text>
                   <Text style={{ fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 4, paddingHorizontal: 20 }}>Upgrade to Premium to visualize your net worth growth over time.</Text>
                   <TouchableOpacity
@@ -529,8 +532,8 @@ const StatisticsScreen = function(props) {
               <svg viewBox="0 0 300 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 <defs>
                   <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={theme.colors.primary} stopOpacity="0.3" />
-                    <stop offset="100%" stopColor={theme.colors.primary} stopOpacity="0" />
+                    <stop offset="0%" stopColor={safePrimary} stopOpacity="0.3" />
+                    <stop offset="100%" stopColor={safePrimary} stopOpacity="0" />
                   </linearGradient>
                 </defs>
                 {/* Grid Lines */}
@@ -541,7 +544,7 @@ const StatisticsScreen = function(props) {
                 {(() => {
                   var points = netWorthTrend.map((t, i) => {
                     var x = (i / (netWorthTrend.length - 1)) * 300;
-                    var y = 120 - ((t.value - chartMin) / (chartMax - chartMin)) * 120;
+                    var y = 120 - ((t.value - chartMin) / (Math.max(1, chartMax - chartMin))) * 120;
                     if (isNaN(y)) y = 120;
                     return { x, y };
                   });
@@ -563,9 +566,9 @@ const StatisticsScreen = function(props) {
                   return (
                     <>
                       <path d={areaData} fill="url(#areaGradient)" />
-                      <path d={pathData} fill="transparent" stroke={theme.colors.primary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d={pathData} fill="transparent" stroke={safePrimary} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                       {points.map((p, i) => (
-                        <circle key={i} cx={p.x} cy={p.y} r="4" fill={theme.colors.card} stroke={theme.colors.primary} strokeWidth="2" />
+                        <circle key={i} cx={p.x} cy={p.y} r="4" fill={theme.colors.card} stroke={safePrimary} strokeWidth="2" />
                       ))}
                     </>
                   );
@@ -582,7 +585,7 @@ const StatisticsScreen = function(props) {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 5 }}>
               {netWorthTrend.map((t, i) => (
                 <View key={i} style={{ alignItems: 'center' }}>
-                  <Text style={{ fontSize: normalize(9), fontWeight: 'bold', color: i === netWorthTrend.length - 1 ? theme.colors.primary : theme.colors.textSecondary }}>{t.label}</Text>
+                  <Text style={{ fontSize: normalize(9), fontWeight: 'bold', color: i === netWorthTrend.length - 1 ? safePrimary : theme.colors.textSecondary }}>{t.label}</Text>
                   <Text style={{ fontSize: normalize(8), color: theme.colors.textSecondary, marginTop: 2 }}>{balancesVisible ? (t.value >= 10000 ? (t.value / 1000).toFixed(0) + 'k' : t.value.toFixed(0)) : '•••'}</Text>
                 </View>
               ))}

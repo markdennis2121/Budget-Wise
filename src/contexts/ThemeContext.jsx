@@ -56,7 +56,7 @@ const THEME_MAP = {
   '#10B981': { background: '#0B0F19', card: '#1F2937', border: '#374151' }, // Penny Classic
   '#2563EB': { background: '#0F172A', card: '#1E293B', border: '#334155' }, // Corporate Blue
   '#059669': { background: '#061613', card: '#0D2622', border: '#16423C' }, // Forest Green
-  '#111827': { background: '#000000', card: '#111827', border: '#1F2937' }, // Stealth Black
+  '#111827': { background: '#000000', card: '#1A202C', border: '#2D3748' }, // Stealth Black (Improved Card Contrast)
 
   // Premium Themes
   '#D97706': { background: '#1A1614', card: '#261F1D', border: '#3D302C' }, // Copper Penny

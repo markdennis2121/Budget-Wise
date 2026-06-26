@@ -193,6 +193,9 @@ const SettingsScreen = function(props) {
       });
   };
 
+  var [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  var [selectedMonths, setSelectedMonths] = useState(12);
+
   var handleArchiveData = function () {
     if (!userId) {
       showAlert('Error', 'Sign in to use this feature.');
@@ -206,77 +209,60 @@ const SettingsScreen = function(props) {
     }
 
     if (isArchiveDisabled) {
-      showAlert('Archive Disabled', 'You cannot compress history while your wallets have a positive balance. Please transfer or spend your remaining ' + formatCurrency(totalWalletBalance) + ' before archiving for data integrity.');
+      showAlert('Archive Locked', 'Wallets must be empty (₱0.00) to compress history. This ensures your final balances remain 100% accurate after detail removal.');
       return;
     }
 
-    var startCompressionFlow = function (monthsAgo) {
-      var cutoffDate = new Date();
-      cutoffDate.setMonth(cutoffDate.getMonth() - monthsAgo);
-      var cutoffStr = cutoffDate.toISOString().split('T')[0];
+    setArchiveModalVisible(true);
+  };
 
-      var envs = parseUserEnvelopes(userSettings);
-      var accs = getStoredAccountsList(userSettings);
-      
-      var rollupResult = calculateArchiveRollup(userHistory, cutoffStr, userId);
-      
-      if (rollupResult.historyIdsToDelete.length === 0) {
-        showAlert('No Old Data', 'You do not have any transaction history older than ' + monthsAgo + ' months to clean up.');
-        return;
-      }
+  var startCompressionFlow = function (monthsAgo) {
+    setArchiveModalVisible(false);
+    var cutoffDate = new Date();
+    cutoffDate.setMonth(cutoffDate.getMonth() - monthsAgo);
+    var cutoffStr = cutoffDate.toISOString().split('T')[0];
 
-      var msg = `This will permanently compress ${rollupResult.historyIdsToDelete.length} transactions older than ${monthsAgo} months into ${rollupResult.summaryTransactions.length} monthly summary records, and download your raw data as an Excel file. Your live wallet balances and analytics charts will remain completely accurate. Continue?`;
-      
-      var performArchive = function () {
-        setBackupBusy(true);
-        downloadCsvFile(rollupResult.archivedHistory, envs, accs)
-          .then(function () {
-            var db = getDatabase();
-            var updatedDb = applyArchiveToDatabase(db, userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
+    var envs = parseUserEnvelopes(userSettings);
+    var accs = getStoredAccountsList(userSettings);
 
-            if (updatedDb) {
-              persistDatabase(updatedDb);
-              refetch();
-              historyQuery.refetch();
-              showAlert('Compression Complete', `${rollupResult.historyIdsToDelete.length} old transactions were safely compressed to save space, while preserving all analytics.`);
-            } else {
-              showAlert('Error', 'Failed to update database.');
-            }
-          })
-          .catch(function () {
-            showAlert('Export failed', 'Could not export the backup file, so the compression was cancelled for your safety.');
-          })
-          .finally(function () {
-            setBackupBusy(false);
-          });
-      };
+    var rollupResult = calculateArchiveRollup(userHistory, cutoffStr, userId);
 
-      if (Platform.OS === 'web') {
-        if (window.confirm(msg)) performArchive();
-      } else {
-        Alert.alert('Compress Old History', msg, [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Compress Data', onPress: performArchive, style: 'destructive' }
-        ]);
-      }
+    if (rollupResult.historyIdsToDelete.length === 0) {
+      showAlert('No Data Found', 'No transactions found older than ' + monthsAgo + ' months.');
+      return;
+    }
+
+    var performArchive = function () {
+      setBackupBusy(true);
+      downloadCsvFile(rollupResult.archivedHistory, envs, accs)
+        .then(function () {
+          var db = getDatabase();
+          var updatedDb = applyArchiveToDatabase(db, userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
+
+          if (updatedDb) {
+            persistDatabase(updatedDb);
+            refetch();
+            historyQuery.refetch();
+            showAlert('Success', `${rollupResult.historyIdsToDelete.length} transactions compressed! A backup CSV has been saved to your device.`);
+          }
+        })
+        .catch(function () {
+          showAlert('Safety Cancel', 'Backup failed. Compression cancelled to prevent data loss.');
+        })
+        .finally(function () {
+          setBackupBusy(false);
+        });
     };
 
     if (Platform.OS === 'web') {
-      var val = window.prompt('Enter timeframe to keep in months (e.g. 3, 6, 12). Everything older will be compressed:', '12');
-      if (val) {
-        var months = parseInt(val, 10);
-        if (!isNaN(months) && months > 0) startCompressionFlow(months);
-      }
+      if (window.confirm(`Warning: This will merge ${rollupResult.historyIdsToDelete.length} transactions into monthly summaries. This cannot be undone. Continue?`)) performArchive();
     } else {
-      Alert.alert('Select Timeframe', 'Compress transactions older than:', [
-        { text: '3 Months', onPress: () => startCompressionFlow(3) },
-        { text: '6 Months', onPress: () => startCompressionFlow(6) },
-        { text: '1 Year', onPress: () => startCompressionFlow(12) },
-        { text: 'Cancel', style: 'cancel' }
+      Alert.alert('Final Confirmation', `Are you sure? ${rollupResult.historyIdsToDelete.length} transactions will be permanently compressed.`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Compress Now', onPress: performArchive, style: 'destructive' }
       ]);
     }
   };
-
 
   var handleLogout = function() {
     var msg = 'Are you sure you want to sign out?';
@@ -330,6 +316,61 @@ const SettingsScreen = function(props) {
       mutateUpdateSettings: mutateUpdate
     }),
     React.createElement(SaveSuccessOverlay, { visible: showPinSaved, theme: theme, message: 'PIN saved!' }),
+
+    React.createElement(Modal, {
+      visible: archiveModalVisible,
+      transparent: true,
+      animationType: 'fade',
+      onRequestClose: () => setArchiveModalVisible(false)
+    },
+      React.createElement(View, { style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 } },
+        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 28, padding: 24, borderWidth: 2, borderColor: '#EF4444', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 15 } },
+
+          React.createElement(View, { style: { backgroundColor: isDark ? '#451A1A' : '#FEF2F2', borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5' } },
+            React.createElement(View, { style: { width: 64, height: 64, borderRadius: 32, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 } },
+              React.createElement(MaterialIcons, { name: 'auto-delete', size: 36, color: '#EF4444' })
+            ),
+            React.createElement(Text, { style: { fontSize: 20, fontWeight: '900', color: isDark ? '#FECACA' : '#B91C1C', textAlign: 'center', marginBottom: 8 } }, 'HISTORY COMPRESSION'),
+            React.createElement(Text, { style: { fontSize: 14, color: isDark ? '#FCA5A5' : '#B91C1C', textAlign: 'center', lineHeight: 20 } },
+              'This will merge all detailed transactions into single monthly totals. This action is permanent and cannot be reversed.'
+            )
+          ),
+
+          React.createElement(Text, { style: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' } }, 'Select Timeframe to keep'),
+          React.createElement(View, { style: { flexDirection: 'row', gap: 8, marginBottom: 24 } },
+            [3, 6, 12].map(m => (
+              React.createElement(TouchableOpacity, {
+                key: m,
+                onPress: () => setSelectedMonths(m),
+                style: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: selectedMonths === m ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: selectedMonths === m ? theme.colors.primary : theme.colors.border, alignItems: 'center' }
+              },
+                React.createElement(Text, { style: { fontWeight: 'bold', color: selectedMonths === m ? '#FFFFFF' : theme.colors.textPrimary } }, m + 'm')
+              )
+            ))
+          ),
+
+          React.createElement(View, { style: { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#FFFBEB', borderRadius: 12, padding: 12, marginBottom: 24, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7' } },
+            React.createElement(MaterialIcons, { name: 'security', size: 20, color: '#B45309', style: { marginRight: 10 } }),
+            React.createElement(Text, { style: { flex: 1, fontSize: 12, color: '#B45309', fontWeight: '600' } }, 'A full CSV backup will be automatically saved before compression starts.')
+          ),
+
+          React.createElement(View, { style: { flexDirection: 'row', gap: 12 } },
+            React.createElement(TouchableOpacity, {
+              onPress: () => setArchiveModalVisible(false),
+              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }
+            },
+              React.createElement(Text, { style: { fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Cancel')
+            ),
+            React.createElement(TouchableOpacity, {
+              onPress: () => startCompressionFlow(selectedMonths),
+              style: { flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }
+            },
+              React.createElement(Text, { style: { fontWeight: 'bold', color: '#FFFFFF' } }, 'Compress Now')
+            )
+          )
+        )
+      )
+    ),
 
     React.createElement(Modal, {
       visible: showResetConfirm,

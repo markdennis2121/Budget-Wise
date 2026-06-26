@@ -451,6 +451,7 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   var [selectedSource, setSelectedSource] = useState('');
   var [isSaving, setIsSaving] = useState(false);
   var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   var [deleteConfirmText, setDeleteConfirmText] = useState('');
   var [deleteOption, setDeleteOption] = useState('keep_history');
 
@@ -839,6 +840,7 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   var [deleteConfirmText, setDeleteConfirmText] = useState('');
   var [deleteOption, setDeleteOption] = useState('keep_history');
 
@@ -1092,6 +1094,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var [successMessage, setSuccessMessage] = useState('Saved!');
   var [isSaving, setIsSaving] = useState(false);
   var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   var [deleteConfirmText, setDeleteConfirmText] = useState('');
   var [deleteOption, setDeleteOption] = useState('keep_history');
 
@@ -1108,6 +1111,7 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
       setShowSaveSuccess(false);
       setIsSaving(false);
       setShowDeleteConfirm(false);
+      setShowArchiveConfirm(false);
       setDeleteConfirmText('');
       setDeleteOption('keep_history');
     }
@@ -1191,36 +1195,26 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var handleArchive = () => {
     if (isSaving) return;
     if (!requireEmptyWallet()) return;
+    setShowArchiveConfirm(true);
+  };
 
-    showAlert(
-      'Archive Wallet?',
-      `"${account.name}" will be hidden from your dashboard, but its transaction history is kept so your reports stay accurate. You can restore it anytime from the Archive Manager.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Archive',
-          style: 'default',
-          onPress: function () {
-            var newList = getStoredAccountsList(userSettings).map(function (a) {
-              if (a.id === account.id) return { ...a, isArchived: true };
-              return a;
-            });
-            if (userSettings) {
-              setIsSaving(true);
-              var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
-              runSaveWithFeedback(savePromise, {
-                onClose: onClose,
-                onSaved: onSaved,
-                setShowSuccess: setShowSaveSuccess,
-                message: 'Wallet Archived!',
-                errorMessage: 'Could not archive wallet.',
-                onError: () => setIsSaving(false)
-              }).then(() => setIsSaving(false));
-            }
-          }
-        }
-      ]
-    );
+  var performActualArchiving = () => {
+    var newList = getStoredAccountsList(userSettings).map(function (a) {
+      if (a.id === account.id) return { ...a, isArchived: true };
+      return a;
+    });
+    if (userSettings) {
+      setIsSaving(true);
+      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+      runSaveWithFeedback(savePromise, {
+        onClose: onClose,
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        message: 'Wallet Archived!',
+        errorMessage: 'Could not archive wallet.',
+        onError: () => setIsSaving(false)
+      }).then(() => setIsSaving(false));
+    }
   };
 
   var handleDelete = () => {
@@ -1309,11 +1303,43 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
-            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>{showDeleteConfirm ? 'Confirm Deletion' : 'Edit Wallet'}</Text>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>{showDeleteConfirm ? 'Confirm Deletion' : (showArchiveConfirm ? 'Confirm Archive' : 'Edit Wallet')}</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          {showDeleteConfirm ? (
+          {showArchiveConfirm ? (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+              <View style={{ backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.1)' : '#EFF6FF', borderRadius: 24, padding: 24, marginBottom: 20, borderWidth: 1.5, borderColor: '#3B82F6' }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 }}>
+                  <MaterialIcons name="inventory" size={40} color="#3B82F6" />
+                </View>
+
+                <Text style={{ fontSize: 20, fontWeight: '900', color: theme.isDark ? '#93C5FD' : '#1E40AF', textAlign: 'center', marginBottom: 8 }}>ARCHIVE WALLET</Text>
+
+                <Text style={{ fontSize: 14, color: theme.isDark ? '#BFDBFE' : '#1E3A8A', lineHeight: 22, textAlign: 'center', marginBottom: 20 }}>
+                  <Text style={{ fontWeight: 'bold' }}>{account.name}</Text> will be moved to the archive. It will be hidden from your dashboard, but its transaction history is preserved for your reports.
+                </Text>
+
+                <View style={{ backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.08)', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center' }}>
+                   <MaterialIcons name="info" size={18} color="#3B82F6" style={{ marginRight: 10 }} />
+                   <Text style={{ flex: 1, fontSize: 12, color: theme.isDark ? '#93C5FD' : '#1E40AF', fontWeight: '600' }}>You can restore archived wallets anytime from the Archive Manager.</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity onPress={() => setShowArchiveConfirm(false)} style={{ flex: 1, paddingVertical: 16, borderRadius: 16, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}>
+                  <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary, fontSize: 15 }}>Go Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={isSaving}
+                  onPress={performActualArchiving}
+                  style={{ flex: 1.5, paddingVertical: 16, borderRadius: 16, backgroundColor: '#3B82F6', alignItems: 'center', shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                >
+                  {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={{ fontWeight: '900', color: '#FFFFFF', fontSize: 15 }}>ARCHIVE NOW</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          ) : showDeleteConfirm ? (
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
               <View style={{ backgroundColor: theme.isDark ? '#451A1A' : '#FEF2F2', borderRadius: 24, padding: 24, marginBottom: 20, borderWidth: 2, borderColor: '#EF4444', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 }}>
                 <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 }}>
@@ -1754,6 +1780,7 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   var [deleteConfirmText, setDeleteConfirmText] = useState('');
   var [deleteOption, setDeleteOption] = useState('keep_history');
 
@@ -2359,7 +2386,7 @@ const IncomeManagerModal = function ({ visible, onClose, accounts = [], userSett
   );
 };
 
-const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses, envelopes, userId, theme, insetsTop, insetsBottom, onSaved, userHistory, recurringExpenses, accounts }) {
+const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses, envelopes, userId, theme, insetsTop, insetsBottom, onSaved, userHistory, recurringExpenses, accounts, isSimpleMode }) {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width > 1024;
 
@@ -2473,12 +2500,13 @@ const SpentManagerModal = function ({ visible, onClose, filter, oneTimeExpenses,
     if (exp.type === 'One-Time' || exp.type === 'Recurring') {
       var spendCheck = validateSpendOperation({
         amount: amt,
-        categoryId: exp.category,
+        categoryId: isSimpleMode ? null : exp.category,
         envelopeBalances: envelopes,
         accountId: accountId,
         accounts: accounts,
         isEdit: true,
-        oldAmount: exp.amount
+        oldAmount: exp.amount,
+        isRecurringPayment: exp.type === 'Recurring' && !isSimpleMode
       });
 
       if (!spendCheck.ok) {
@@ -2702,6 +2730,7 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
   var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   var [deleteConfirmText, setDeleteConfirmText] = useState('');
   var [deleteOption, setDeleteOption] = useState('keep_history');
 

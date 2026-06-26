@@ -236,13 +236,14 @@ const AddExpenseModal = function (props) {
       return;
     }
 
-    var selectedItem = optionsList.find(o => o.id === selectedFund);
+    var finalCategory = isSimpleMode ? null : selectedFund;
+    var selectedItem = !isSimpleMode ? optionsList.find(o => o.id === selectedFund) : null;
     var fundName = selectedItem ? selectedItem.name : 'Unknown';
 
     if (expType === 'one_time' || expType === 'recurring') {
       var spendCheck = validateSpendOperation({
         amount: amt,
-        categoryId: selectedFund,
+        categoryId: finalCategory,
         envelopeBalances: envelopes,
         accountId: expType === 'one_time' ? selectedAccount : null,
         accounts: accounts,
@@ -268,9 +269,9 @@ const AddExpenseModal = function (props) {
         expense_type: 'One-Time',
         date: expDate,
         status: 'Spent',
-        notes: timeStr + ' • Env: ' + fundName + ' • Paid via: ' + accName,
+        notes: timeStr + (isSimpleMode ? '' : ' • Env: ' + fundName) + ' • Paid via: ' + accName,
         account_id: selectedAccount,
-        category: selectedFund
+        category: finalCategory
       });
       finishSave(savePromise, {
         message: 'Expense saved!',
@@ -280,7 +281,7 @@ const AddExpenseModal = function (props) {
         }
       });
     } else if (expType === 'recurring') {
-      var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: selectedFund, account_id: selectedAccount };
+      var newRecurring = { id: generateId(), user_id: userId, name: expName.trim(), amount: amt, due_date: dueDate, status: 'Pending', category: finalCategory, account_id: selectedAccount };
       var recurringId = newRecurring.id;
       var recurringPromise = mutateRecurring(newRecurring).then(function () {
         return scheduleBillNotification(newRecurring);
@@ -338,8 +339,8 @@ const AddExpenseModal = function (props) {
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', backgroundColor: theme.isDark ? 'rgba(0,0,0,0.2)' : theme.colors.background, borderRadius: scale(16), padding: scale(6), marginBottom: moderateScale(20), borderWidth: 1, borderColor: theme.colors.border }}>
               <TouchableOpacity
-                onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('one_time'); }}
-                disabled={rawEnvelopes.length === 0}
+                onPress={() => { triggerImpactHaptic('Light'); if (isSimpleMode || rawEnvelopes.length > 0) setExpType('one_time'); }}
+                disabled={!isSimpleMode && rawEnvelopes.length === 0}
                 style={{
                   flex: 1,
                   flexDirection: 'row',
@@ -348,7 +349,7 @@ const AddExpenseModal = function (props) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: expType === 'one_time' ? theme.colors.primary : 'transparent',
-                  opacity: rawEnvelopes.length === 0 ? 0.45 : 1,
+                  opacity: (!isSimpleMode && rawEnvelopes.length === 0) ? 0.45 : 1,
                   shadowColor: expType === 'one_time' ? theme.colors.primary : 'transparent',
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.2,
@@ -360,8 +361,8 @@ const AddExpenseModal = function (props) {
                 <Text style={{ color: expType === 'one_time' ? '#FFFFFF' : theme.colors.textSecondary, fontWeight: 'bold', fontSize: normalize(14) }}>{EXPENSE_TYPE_HELP.one_time.tabLabel}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => { triggerImpactHaptic('Light'); if (rawEnvelopes.length > 0) setExpType('recurring'); }}
-                disabled={rawEnvelopes.length === 0}
+                onPress={() => { triggerImpactHaptic('Light'); if (isSimpleMode || rawEnvelopes.length > 0) setExpType('recurring'); }}
+                disabled={!isSimpleMode && rawEnvelopes.length === 0}
                 style={{
                   flex: 1,
                   flexDirection: 'row',
@@ -370,7 +371,7 @@ const AddExpenseModal = function (props) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: expType === 'recurring' ? theme.colors.primary : 'transparent',
-                  opacity: rawEnvelopes.length === 0 ? 0.45 : 1,
+                  opacity: (!isSimpleMode && rawEnvelopes.length === 0) ? 0.45 : 1,
                   shadowColor: expType === 'recurring' ? theme.colors.primary : 'transparent',
                   shadowOffset: { width: 0, height: 4 },
                   shadowOpacity: 0.2,
@@ -383,7 +384,7 @@ const AddExpenseModal = function (props) {
               </TouchableOpacity>
             </View>
 
-            {rawEnvelopes.length === 0 ? (
+            {(!isSimpleMode && rawEnvelopes.length === 0) ? (
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: scale(10), padding: moderateScale(12), marginBottom: moderateScale(12), borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.25)' }}>
                 <MaterialIcons name="info-outline" size={scale(18)} color="#3B82F6" style={{ marginRight: 8, marginTop: 1 }} />
                 <Text style={{ flex: 1, fontSize: normalize(12), color: theme.colors.textSecondary, lineHeight: normalize(18) }}>
