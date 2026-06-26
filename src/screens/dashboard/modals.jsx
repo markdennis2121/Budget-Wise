@@ -10,6 +10,24 @@ import DatePickerInput from '../../components/DatePickerInput';
 import BrandLogo from '../../components/BrandLogo';
 import { runSaveWithFeedback } from '../../utils/saveSuccess';
 import { triggerImpactHaptic } from '../../utils/feedback';
+
+/**
+ * Architect: React Native Web ignores Alert.alert button arrays.
+ * This wrapper uses native Alert on mobile, and falls back to window.confirm on web.
+ */
+function showAlert(title, message, buttons) {
+  if (Platform.OS === 'web') {
+    // On web, Alert.alert with buttons is a no-op. Use browser dialogs.
+    var confirmBtn = buttons.find(function (b) { return b.style === 'destructive'; })
+      || buttons.find(function (b) { return b.style !== 'cancel' && b.text !== 'Cancel'; });
+    var result = window.confirm(message);
+    if (result && confirmBtn && confirmBtn.onPress) {
+      confirmBtn.onPress();
+    }
+  } else {
+    Alert.alert(title, message, buttons);
+  }
+}
 import { deleteEnvelopeAndCleanup, isEnvelopeArchived } from '../../utils/envelopeBudget';
 import { promptDeleteEnvelope, getEnvelopeIcon } from './envelopeUtils';
 import { formatCurrency, formatDate, generateId, getTodayStr, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue, parseAmount } from '../../utils/helpers';
@@ -432,6 +450,9 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
   var [successMessage, setSuccessMessage] = useState('Saved!');
   var [selectedSource, setSelectedSource] = useState('');
   var [isSaving, setIsSaving] = useState(false);
+  var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState('');
+  var [deleteOption, setDeleteOption] = useState('keep_history');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
@@ -817,6 +838,9 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
   var [type, setType] = useState('Cash');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
+  var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState('');
+  var [deleteOption, setDeleteOption] = useState('keep_history');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
@@ -838,40 +862,52 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
        return;
     }
 
-    // Senior Developer: Enforce Freemium 5-Account Limit
     var currentAccounts = getStoredAccountsList(userSettings);
     var isPremium = userSettings?.is_premium || false;
 
-    if (currentAccounts.length >= 5 && !isPremium) {
+    // Architect: Smart Restore Logic.
+    // Check if a wallet with this name is already in the Archive.
+    var archivedMatch = currentAccounts.find(function(a) {
+      return a.isArchived && a.name.toLowerCase() === finalName.toLowerCase();
+    });
+
+    if (currentAccounts.filter(a => !a.isArchived).length >= 5 && !isPremium && !archivedMatch) {
       setShowPremiumModal(true);
       return;
     }
 
     var startingBal = parseAmount(balance);
-    var newId = 'acc-' + generateId();
-
-    // Architect: We set starting_balance to 0 and create a History Entry instead.
-    // This ensures the initial cash counts as "Income" in the Monthly Snapshot.
-    var newAcc = { id: newId, name: finalName, starting_balance: 0, type: type };
-    var newList = currentAccounts.concat(newAcc);
+    var targetId = archivedMatch ? archivedMatch.id : ('acc-' + generateId());
 
     if (userSettings) {
       setIsSaving(true);
 
-      // We wrap the whole operation in a single chain to ensure integrity
+      var newList;
+      if (archivedMatch) {
+        // Restore existing
+        newList = currentAccounts.map(function(a) {
+          if (a.id === archivedMatch.id) return { ...a, isArchived: false };
+          return a;
+        });
+      } else {
+        // Create new
+        var newAcc = { id: targetId, name: finalName, starting_balance: 0, type: type, isArchived: false };
+        newList = currentAccounts.concat(newAcc);
+      }
+
       var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } })
         .then(function() {
           if (startingBal > 0) {
             return mutateInsertHistory({
               id: generateId(),
               user_id: userId,
-              expense_name: 'Opening Balance: ' + finalName,
+              expense_name: archivedMatch ? 'Account Re-opened: ' + finalName : 'Opening Balance: ' + finalName,
               amount: startingBal,
               date: new Date().toISOString().split('T')[0],
               expense_type: 'Income',
               category: 'Income',
-              account_id: newId,
-              notes: 'Initial account setup'
+              account_id: targetId,
+              notes: archivedMatch ? 'Restored archived wallet with new deposit' : 'Initial account setup'
             });
           }
           return Promise.resolve();
@@ -881,8 +917,35 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
         onClose: onClose,
         onSaved: onSaved,
         setShowSuccess: setShowSaveSuccess,
-        message: 'Wallet Added!',
-        errorMessage: 'Could not add wallet.',
+        message: archivedMatch ? 'Wallet Restored!' : 'Wallet Added!',
+        errorMessage: 'Could not save wallet.',
+        onError: () => setIsSaving(false)
+      }).then(() => setIsSaving(false));
+    }
+  };
+
+  var archivedWalletsList = useMemo(() => {
+    return (accounts || []).filter(a => a.isArchived);
+  }, [accounts]);
+
+  var handleRestore = function (acc) {
+    if (isSaving) return;
+    var activeAccs = (accounts || []).filter(a => !a.isArchived);
+    if (activeAccs.find(a => a.name.toLowerCase() === acc.name.trim().toLowerCase())) {
+      return Alert.alert('Error', 'An active wallet with the name "' + acc.name + '" already exists.');
+    }
+    var newList = accounts.map(a => {
+      if (a.id === acc.id) return { ...a, isArchived: false };
+      return a;
+    });
+    if (userSettings) {
+      setIsSaving(true);
+      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+      runSaveWithFeedback(savePromise, {
+        onClose: onClose,
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        message: 'Wallet Restored!',
         onError: () => setIsSaving(false)
       }).then(() => setIsSaving(false));
     }
@@ -925,6 +988,23 @@ const AddAccountModal = function ({ visible, onClose, accounts, userSettings, mu
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled">
+            {archivedWalletsList.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <MaterialIcons name="history" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary }}>RESTORE ARCHIVED WALLETS</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                  {archivedWalletsList.map(acc => (
+                    <TouchableOpacity key={acc.id} onPress={() => handleRestore(acc)} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.primary + '10', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginRight: 8, borderWidth: 1.5, borderColor: theme.colors.primary + '40', borderStyle: 'dashed' }}>
+                      <BrandLogo type={acc.type} size={14} style={{ marginRight: 6 }} />
+                      <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.primary }}>{acc.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {type === 'Custom' && (
               <>
                 <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>WALLET NAME</Text>
@@ -1011,6 +1091,9 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [successMessage, setSuccessMessage] = useState('Saved!');
   var [isSaving, setIsSaving] = useState(false);
+  var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState('');
+  var [deleteOption, setDeleteOption] = useState('keep_history');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
@@ -1024,6 +1107,9 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
       setMode('add');
       setShowSaveSuccess(false);
       setIsSaving(false);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
+      setDeleteOption('keep_history');
     }
   }, [visible, account]);
 
@@ -1088,49 +1174,99 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
     }
   };
 
-  var handleDelete = () => {
-    if (isSaving) return;
-    var otherWalletsTotal = (accounts || []).filter(a => a.id !== account.id).reduce((s, a) => s + (parseFloat(a.balance) || 0), 0);
-
-    if (otherWalletsTotal < totalEnvelopeLiabilities) {
-      var deficit = totalEnvelopeLiabilities - otherWalletsTotal;
-      var err = `Budget Integrity Error: You cannot delete "${account.name}" because your remaining wallets will only have ${formatCurrency(otherWalletsTotal)}, but your envelopes need ${formatCurrency(totalEnvelopeLiabilities)}. Please reduce your envelope budgets by ${formatCurrency(deficit)} first.`;
-      return Alert.alert('Budget Integrity', err);
+  // Senior Developer: Safety Guard - Cannot remove a wallet with money in it.
+  // User must transfer it to another wallet first so budget integrity is maintained.
+  var requireEmptyWallet = function () {
+    var liveBal = parseFloat(account.balance) || 0;
+    if (Math.abs(liveBal) > 0.01) {
+      Alert.alert(
+        'Empty Wallet First',
+        `You still have ${formatCurrency(liveBal)} in "${account.name}". Please transfer this money to another wallet before archiving or deleting this account.`
+      );
+      return false;
     }
+    return true;
+  };
 
-    var performDelete = function () {
-      var newList = getStoredAccountsList(userSettings).filter(function (a) { return a.id !== account.id; });
-      if (userSettings) {
-        var relatedHistory = (userHistory || []).filter(function (h) {
-          return h.account_id === account.id || h.dest_account_id === account.id;
-        });
+  var handleArchive = () => {
+    if (isSaving) return;
+    if (!requireEmptyWallet()) return;
+
+    showAlert(
+      'Archive Wallet?',
+      `"${account.name}" will be hidden from your dashboard, but its transaction history is kept so your reports stay accurate. You can restore it anytime from the Archive Manager.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          style: 'default',
+          onPress: function () {
+            var newList = getStoredAccountsList(userSettings).map(function (a) {
+              if (a.id === account.id) return { ...a, isArchived: true };
+              return a;
+            });
+            if (userSettings) {
+              setIsSaving(true);
+              var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+              runSaveWithFeedback(savePromise, {
+                onClose: onClose,
+                onSaved: onSaved,
+                setShowSuccess: setShowSaveSuccess,
+                message: 'Wallet Archived!',
+                errorMessage: 'Could not archive wallet.',
+                onError: () => setIsSaving(false)
+              }).then(() => setIsSaving(false));
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  var handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  var performActualDeletion = () => {
+    if (isSaving || deleteConfirmText !== 'DELETE') return;
+
+    var relatedHistory = (userHistory || []).filter(function (h) {
+      return h.account_id === account.id || h.dest_account_id === account.id;
+    });
+
+    var newList = getStoredAccountsList(userSettings).filter(function (a) { return a.id !== account.id; });
+
+    if (userSettings) {
+      setIsSaving(true);
+      var mainPromise;
+
+      if (deleteOption === 'delete_all') {
         var historyCleanup = relatedHistory.map(function (h) {
           return mutateDeleteHistory({ id: h.id });
         });
-        setIsSaving(true);
-        var deletePromise = Promise.all(historyCleanup).then(function () {
+        mainPromise = Promise.all(historyCleanup).then(function () {
           return mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
         });
-        runSaveWithFeedback(deletePromise, {
-          onClose: onClose,
-          onSaved: onSaved,
-          setShowSuccess: setShowSaveSuccess,
-          setSuccessMessage: setSuccessMessage,
-          message: 'Wallet & History Deleted!',
-          errorMessage: 'Could not delete wallet history.',
-          onError: () => setIsSaving(false)
-        }).then(() => setIsSaving(false));
+      } else {
+        mainPromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
       }
-    };
 
-    var msg = `Deleting "${account.name}" will PERMANENTLY DELETE all linked spending and income history. Total cash will be updated. Continue?`;
-    Alert.alert('Delete Wallet & History?', msg, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete Everything', style: 'destructive', onPress: performDelete }]);
+      runSaveWithFeedback(mainPromise, {
+        onClose: onClose,
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        message: deleteOption === 'delete_all' ? 'Wallet & History Deleted!' : 'Wallet Deleted!',
+        errorMessage: 'Could not delete wallet.',
+        onError: () => setIsSaving(false)
+      }).then(() => setIsSaving(false));
+    }
   };
 
   if (!visible || !account) return null;
 
   var valInput = parseAmount(amount) || 0;
   var liveBal = parseFloat(account.balance) || 0;
+  var isArchiveDisabled = Math.abs(liveBal) > 0.01;
 
   // Senior Developer Fix: Handle reconcile mode in preview calculation
   var previewBal = mode === 'reconcile'
@@ -1173,11 +1309,79 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
-            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Edit Wallet</Text>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>{showDeleteConfirm ? 'Confirm Deletion' : 'Edit Wallet'}</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+          {showDeleteConfirm ? (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+              <View style={{ backgroundColor: theme.isDark ? '#451A1A' : '#FEF2F2', borderRadius: 24, padding: 24, marginBottom: 20, borderWidth: 2, borderColor: '#EF4444', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 5 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 }}>
+                  <MaterialIcons name="delete-forever" size={40} color="#EF4444" />
+                </View>
+
+                <Text style={{ fontSize: 20, fontWeight: '900', color: theme.isDark ? '#FECACA' : '#B91C1C', textAlign: 'center', marginBottom: 8 }}>PERMANENT DELETION</Text>
+
+                <Text style={{ fontSize: 14, color: theme.isDark ? '#FCA5A5' : '#B91C1C', lineHeight: 22, textAlign: 'center', marginBottom: 20 }}>
+                  You are about to wipe <Text style={{ fontWeight: 'bold' }}>{account.name}</Text> from existence.
+                  {liveBal > 0.01 ? `\n\nWarning: ${formatCurrency(liveBal)} will be lost forever.` : ''}
+                </Text>
+
+                <View style={{ height: 1, backgroundColor: 'rgba(239, 68, 68, 0.2)', marginBottom: 20 }} />
+
+                <Text style={{ fontSize: 11, fontWeight: '900', color: theme.isDark ? '#FCA5A5' : '#B91C1C', marginBottom: 12, letterSpacing: 1, textAlign: 'center' }}>CHOOSE HISTORY OPTION</Text>
+
+                <TouchableOpacity
+                  onPress={() => setDeleteOption('keep_history')}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: deleteOption === 'keep_history' ? '#EF4444' : (theme.isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF'), padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1.5, borderColor: '#EF4444' }}
+                >
+                  <MaterialIcons name={deleteOption === 'keep_history' ? "check-circle" : "radio-button-unchecked"} size={22} color={deleteOption === 'keep_history' ? "#FFFFFF" : "#EF4444"} style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: deleteOption === 'keep_history' ? "#FFFFFF" : (theme.isDark ? '#FCA5A5' : "#B91C1C") }}>Keep Transactions</Text>
+                    <Text style={{ fontSize: 11, color: deleteOption === 'keep_history' ? "rgba(255,255,255,0.85)" : theme.colors.textSecondary }}>Safe: Wallet goes away, but past reports stay accurate.</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setDeleteOption('delete_all')}
+                  style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: deleteOption === 'delete_all' ? '#EF4444' : (theme.isDark ? 'rgba(255,255,255,0.05)' : '#FFFFFF'), padding: 16, borderRadius: 16, borderWidth: 1.5, borderColor: '#EF4444' }}
+                >
+                  <MaterialIcons name={deleteOption === 'delete_all' ? "warning" : "radio-button-unchecked"} size={22} color={deleteOption === 'delete_all' ? "#FFFFFF" : "#EF4444"} style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: deleteOption === 'delete_all' ? "#FFFFFF" : (theme.isDark ? '#FCA5A5' : "#B91C1C") }}>Delete Everything</Text>
+                    <Text style={{ fontSize: 11, color: deleteOption === 'delete_all' ? "rgba(255,255,255,0.85)" : theme.colors.textSecondary }}>Destructive: Wipes this wallet AND all its transaction history.</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ paddingHorizontal: 8 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 10, textAlign: 'center' }}>TYPE <Text style={{ color: '#EF4444' }}>DELETE</Text> TO CONFIRM</Text>
+                <TextInput
+                  value={deleteConfirmText}
+                  onChangeText={setDeleteConfirmText}
+                  placeholder="DELETE"
+                  placeholderTextColor={theme.colors.textSecondary}
+                  autoCapitalize="characters"
+                  style={{ backgroundColor: theme.colors.background, borderWidth: 1.5, borderColor: deleteConfirmText === 'DELETE' ? '#EF4444' : theme.colors.border, borderRadius: 16, padding: 16, textAlign: 'center', fontSize: 18, fontWeight: '900', color: '#EF4444', marginBottom: 24 }}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity onPress={() => setShowDeleteConfirm(false)} style={{ flex: 1, paddingVertical: 16, borderRadius: 16, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}>
+                    <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary, fontSize: 15 }}>Go Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={deleteConfirmText !== 'DELETE' || isSaving}
+                    onPress={performActualDeletion}
+                    style={{ flex: 1.5, paddingVertical: 16, borderRadius: 16, backgroundColor: deleteConfirmText === 'DELETE' ? '#EF4444' : theme.colors.border, alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: deleteConfirmText === 'DELETE' ? 0.3 : 0, shadowRadius: 8, elevation: deleteConfirmText === 'DELETE' ? 4 : 0 }}
+                  >
+                    {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={{ fontWeight: '900', color: '#FFFFFF', fontSize: 15 }}>CONFIRM WIPE</Text>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ paddingBottom: moderateScale(8) }} keyboardShouldPersistTaps="handled">
+
             <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>WALLET NAME</Text>
             <TextInput
               value={name}
@@ -1233,14 +1437,42 @@ const EditAccountModal = function ({ visible, onClose, account, accounts, userSe
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={handleDelete} style={{ flex: 1, backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#FEE2E2' }}>
-                <Text style={{ color: theme.colors.error, fontWeight: 'bold', fontSize: normalize(16) }}>Delete Wallet</Text>
+              <TouchableOpacity
+                onPress={handleArchive}
+                disabled={isSaving || isArchiveDisabled}
+                style={{
+                  flex: 1,
+                  backgroundColor: theme.colors.background,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: theme.colors.border,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: moderateScale(6),
+                  opacity: isArchiveDisabled ? 0.4 : 1
+                }}
+              >
+                <MaterialIcons name={isArchiveDisabled ? "lock" : "archive"} size={scale(16)} color={theme.colors.textSecondary} />
+                <Text style={{ color: theme.colors.textPrimary, fontWeight: 'bold', fontSize: normalize(16) }}>Archive</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSave} disabled={isSaving} style={{ flex: 2, backgroundColor: isSaving ? theme.colors.accent : theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}>
                 {isSaving ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: normalize(16) }}>Save Changes</Text>}
               </TouchableOpacity>
             </View>
+
+            {isArchiveDisabled && (
+              <Text style={{ fontSize: normalize(10), color: theme.colors.error, textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
+                Transfer or spend remaining funds to enable archiving.
+              </Text>
+            )}
+
+            <TouchableOpacity onPress={handleDelete} disabled={isSaving} style={{ alignSelf: 'center', marginTop: moderateScale(16), paddingVertical: 8, paddingHorizontal: 12 }}>
+              <Text style={{ color: theme.colors.error, fontWeight: '600', fontSize: normalize(13), textDecorationLine: 'underline' }}>Permanently delete this wallet…</Text>
+            </TouchableOpacity>
           </ScrollView>
+          )}
         </View>
       </View>
     </Modal>
@@ -1521,6 +1753,9 @@ const TransferWalletModal = function ({ visible, onClose, accounts, userHistory,
   var [destId, setDestId] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
+  var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState('');
+  var [deleteOption, setDeleteOption] = useState('keep_history');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
@@ -2466,6 +2701,9 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
   var [errorMsg, setErrorMsg] = useState('');
   var [showSaveSuccess, setShowSaveSuccess] = useState(false);
   var [isSaving, setIsSaving] = useState(false);
+  var [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  var [deleteConfirmText, setDeleteConfirmText] = useState('');
+  var [deleteOption, setDeleteOption] = useState('keep_history');
 
   var insertHistory = useMutation('expense_history', 'insert');
   var mutateInsertHistory = insertHistory.mutate;
@@ -2605,7 +2843,7 @@ const QuickAddBudgetModal = function ({ visible, onClose, envelope, readyToAssig
   );
 };
 
-const ArchiveManagerModal = function ({ visible, onClose, envelopes, userSettings, mutateUpdateSettings, onSaved, theme }) {
+const ArchiveManagerModal = function ({ visible, onClose, envelopes, accounts, userSettings, mutateUpdateSettings, onSaved, theme }) {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width > 1024;
   const insets = useSafeAreaInsets();
@@ -2616,14 +2854,18 @@ const ArchiveManagerModal = function ({ visible, onClose, envelopes, userSetting
     return (envelopes || []).filter(isEnvelopeArchived);
   }, [envelopes]);
 
-  var handleRestore = function (env) {
+  var archivedWallets = useMemo(() => {
+    return (accounts || []).filter(a => a.isArchived);
+  }, [accounts]);
+
+  var handleRestoreEnvelope = function (env) {
     if (isSaving) return;
     var activeEnvs = (envelopes || []).filter(e => !isEnvelopeArchived(e));
     if (activeEnvs.find(e => e.name.toLowerCase() === env.name.trim().toLowerCase())) {
-      return Alert.alert('Error', 'An active envelope with the name "' + env.name + '" already exists. Please rename or delete the active one before restoring this.');
+      return Alert.alert('Error', 'An active envelope with the name "' + env.name + '" already exists.');
     }
     var newList = envelopes.map(e => {
-      if (e.id === env.id) return { ...e, isArchived: false, archived: false, is_archived: false };
+      if (e.id === env.id) return { ...e, isArchived: false };
       return e;
     });
     if (userSettings) {
@@ -2633,11 +2875,33 @@ const ArchiveManagerModal = function ({ visible, onClose, envelopes, userSetting
         onSaved: onSaved,
         setShowSuccess: setShowSaveSuccess,
         message: 'Envelope Restored!',
-        errorMessage: 'Could not restore.',
         onError: () => setIsSaving(false)
       }).then(() => {
         setIsSaving(false);
-        if (archivedEnvelopes.length <= 1) onClose();
+      });
+    }
+  };
+
+  var handleRestoreWallet = function (acc) {
+    if (isSaving) return;
+    var activeAccs = (accounts || []).filter(a => !a.isArchived);
+    if (activeAccs.find(a => a.name.toLowerCase() === acc.name.trim().toLowerCase())) {
+      return Alert.alert('Error', 'An active wallet with the name "' + acc.name + '" already exists.');
+    }
+    var newList = accounts.map(a => {
+      if (a.id === acc.id) return { ...a, isArchived: false };
+      return a;
+    });
+    if (userSettings) {
+      setIsSaving(true);
+      var savePromise = mutateUpdateSettings({ id: userSettings.id, data: { accounts: newList, accounts_customized: true } });
+      runSaveWithFeedback(savePromise, {
+        onSaved: onSaved,
+        setShowSuccess: setShowSaveSuccess,
+        message: 'Wallet Restored!',
+        onError: () => setIsSaving(false)
+      }).then(() => {
+        setIsSaving(false);
       });
     }
   };
@@ -2674,58 +2938,59 @@ const ArchiveManagerModal = function ({ visible, onClose, envelopes, userSetting
           <View style={{ width: scale(40), height: scale(5), backgroundColor: theme.colors.border, borderRadius: scale(3), alignSelf: 'center', marginBottom: moderateScale(15), opacity: 0.8 }} />
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialIcons name="archive" size={scale(24)} color={theme.colors.primary} />
-              <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Envelope Archive</Text>
-            </View>
+            <Text style={{ fontSize: normalize(20), fontWeight: 'bold', color: theme.colors.textPrimary }}>Archive Manager</Text>
             <TouchableOpacity onPress={onClose}><MaterialIcons name="close" size={scale(24)} color={theme.colors.textSecondary} /></TouchableOpacity>
           </View>
 
-          <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, marginBottom: 20, lineHeight: 18 }}>
-            These are your retired budget categories. Restoring them will bring back their history to your dashboard.
-          </Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Wallets Section */}
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 12, letterSpacing: 0.5 }}>ARCHIVED WALLETS</Text>
+            {archivedWallets.length === 0 ? (
+              <View style={{ padding: 20, alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: 16, marginBottom: 24, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.border }}>
+                <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>No archived wallets.</Text>
+              </View>
+            ) : (
+              archivedWallets.map(acc => (
+                <View key={acc.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.colors.background, padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <BrandLogo type={acc.type} size={24} style={{ marginRight: 12 }} />
+                    <View>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>{acc.name}</Text>
+                      <Text style={{ fontSize: 11, color: theme.colors.textSecondary }}>History preserved</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => handleRestoreWallet(acc)} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: 'bold' }}>Restore</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flexGrow: 0, maxHeight: scale(400) }}>
+            {/* Envelopes Section */}
+            <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 12, letterSpacing: 0.5, marginTop: 10 }}>ARCHIVED ENVELOPES</Text>
             {archivedEnvelopes.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <MaterialIcons name="folder-zip" size={48} color={theme.colors.border} />
-                <Text style={{ color: theme.colors.textSecondary, marginTop: 12 }}>No archived envelopes yet.</Text>
+              <View style={{ padding: 20, alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.border }}>
+                <Text style={{ color: theme.colors.textSecondary, fontSize: 13 }}>No archived envelopes.</Text>
               </View>
             ) : (
               archivedEnvelopes.map(env => (
-                <View key={env.id} style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: theme.colors.background,
-                  padding: 16,
-                  borderRadius: 16,
-                  marginBottom: 12,
-                  borderWidth: 1,
-                  borderColor: theme.colors.border
-                }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
-                    <View style={{ backgroundColor: theme.colors.primary + '15', padding: scale(8), borderRadius: scale(10) }}>
-                      <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(18)} color={theme.colors.primary} />
+                <View key={env.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.colors.background, padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                   <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                      <MaterialIcons name={getEnvelopeIcon(env.name)} size={18} color={theme.colors.primary} />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>{env.name}</Text>
-                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.textPrimary }}>{env.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleRestore(env)}
-                    disabled={isSaving}
-                    style={{ backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 }}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Restore</Text>
+                  <TouchableOpacity onPress={() => handleRestoreEnvelope(env)} style={{ backgroundColor: theme.colors.primary + '15', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: 'bold' }}>Restore</Text>
                   </TouchableOpacity>
                 </View>
               ))
             )}
           </ScrollView>
-          <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Envelope Restored!" />
         </View>
       </View>
+      <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message="Restored!" />
     </Modal>
   );
 };

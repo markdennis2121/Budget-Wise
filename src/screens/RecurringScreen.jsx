@@ -10,12 +10,11 @@ import PayModal from '../components/PayModal';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
 import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { findEnvelopeForCategory } from '../utils/envelopeBudget';
-import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateEnvelopeForSpend, computeEnvelopeBalances, validateSpendOperation } from '../utils/envelopeGuards';
+import { hasUserEnvelopes, showEnvelopeRequiredAlert, validateSpendOperation, computeEnvelopeBalances } from '../utils/envelopeGuards';
 import { formatCurrency, formatDate, isWithin5Days, isOverdue, getCurrentMonthStr } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
 import { scale, moderateScale, normalize } from '../utils/responsive';
-import emptyRecurringImg from '../assets/empty_recurring.png';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const SCROLL_EXTRA_PADDING = 16;
@@ -23,165 +22,123 @@ const WEB_TAB_MENU_PADDING = 90;
 const FAB_SPACING = 16;
 
 const RecurringScreen = function(props) {
-  var themeCtx = useTheme();
-  var theme = themeCtx.theme;
-  var userCtx = useUser();
-  var userId = userCtx.currentUser ? userCtx.currentUser.id : '';
-  var insets = useSafeAreaInsets();
-  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
-  var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
+  const themeCtx = useTheme();
+  const theme = themeCtx.theme;
+  const userCtx = useUser();
+  const userId = userCtx.currentUser ? userCtx.currentUser.id : '';
+  const insets = useSafeAreaInsets();
   
-  var recurringQuery = useQuery('recurring_expenses');
-  var allRecurring = recurringQuery.data || [];
-  var recurringExpenses = allRecurring.filter(function(r) { return r.user_id === userId; });
-  var refetch = recurringQuery.refetch;
-  var loading = recurringQuery.loading;
-  var deleteRecurring = useMutation('recurring_expenses', 'delete');
-  var mutateDelete = deleteRecurring.mutate;
-  var updateRecurring = useMutation('recurring_expenses', 'update');
-  var mutateUpdate = updateRecurring.mutate;
+  const scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
+  const fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
-  var historyQuery = useQuery('expense_history');
-  var allHistory = historyQuery.data || [];
-  var deleteHistory = useMutation('expense_history', 'delete');
-  var mutateDeleteHistory = deleteHistory.mutate;
+  const recurringQuery = useQuery('recurring_expenses');
+  const recurringExpenses = (recurringQuery.data || []).filter(r => r.user_id === userId);
+  const { refetch, loading } = recurringQuery;
 
-  var settingsQuery = useQuery('user_settings');
-  var allSettings = settingsQuery.data || [];
-  var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
-  var isSimpleMode = userSettings && userSettings.budgeting_style === 'simple';
+  const deleteRecurring = useMutation('recurring_expenses', 'delete');
+  const updateRecurring = useMutation('recurring_expenses', 'update');
 
-  var curMonth = getCurrentMonthStr();
-  var oneTimeQuery = useQuery('one_time_expenses');
-  var userOneTime = (oneTimeQuery.data || []).filter(function (o) { return o.user_id === userId; });
-  var userHistory = allHistory.filter(function (h) { return h.user_id === userId; });
+  const historyQuery = useQuery('expense_history');
+  const deleteHistory = useMutation('expense_history', 'delete');
 
-  var incomeSources = useMemo(function () {
-    if (userSettings && userSettings.income_sources) {
-      return typeof userSettings.income_sources === 'string' ? JSON.parse(userSettings.income_sources) : userSettings.income_sources;
-    }
-    var sal = userSettings ? (parseFloat(userSettings.monthly_salary) || 0) : 0;
-    return [{ id: 'main-salary', name: 'Main Salary', amount: sal }];
+  const settingsQuery = useQuery('user_settings');
+  const userSettings = (settingsQuery.data || []).find(s => s.user_id === userId);
+  const isSimpleMode = userSettings?.budgeting_style === 'simple';
+
+  const curMonth = getCurrentMonthStr();
+  const oneTimeQuery = useQuery('one_time_expenses');
+  const userOneTime = (oneTimeQuery.data || []).filter(o => o.user_id === userId);
+  const userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
+
+  const envelopes = useMemo(() => {
+    if (!userSettings?.envelopes) return [];
+    const raw = typeof userSettings.envelopes === 'string' ? JSON.parse(userSettings.envelopes) : userSettings.envelopes;
+    return Array.isArray(raw) ? raw : [];
   }, [userSettings]);
 
-  var accounts = useMemo(function () {
-    return buildAccountsWithBalances({
-      userSettings: userSettings,
-      incomeSources: incomeSources,
-      oneTimeExpenses: userOneTime,
-      userHistory: userHistory,
-      curMonth: curMonth
-    });
-  }, [userSettings, incomeSources, userOneTime, userHistory, curMonth]);
-
-  var envelopes = useMemo(function () {
-    if (userSettings && userSettings.envelopes) {
-      var raw = typeof userSettings.envelopes === 'string' ? JSON.parse(userSettings.envelopes) : userSettings.envelopes;
-      return Array.isArray(raw) ? raw : [];
-    }
-    return [];
-  }, [userSettings]);
-
-  var envelopeBalances = useMemo(function () {
+  const envelopeBalances = useMemo(() => {
     return computeEnvelopeBalances(envelopes, userHistory, recurringExpenses, curMonth);
   }, [envelopes, userHistory, recurringExpenses, curMonth]);
 
-  var payModalState = useState(false);
-  var showPayModal = payModalState[0]; var setShowPayModal = payModalState[1];
-  var selectedExpenseState = useState(null);
-  var selectedExpense = selectedExpenseState[0]; var setSelectedExpense = selectedExpenseState[1];
-  var showAddState = useState(false);
-  var showAdd = showAddState[0]; var setShowAdd = showAddState[1];
-  var filterState = useState('All');
-  var filter = filterState[0]; var setFilter = filterState[1];
-  var [visibleCount, setVisibleCount] = useState(5);
-  var [showSaveSuccess, setShowSaveSuccess] = useState(false);
-  var [successMessage, setSuccessMessage] = useState('Saved!');
+  const accounts = useMemo(() => {
+    return buildAccountsWithBalances({
+      userSettings,
+      userHistory,
+      curMonth
+    });
+  }, [userSettings, userHistory, curMonth]);
+
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(10);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('Saved!');
   
   useEffect(() => {
-    setVisibleCount(5);
+    setVisibleCount(10);
   }, [filter]);
 
-  var afterRecurringAction = function (message, promise) {
+  const afterRecurringAction = (message, promise) => {
     runSaveWithFeedback(promise || Promise.resolve(), {
-      onSaved: function () {
+      onSaved: () => {
         refetch();
-        if (historyQuery.refetch) historyQuery.refetch();
+        historyQuery.refetch?.();
       },
       setShowSuccess: setShowSaveSuccess,
       setSuccessMessage: setSuccessMessage,
       message: message || 'Saved!',
-      errorMessage: 'Something went wrong. Please try again.'
+      errorMessage: 'Something went wrong.'
     });
   };
   
-  var filters = ['All', 'Pending', 'Paid', 'Paid in Advance'];
+  const filters = ['All', 'Pending', 'Paid', 'Paid in Advance'];
   
-  var filtered = useMemo(function() {
+  const filtered = useMemo(() => {
     if (filter === 'All') return recurringExpenses;
-    return recurringExpenses.filter(function(r) { return r.status === filter; });
+    return recurringExpenses.filter(r => r.status === filter);
   }, [recurringExpenses, filter]);
   
-  var handlePayPress = function(expense) {
-    var amt = parseFloat(expense.amount) || 0;
-
-    // In Simple Mode, we only care if the WALLET has enough money (if selected).
-    // The envelope guard is skipped.
-    var payCheck = validateSpendOperation({
+  const handlePayPress = (expense) => {
+    const amt = parseFloat(expense.amount) || 0;
+    const payCheck = validateSpendOperation({
       amount: amt,
       categoryId: isSimpleMode ? null : expense.category,
       envelopeBalances: isSimpleMode ? [] : envelopeBalances,
-      isRecurringPayment: !isSimpleMode // In simple mode, it's not a "recurring envelope payment"
+      isRecurringPayment: !isSimpleMode
     });
 
     if (!isSimpleMode && !payCheck.ok) {
-      if (Platform.OS === 'web') {
-        window.alert(payCheck.message);
-      } else {
-        Alert.alert('Cannot pay bill', payCheck.message);
-      }
-      return;
+      return Alert.alert('Cannot pay bill', payCheck.message);
     }
     setSelectedExpense(expense);
     setShowPayModal(true);
   };
   
-  var handleResetStatus = function(expense) {
-    var msg = 'Reset "' + expense.name + '" back to Pending? ' + formatCurrency(expense.amount) + ' will be returned to your envelope.';
-    var performReset = function () {
-      afterRecurringAction(
-        'Bill reset!',
-        mutateUpdate({ id: expense.id, data: { status: 'Pending' } })
-      );
+  const handleResetStatus = (expense) => {
+    const msg = `Reset "${expense.name}" back to Pending? ${formatCurrency(expense.amount)} will be returned to your envelope.`;
+    const onConfirm = () => {
+      afterRecurringAction('Bill reset!', updateRecurring.mutate({ id: expense.id, data: { status: 'Pending' } }));
     };
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) performReset();
+      if (window.confirm(msg)) onConfirm();
     } else {
-      Alert.alert('Undo Payment', msg, [
-        { text: 'Cancel' },
-        { text: 'Undo', style: 'destructive', onPress: performReset }
-      ]);
+      Alert.alert('Undo Payment', msg, [{ text: 'Cancel' }, { text: 'Undo', style: 'destructive', onPress: onConfirm }]);
     }
   };
   
-  var handleDelete = function(expense) {
-    var isPaid = expense.status === 'Paid' || expense.status === 'Paid in Advance';
-    var msg = isPaid
-      ? 'Delete "' + expense.name + '"? Since it was already paid, the spent amount will be returned to your envelope.'
-      : 'Delete "' + expense.name + '"?';
+  const handleDelete = (expense) => {
+    const isPaid = expense.status === 'Paid' || expense.status === 'Paid in Advance';
+    const msg = isPaid
+      ? `Delete "${expense.name}"? Since it was already paid, the spent amount will be returned to your envelope.`
+      : `Delete "${expense.name}"?`;
 
-    var performDelete = function() {
-      var deletePromise = mutateDelete({ id: expense.id }).then(function() {
+    const onConfirm = () => {
+      const deletePromise = deleteRecurring.mutate({ id: expense.id }).then(() => {
         if (isPaid) {
-          var matchingHistory = allHistory.filter(function(h) {
-            return h.user_id === userId
-              && h.expense_type === 'Recurring'
-              && h.expense_name === expense.name;
-          });
-          var deletePromises = matchingHistory.map(function(h) {
-            return mutateDeleteHistory({ id: h.id });
-          });
-          return Promise.all(deletePromises);
+          const matchingHistory = userHistory.filter(h => h.expense_type === 'Recurring' && h.expense_name === expense.name);
+          return Promise.all(matchingHistory.map(h => deleteHistory.mutate({ id: h.id })));
         }
         return Promise.resolve();
       });
@@ -189,142 +146,221 @@ const RecurringScreen = function(props) {
     };
 
     if (Platform.OS === 'web') {
-      if (window.confirm(msg)) { performDelete(); }
+      if (window.confirm(msg)) onConfirm();
     } else {
-      Alert.alert('Delete Expense', msg, [
-        { text: 'Cancel' },
-        { text: 'Delete', style: 'destructive', onPress: performDelete }
-      ]);
+      Alert.alert('Delete Expense', msg, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: onConfirm }]);
     }
   };
   
-  var getStatusColor = function(status) {
-    if (status === 'Paid') return theme.colors.primary;
-    if (status === 'Paid in Advance') return theme.colors.info;
-    return theme.colors.warning;
+  const getStatusColor = (status) => {
+    if (status === 'Paid') return '#10B981';
+    if (status === 'Paid in Advance') return '#3B82F6';
+    return '#F59E0B';
   };
   
-  var getStatusBg = function(status) {
-    if (status === 'Paid') return '#FED7AA';
-    if (status === 'Paid in Advance') return '#EFF6FF';
-    return '#FFFBEB';
+  const getStatusBg = (status) => {
+    if (status === 'Paid') return '#DCFCE7';
+    if (status === 'Paid in Advance') return '#DBEAFE';
+    return '#FEF3C7';
   };
   
-  return React.createElement(View, { testID: 'View-48', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'recurring-screen' },
-    React.createElement(SaveSuccessOverlay, { visible: showSaveSuccess, theme: theme, message: successMessage }),
-    React.createElement(View, { testID: 'View-49', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(20), paddingHorizontal: moderateScale(20) }, componentId: 'recurring-header' },
-      React.createElement(Text, { testID: 'Text-67', style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Recurring Expenses'),
-      React.createElement(Text, { testID: 'Text-68', style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, String(recurringExpenses.length) + ' total bills')
-    ),
-    React.createElement(ScrollView, { testID: 'ScrollView-8', horizontal: true, style: { flexGrow: 'initial', backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, showsHorizontalScrollIndicator: false, contentContainerStyle: { paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(12) } },
-      filters.map(function(f) {
-        var count = f === 'All' ? recurringExpenses.length : recurringExpenses.filter(r => r.status === f).length;
-        return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-18', key: f, onPress: function() { setFilter(f); },
-          style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(8), borderRadius: scale(20), marginRight: moderateScale(8), backgroundColor: filter === f ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: filter === f ? theme.colors.primary : '#FED7AA' },
-          componentId: 'filter-' + f
-        },
-          React.createElement(Text, { testID: 'Text-69', style: { color: filter === f ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(13), fontWeight: '600' } }, f),
-          count > 0 ? React.createElement(View, { style: { marginLeft: moderateScale(6), backgroundColor: filter === f ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: scale(10), paddingHorizontal: moderateScale(6), paddingVertical: moderateScale(2) } },
-            React.createElement(Text, { style: { color: filter === f ? '#FFFFFF' : theme.colors.primary, fontSize: normalize(11), fontWeight: 'bold' } }, String(count))
-          ) : null
-        );
-      })
-    ),
-    loading ? React.createElement(View, { testID: 'View-50', style: { flex: 1, alignItems: 'center', justifyContent: 'center' }, componentId: 'recurring-loading' },
-      React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-4', size: 'large', color: theme.colors.primary })
-    ) :
-    React.createElement(ScrollView, { testID: 'ScrollView-9', style: { flex: 1 },
-      contentContainerStyle: { paddingTop: moderateScale(16), paddingHorizontal: moderateScale(16), paddingBottom: scrollBottomPadding }
-    },
-      filtered.length === 0 ? React.createElement(View, { testID: 'View-51', style: { alignItems: 'center', paddingTop: moderateScale(40), paddingHorizontal: moderateScale(30) }, componentId: 'recurring-empty' },
-        React.createElement(Text, { style: { fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(8), textAlign: 'center' } }, "You're all caught up! 🎉"),
-        React.createElement(Text, { testID: 'Text-70', style: { fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: normalize(22) } }, "No recurring bills to worry about. If you have monthly subscriptions or rent, tap the + button to keep track of them effortlessly.")
-      ) :
-      [...filtered.slice(0, visibleCount).map(function(expense, idx) {
-        var overdue = isOverdue(expense.due_date) && expense.status === 'Pending';
-        var upcoming = isWithin5Days(expense.due_date) && !overdue && expense.status === 'Pending';
-        var missingEnvelope = !isSimpleMode && expense.status === 'Pending' && !findEnvelopeForCategory(envelopes, expense.category);
-        return React.createElement(View, { testID: 'View-52', key: expense.id,
-          style: { backgroundColor: theme.colors.card, borderRadius: scale(14), padding: moderateScale(16), marginBottom: moderateScale(12), shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, borderLeftWidth: overdue ? scale(4) : (upcoming ? scale(4) : 0), borderLeftColor: overdue ? theme.colors.error : theme.colors.warning },
-          componentId: 'recurring-item-' + idx
-        },
-          React.createElement(View, { testID: 'View-53', style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' } },
-            React.createElement(View, { testID: 'View-54', style: { flex: 1, marginRight: moderateScale(12) } },
-              React.createElement(Text, { testID: 'Text-72', style: { fontSize: normalize(16), fontWeight: 'bold', color: theme.colors.textPrimary } }, expense.name),
-              React.createElement(Text, { testID: 'Text-73', style: { fontSize: normalize(13), color: theme.colors.textSecondary, marginTop: 3 } }, 'Due: ' + formatDate(expense.due_date)),
-              overdue ? React.createElement(Text, { testID: 'Text-74', style: { fontSize: normalize(12), color: theme.colors.error, marginTop: 2 } }, '⚠ OVERDUE') : null,
-              upcoming ? React.createElement(Text, { testID: 'Text-75', style: { fontSize: normalize(12), color: theme.colors.warning, marginTop: 2 } }, '⏰ Due soon') : null,
-              missingEnvelope ? React.createElement(Text, { testID: 'Text-76', style: { fontSize: normalize(12), color: theme.colors.error, marginTop: 2 } }, '⚠ Envelope missing — edit or delete this bill') : null
-            ),
-            React.createElement(View, { testID: 'View-55', style: { alignItems: 'flex-end' } },
-              React.createElement(Text, { testID: 'Text-77', style: { fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary } }, formatCurrency(expense.amount)),
-              React.createElement(View, { testID: 'View-56', style: { backgroundColor: getStatusBg(expense.status), borderRadius: scale(20), paddingHorizontal: moderateScale(10), paddingVertical: moderateScale(4), marginTop: 6 } },
-                React.createElement(Text, { testID: 'Text-78', style: { fontSize: normalize(11), color: getStatusColor(expense.status), fontWeight: '600' } }, expense.status)
-              )
-            )
-          ),
-          React.createElement(View, { testID: 'View-57', style: { flexDirection: 'row', marginTop: moderateScale(14), gap: moderateScale(8) } },
-            expense.status === 'Pending' ? React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-19', onPress: function() { triggerImpactHaptic('Light'); handlePayPress(expense); },
-              style: { flex: 1, backgroundColor: theme.colors.primary, borderRadius: scale(10), paddingVertical: moderateScale(10), alignItems: 'center' },
-              componentId: 'pay-btn-' + idx
-            },
-              React.createElement(Text, { testID: 'Text-79', style: { color: '#FFFFFF', fontSize: normalize(14), fontWeight: '600' } }, '💰 Pay Now')
-            ) : React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-20', onPress: function() { handleResetStatus(expense); },
-              style: { flex: 1, backgroundColor: theme.colors.background, borderRadius: scale(10), paddingVertical: moderateScale(10), alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
-              componentId: 'reset-btn-' + idx
-            },
-              React.createElement(Text, { testID: 'Text-80', style: { color: theme.colors.textSecondary, fontSize: normalize(14), fontWeight: '600' } }, '↩ Reset')
-            ),
-            React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-21', onPress: function() { handleDelete(expense); },
-              style: { width: scale(42), height: scale(42), borderRadius: scale(10), backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center' },
-              componentId: 'delete-recurring-' + idx
-            },
-              React.createElement(MaterialIcons, { testID: 'MaterialIcons-10', name: 'delete-outline', size: scale(20), color: theme.colors.error })
-            )
-          )
-        );
-      }),
-      visibleCount < filtered.length ? React.createElement(TouchableOpacity, {
-        key: 'see-more-btn',
-        onPress: () => setVisibleCount(visibleCount + 5),
-        style: { alignItems: 'center', paddingVertical: moderateScale(16) }
-      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold', fontSize: normalize(14) } }, "See More (" + (filtered.length - visibleCount) + " hidden)")) : null]
-    ),
-    React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-22', onPress: function() {
-        triggerImpactHaptic('Medium');
-        if (!isSimpleMode && !hasUserEnvelopes(userSettings)) {
-          showEnvelopeRequiredAlert();
-          return;
-        }
-        setShowAdd(true);
-      },
-      style: { position: 'absolute', right: scale(20), bottom: fabBottom, width: scale(56), height: scale(56), borderRadius: scale(28), backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
-      componentId: 'recurring-fab'
-    },
-      React.createElement(MaterialIcons, { testID: 'MaterialIcons-11', name: 'add', size: scale(28), color: '#FFFFFF' })
-    ),
-    React.createElement(PayModal, { testID: 'PayModal-1', visible: showPayModal,
-      expense: selectedExpense,
-      onClose: function() { setShowPayModal(false); },
-      onPaid: refetch,
-      userId: userId,
-      insetsTop: insets.top,
-      insetsBottom: insets.bottom,
-      theme: theme,
-      accounts: accounts,
-      userSettings: userSettings,
-      envelopeBalances: envelopeBalances
-    }),
-    React.createElement(AddExpenseModal, { testID: 'AddExpenseModal-2', visible: showAdd,
-      onClose: function() { setShowAdd(false); },
-      onSaved: refetch,
-      userId: userId,
-      theme: theme,
-      insetsTop: insets.top,
-      insetsBottom: insets.bottom,
-      accounts: accounts,
-      initialExpType: 'recurring'
-    })
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
+
+      {/* Premium Header */}
+      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(24), paddingHorizontal: moderateScale(20), shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 }}>
+        <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Recurring Bills</Text>
+        <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '600' }}>
+          Managing {recurringExpenses.length} active subscriptions
+        </Text>
+      </View>
+
+      {/* Modern Filter Bar */}
+      <View style={{ backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(14) }}>
+          {filters.map(f => {
+            const isActive = filter === f;
+            const count = f === 'All' ? recurringExpenses.length : recurringExpenses.filter(r => r.status === f).length;
+            return (
+              <TouchableOpacity
+                key={f}
+                onPress={() => { triggerImpactHaptic('Light'); setFilter(f); }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: moderateScale(16),
+                  paddingVertical: moderateScale(8),
+                  borderRadius: scale(20),
+                  marginRight: moderateScale(10),
+                  backgroundColor: isActive ? theme.colors.primary : theme.colors.background,
+                  borderWidth: 1,
+                  borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                  shadowColor: isActive ? theme.colors.primary : '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isActive ? 0.2 : 0.05,
+                  shadowRadius: 4,
+                  elevation: 2
+                }}
+              >
+                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(13), fontWeight: 'bold' }}>{f}</Text>
+                {count > 0 && (
+                  <View style={{ marginLeft: 8, backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : theme.colors.border, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
+                    <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textPrimary, fontSize: normalize(10), fontWeight: '800' }}>{count}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: moderateScale(20), paddingHorizontal: moderateScale(16), paddingBottom: scrollBottomPadding }}>
+          {filtered.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingTop: moderateScale(60), paddingHorizontal: moderateScale(40) }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                 <MaterialIcons name="done-all" size={48} color={theme.colors.primary} />
+              </View>
+              <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 12, textAlign: 'center' }}>All Caught Up! 🎉</Text>
+              <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, opacity: 0.8 }}>
+                No {filter.toLowerCase()} bills found. High five for staying on top of your finances!
+              </Text>
+            </View>
+          ) : (
+            filtered.slice(0, visibleCount).map((expense, idx) => {
+              const isPending = expense.status === 'Pending';
+              const overdue = isOverdue(expense.due_date) && isPending;
+              const upcoming = isWithin5Days(expense.due_date) && !overdue && isPending;
+              const statusColor = getStatusColor(expense.status);
+
+              return (
+                <View key={expense.id} style={{
+                  backgroundColor: theme.colors.card,
+                  borderRadius: scale(20),
+                  padding: moderateScale(18),
+                  marginBottom: moderateScale(14),
+                  borderWidth: 1.5,
+                  borderColor: overdue ? theme.colors.error + '44' : (upcoming ? theme.colors.warning + '44' : theme.colors.border),
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={{ fontSize: normalize(16), fontWeight: '900', color: theme.colors.textPrimary }} numberOfLines={1}>{expense.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                        <MaterialIcons name="event" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
+                        <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, fontWeight: '600' }}>Due {formatDate(expense.due_date)}</Text>
+                      </View>
+
+                      {overdue && (
+                        <View style={{ alignSelf: 'flex-start', backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center' }}>
+                           <MaterialIcons name="error-outline" size={14} color="#DC2626" style={{ marginRight: 4 }} />
+                           <Text style={{ fontSize: normalize(11), color: '#DC2626', fontWeight: 'bold' }}>OVERDUE</Text>
+                        </View>
+                      )}
+                      {upcoming && (
+                        <View style={{ alignSelf: 'flex-start', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center' }}>
+                           <MaterialIcons name="access-time" size={14} color="#B45309" style={{ marginRight: 4 }} />
+                           <Text style={{ fontSize: normalize(11), color: '#B45309', fontWeight: 'bold' }}>DUE SOON</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: normalize(20), fontWeight: '900', color: theme.colors.textPrimary }}>{formatCurrency(expense.amount)}</Text>
+                      <View style={{ backgroundColor: getStatusBg(expense.status), borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, borderWidth: 1, borderColor: statusColor + '22' }}>
+                        <Text style={{ fontSize: normalize(11), color: statusColor, fontWeight: '900', textTransform: 'uppercase' }}>{expense.status}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 18, opacity: 0.5 }} />
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    {isPending ? (
+                      <TouchableOpacity
+                        onPress={() => { triggerImpactHaptic('Medium'); handlePayPress(expense); }}
+                        style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+                      >
+                        <MaterialIcons name="check-circle" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: normalize(14), fontWeight: '900' }}>Mark as Paid</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => handleResetStatus(expense)}
+                        style={{ flex: 1, backgroundColor: theme.colors.background, borderRadius: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.colors.border }}
+                      >
+                        <MaterialIcons name="undo" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(14), fontWeight: 'bold' }}>Undo Payment</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity
+                      onPress={() => handleDelete(expense)}
+                      style={{ width: scale(48), height: scale(48), borderRadius: 14, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FCA5A5' }}
+                    >
+                      <MaterialIcons name="delete-outline" size={24} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
+
+          {visibleCount < filtered.length && (
+            <TouchableOpacity onPress={() => setVisibleCount(v => v + 10)} style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: normalize(14) }}>
+                Load {filtered.length - visibleCount} More Bills
+              </Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Floating Add Button */}
+      <TouchableOpacity
+        onPress={() => {
+          triggerImpactHaptic('Medium');
+          if (!isSimpleMode && !hasUserEnvelopes(userSettings)) {
+            showEnvelopeRequiredAlert();
+            return;
+          }
+          setShowAdd(true);
+        }}
+        style={{ position: 'absolute', right: scale(20), bottom: fabBottom, width: scale(60), height: scale(60), borderRadius: scale(30), backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 }}
+      >
+        <MaterialIcons name="add" size={scale(32)} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      <PayModal
+        visible={showPayModal}
+        expense={selectedExpense}
+        onClose={() => setShowPayModal(false)}
+        onPaid={refetch}
+        userId={userId}
+        insetsTop={insets.top}
+        insetsBottom={insets.bottom}
+        theme={theme}
+        accounts={accounts}
+        userSettings={userSettings}
+        envelopeBalances={envelopeBalances}
+      />
+
+      <AddExpenseModal
+        visible={showAdd}
+        onClose={() => setShowAdd(false)}
+        onSaved={refetch}
+        userId={userId}
+        theme={theme}
+        insetsTop={insets.top}
+        insetsBottom={insets.bottom}
+        accounts={accounts}
+        initialExpType="recurring"
+      />
+    </View>
   );
 };
 

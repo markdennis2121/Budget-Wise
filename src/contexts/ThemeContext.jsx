@@ -52,10 +52,24 @@ const darkTheme = {
 };
 
 const THEME_MAP = {
-  '#D97706': { background: '#1A1614', card: '#261F1D', border: '#3D302C' }, // Classic Penny
+  // Standard Themes
+  '#10B981': { background: '#0B0F19', card: '#1F2937', border: '#374151' }, // Penny Classic
+  '#2563EB': { background: '#0F172A', card: '#1E293B', border: '#334155' }, // Corporate Blue
+  '#059669': { background: '#061613', card: '#0D2622', border: '#16423C' }, // Forest Green
+  '#111827': { background: '#000000', card: '#111827', border: '#1F2937' }, // Stealth Black
+
+  // Premium Themes
+  '#D97706': { background: '#1A1614', card: '#261F1D', border: '#3D302C' }, // Copper Penny
   '#EAB308': { background: '#0F172A', card: '#1E293B', border: '#334155' }, // Midnight Royal
-  '#2DD4BF': { background: '#000000', card: '#121212', border: '#262626' }, // Cyber Mint
-  '#059669': { background: '#061613', card: '#0D2622', border: '#16423C' }  // Forest Serenity
+  '#2DD4BF': { background: '#020D0C', card: '#051A18', border: '#0A3330' }, // Cyber Mint
+  '#FB7185': { background: '#1C1012', card: '#2D181B', border: '#452226' }, // Rose Gold
+  '#8B5CF6': { background: '#12101C', card: '#1C182E', border: '#2D264A' }, // Lavender Dream
+  '#D4A373': { background: '#171412', card: '#241F1C', border: '#382F2A' }, // Latte Neutral
+
+  // Gradients (Using the first color as key)
+  '#FF512F': { background: '#1A0D08', card: '#2A140D', border: '#451F14' }, // Sunset Blend
+  '#8E2DE2': { background: '#0D081A', card: '#150D2A', border: '#231445' }, // Cosmic Purple
+  '#11998E': { background: '#081A18', card: '#0D2A27', border: '#144541' }, // Mint Glow
 };
 
 const ThemeContext = createContext({

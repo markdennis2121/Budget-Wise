@@ -1,4 +1,4 @@
-# Penny
+# Penny (v5.5.2)
 
 A premium, highly aesthetic, cross-platform **Personal Ledger & Envelope Budgeting** companion built with React Native, React Native Web, Vite, and Capacitor.
 

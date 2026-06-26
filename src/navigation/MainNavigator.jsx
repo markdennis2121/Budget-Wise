@@ -92,7 +92,7 @@ const WebSideBar = ({ state, navigation, theme, pendingCount }) => {
       <View style={{ marginTop: 'auto', marginBottom: 30, paddingHorizontal: 12 }}>
         <View style={{ backgroundColor: theme.colors.background, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: theme.colors.border }}>
           <Text style={{ fontSize: 12, color: theme.colors.textSecondary, fontWeight: 'bold' }}>VERSION</Text>
-          <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '800' }}>5.5.1 Release</Text>
+          <Text style={{ fontSize: 14, color: theme.colors.textPrimary, fontWeight: '800' }}>5.5.2 Release</Text>
         </View>
       </View>
     </View>

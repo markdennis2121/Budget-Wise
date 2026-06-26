@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   PENNY - RELEASE APK GENERATOR
+echo   PENNY - RELEASE APK GENERATOR (v5.5.2)
 echo ===================================================
 echo.
 echo [1/3] Building Web Production Assets...
@@ -22,5 +22,7 @@ echo ===================================================
 echo.
 echo Your hardened APK should be located at:
 echo android\app\build\outputs\apk\release\app-release.apk
+echo.
+explorer android\app\build\outputs\apk\release\
 echo.
 pause

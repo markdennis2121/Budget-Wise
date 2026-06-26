@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, ActivityIndicator, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
-import { formatDate, generateId } from '../utils/helpers';
+import { formatDate, generateId, formatCurrency } from '../utils/helpers';
 import { getDatabase, persistDatabase } from '../platform-hooks';
 import SaveSuccessOverlay from '../components/SaveSuccessOverlay';
 import OnboardingModal from '../components/OnboardingModal';
@@ -18,7 +18,7 @@ import {
   downloadFile
 } from '../utils/dataBackup';
 import { parseUserEnvelopes } from '../utils/envelopeGuards';
-import { getStoredAccountsList } from '../utils/accountBalances';
+import { getStoredAccountsList, buildAccountsWithBalances } from '../utils/accountBalances';
 import { calculateArchiveRollup, applyArchiveToDatabase } from '../utils/dataArchive';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
@@ -141,6 +141,14 @@ const SettingsScreen = function(props) {
   var historyQuery = useQuery('expense_history');
   var userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
 
+  var accountsWithBalances = useMemo(() => {
+    if (!userSettings) return [];
+    return buildAccountsWithBalances({ userSettings: userSettings, userHistory: userHistory });
+  }, [userSettings, userHistory]);
+
+  var totalWalletBalance = accountsWithBalances.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  var isArchiveDisabled = Math.abs(totalWalletBalance) > 0.01;
+
   var handleExportExcel = function () {
     if (!userId) {
       showAlert('Error', 'Sign in to export your data.');
@@ -194,6 +202,11 @@ const SettingsScreen = function(props) {
     // UI/UX Nudge: Check Premium for Archive/Compression
     if (!userSettings?.is_premium) {
       navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
+      return;
+    }
+
+    if (isArchiveDisabled) {
+      showAlert('Archive Disabled', 'You cannot compress history while your wallets have a positive balance. Please transfer or spend your remaining ' + formatCurrency(totalWalletBalance) + ' before archiving for data integrity.');
       return;
     }
 
@@ -306,6 +319,9 @@ const SettingsScreen = function(props) {
     }
   };
 
+  var [showResetConfirm, setShowResetConfirm] = useState(false);
+  var [resetConfirmText, setResetConfirmText] = useState('');
+
   return React.createElement(View, { testID: 'View-71', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'settings-screen' },
     React.createElement(OnboardingModal, {
       visible: showAppTour,
@@ -314,6 +330,71 @@ const SettingsScreen = function(props) {
       mutateUpdateSettings: mutateUpdate
     }),
     React.createElement(SaveSuccessOverlay, { visible: showPinSaved, theme: theme, message: 'PIN saved!' }),
+
+    React.createElement(Modal, {
+      visible: showResetConfirm,
+      transparent: true,
+      animationType: 'fade',
+      onRequestClose: () => setShowResetConfirm(false)
+    },
+      React.createElement(View, { style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 } },
+        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 24, padding: 24, borderWidth: 2, borderColor: '#EF4444' } },
+          React.createElement(View, { style: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 } },
+            React.createElement(MaterialIcons, { name: 'report-problem', size: 36, color: '#EF4444' })
+          ),
+          React.createElement(Text, { style: { fontSize: 20, fontWeight: '900', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 } }, 'FACTORY RESET'),
+          React.createElement(Text, { style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 } },
+            'This will permanently delete all your Wallets, Envelopes, and Transaction History. This action is irreversible.'
+          ),
+          React.createElement(Text, { style: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' } }, 'Type "RESET" to confirm:'),
+          React.createElement(TextInput, {
+            value: resetConfirmText,
+            onChangeText: setResetConfirmText,
+            placeholder: 'RESET',
+            placeholderTextColor: theme.colors.textSecondary,
+            style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, textAlign: 'center', fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 20 }
+          }),
+          React.createElement(View, { style: { flexDirection: 'row', gap: 12 } },
+            React.createElement(TouchableOpacity, {
+              onPress: () => { setShowResetConfirm(false); setResetConfirmText(''); },
+              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }
+            },
+              React.createElement(Text, { style: { fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Cancel')
+            ),
+            React.createElement(TouchableOpacity, {
+              disabled: resetConfirmText !== 'RESET',
+              onPress: function() {
+                var performReset = function() {
+                  var db = getDatabase();
+                  if (db) {
+                    db.expense_history = (db.expense_history || []).filter(function(h) { return h.user_id !== userId; });
+                    db.recurring_expenses = (db.recurring_expenses || []).filter(function(r) { return r.user_id !== userId; });
+                    db.one_time_expenses = (db.one_time_expenses || []).filter(function(o) { return o.user_id !== userId; });
+                    db.user_settings = (db.user_settings || []).map(function(s) {
+                      if (s.user_id === userId) {
+                        return Object.assign({}, s, { envelopes: [], accounts: [], accounts_customized: false, savings: [], monthly_salary: 0 });
+                      }
+                      return s;
+                    });
+                    persistDatabase(db);
+                    refetch();
+                    historyQuery.refetch();
+                    setShowResetConfirm(false);
+                    setResetConfirmText('');
+                    if (Platform.OS === 'web') window.alert("Account cleared.");
+                    else Alert.alert("Reset Complete", "Your account has been cleared.");
+                  }
+                };
+                performReset();
+              },
+              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: resetConfirmText === 'RESET' ? '#EF4444' : theme.colors.border, alignItems: 'center' }
+            },
+              React.createElement(Text, { style: { fontWeight: 'bold', color: '#FFFFFF' } }, 'Delete All')
+            )
+          )
+        )
+      )
+    ),
 
     React.createElement(View, { testID: 'View-72', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }, componentId: 'settings-header' },
       React.createElement(Text, { testID: 'Text-91', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Settings'),
@@ -546,17 +627,18 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(TouchableOpacity, {
           onPress: handleArchiveData,
-          disabled: backupBusy,
-          style: { backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
+          disabled: backupBusy || isArchiveDisabled,
+          style: { backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: (backupBusy || isArchiveDisabled) ? 0.6 : 1 }
         },
           React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-            React.createElement(MaterialIcons, { name: 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
-            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, 'Compress Old Data'),
+            React.createElement(MaterialIcons, { name: isArchiveDisabled ? 'lock' : 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
+            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, isArchiveDisabled ? 'Archive Locked (Balance > 0)' : 'Compress Old Data'),
             !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: theme.colors.error } },
               React.createElement(Text, { style: { color: theme.colors.error, fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
             ) : null
           )
         ),
+        isArchiveDisabled ? React.createElement(Text, { style: { fontSize: 10, color: theme.colors.error, textAlign: 'center', marginBottom: 10, fontStyle: 'italic' } }, 'Empty your wallets to enable history compression.') : null,
         React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
           'Your data is private and stays on this device.'
         )
@@ -573,7 +655,7 @@ const SettingsScreen = function(props) {
         ),
         React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
           React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.1')
+          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.2')
         )
       ),
       React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } },
@@ -584,31 +666,7 @@ const SettingsScreen = function(props) {
 
         React.createElement(TouchableOpacity, {
           onPress: function() {
-            var msg = "This will clear all your Wallets, Envelopes, and Transaction History for this account. Your login will remain active. This cannot be undone! Continue?";
-            var performReset = function() {
-              var db = getDatabase();
-              if (db) {
-                db.expense_history = (db.expense_history || []).filter(function(h) { return h.user_id !== userId; });
-                db.recurring_expenses = (db.recurring_expenses || []).filter(function(r) { return r.user_id !== userId; });
-                db.one_time_expenses = (db.one_time_expenses || []).filter(function(o) { return o.user_id !== userId; });
-                db.user_settings = (db.user_settings || []).map(function(s) {
-                  if (s.user_id === userId) {
-                    return Object.assign({}, s, { envelopes: [], accounts: [], accounts_customized: false, savings: [], monthly_salary: 0 });
-                  }
-                  return s;
-                });
-                persistDatabase(db);
-                refetch();
-                historyQuery.refetch();
-                if (Platform.OS === 'web') window.alert("Account cleared.");
-                else Alert.alert("Reset Complete", "Your account has been cleared.");
-              }
-            };
-            if (Platform.OS === 'web') {
-              if (window.confirm(msg)) performReset();
-            } else {
-              Alert.alert("Factory Reset?", msg, [{ text: "Cancel" }, { text: "Reset", style: "destructive", onPress: performReset }]);
-            }
+            setShowResetConfirm(true);
           },
           style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border }
         },
@@ -642,7 +700,7 @@ const SettingsScreen = function(props) {
         React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
           React.createElement(View, { style: { flex: 1 } },
             React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Premium Status'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Toggle Basic vs Luxe UI')
+            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Toggle Basic vs Premium UI')
           ),
           React.createElement(TouchableOpacity, {
             onPress: () => {

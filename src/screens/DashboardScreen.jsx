@@ -16,7 +16,7 @@ import { hasUserEnvelopes, showEnvelopeRequiredAlert } from '../utils/envelopeGu
 import logoImg from '../assets/logo.png';
 import { formatCurrency, getCurrentMonthStr } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
-import { scale, moderateScale, SCREEN_WIDTH } from '../utils/responsive';
+import { scale, moderateScale, normalize, SCREEN_WIDTH } from '../utils/responsive';
 import {
   TAB_MENU_HEIGHT,
   SCROLL_EXTRA_PADDING,
@@ -482,71 +482,75 @@ const DashboardScreen = function (props) {
                   setSelectedAccount(acc);
                   setShowEditAccountModal(true);
                 };
-                return (
-                  <Animated.View key={acc.id} style={{ opacity: walletsFade }}>
-                    <Pressable
-                      onPress={openWalletEditor}
-                      style={function ({ pressed }) {
-                        var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-                        var mainColor = acc.color || styleInfo.color;
+                    return (
+                      <Animated.View key={acc.id} style={{ opacity: walletsFade }}>
+                        <Pressable
+                          onPress={openWalletEditor}
+                          style={function ({ pressed }) {
+                            var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
+                            var mainColor = acc.color || styleInfo.color;
+                            var shadowColor = mainColor;
 
-                        return {
-                          width: scale(180),
-                          height: scale(110),
-                          backgroundColor: mainColor,
-                          borderRadius: scale(20),
-                          padding: moderateScale(16),
-                          marginRight: moderateScale(14),
-                          justifyContent: 'space-between',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          shadowColor: mainColor,
-                          shadowOffset: { width: 0, height: 6 },
-                          shadowOpacity: 0.25,
-                          shadowRadius: 8,
-                          elevation: 8,
-                          borderWidth: 1,
-                          borderColor: 'rgba(255,255,255,0.2)',
-                          opacity: pressed ? 0.9 : 1,
-                          transform: [{ scale: pressed ? 0.96 : 1 }]
-                        };
-                      }}
-                    >
-                      {/* Premium Mesh Gradient Background */}
-                      {Platform.OS === 'web' && (
-                        <View style={{
-                          position: 'absolute',
-                          top: 0, left: 0, right: 0, bottom: 0,
-                          backgroundImage: `linear-gradient(135deg, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 0%, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color2 || (WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 100%)`
-                        }} />
-                      )}
+                            return {
+                              width: scale(190),
+                              height: scale(115),
+                              backgroundColor: mainColor,
+                              borderRadius: scale(24),
+                              padding: moderateScale(18),
+                              marginRight: moderateScale(16),
+                              justifyContent: 'space-between',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              shadowColor: shadowColor,
+                              shadowOffset: { width: 0, height: 8 },
+                              shadowOpacity: 0.35,
+                              shadowRadius: 10,
+                              elevation: 10,
+                              borderWidth: 1.5,
+                              borderColor: 'rgba(255,255,255,0.25)',
+                              opacity: pressed ? 0.9 : 1,
+                              transform: [{ scale: pressed ? 0.96 : 1 }]
+                            };
+                          }}
+                        >
+                          {/* Premium Mesh Gradient Background */}
+                          {Platform.OS === 'web' ? (
+                            <View style={{
+                              position: 'absolute',
+                              top: 0, left: 0, right: 0, bottom: 0,
+                              backgroundImage: `linear-gradient(135deg, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 0%, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color2 || (WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 100%)`
+                            }} />
+                          ) : (
+                            /* Mobile: Subtle Glossy Highlight */
+                            <View style={{ position: 'absolute', top: -scale(40), left: -scale(40), width: scale(100), height: scale(100), borderRadius: scale(50), backgroundColor: 'rgba(255,255,255,0.12)' }} />
+                          )}
 
-                      {/* Background Watermark Icon */}
-                      <View style={{ position: 'absolute', right: scale(-15), bottom: scale(-15), opacity: 0.12 }}>
-                         <BrandLogo type={acc.type} size={scale(90)} />
-                      </View>
+                          {/* Background Watermark Icon */}
+                          <View style={{ position: 'absolute', right: scale(-12), bottom: scale(-12), opacity: 0.15 }}>
+                             <BrandLogo type={acc.type} size={scale(85)} />
+                          </View>
 
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
-                        <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: scale(6), borderRadius: scale(10), borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
-                           <BrandLogo type={acc.type} size={scale(22)} />
-                        </View>
-                        <View style={{ width: scale(28), height: scale(28), borderRadius: scale(14), backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="edit" size={scale(14)} color="#FFFFFF" />
-                        </View>
-                      </View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
+                            <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', padding: scale(7), borderRadius: scale(12), borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' }}>
+                               <BrandLogo type={acc.type} size={scale(20)} />
+                            </View>
+                            <View style={{ width: scale(30), height: scale(30), borderRadius: scale(15), backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+                              <MaterialIcons name="edit" size={scale(15)} color="#FFFFFF" />
+                            </View>
+                          </View>
 
-                      <View style={{ zIndex: 1 }}>
-                        <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
-                          <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }} numberOfLines={1}>
-                            {acc.name || 'Wallet'}
-                          </Text>
-                        </View>
-                        <Text style={[{ fontSize: scale(19), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.1)' } : { textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>
-                          {maskAmount(acc.balance)}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </Animated.View>
+                          <View style={{ zIndex: 1 }}>
+                            <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8, marginBottom: 6 }}>
+                              <Text style={{ fontSize: scale(9.5), color: '#FFFFFF', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1.2 }} numberOfLines={1}>
+                                {acc.name || 'Wallet'}
+                              </Text>
+                            </View>
+                            <Text style={[{ fontSize: scale(21), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 3px rgba(0,0,0,0.15)' } : { textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 }]}>
+                              {maskAmount(acc.balance)}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      </Animated.View>
                 );
               })}
             </ScrollView>
@@ -566,22 +570,26 @@ const DashboardScreen = function (props) {
                         key={acc.id}
                         onPress={openWalletEditor}
                         style={function ({ pressed }) {
+                          var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
+                          var mainColor = acc.color || styleInfo.color;
+                          var shadowColor = mainColor;
+
                           return {
                             width: '48%',
-                            height: isSimpleMode ? scale(120) : scale(100),
+                            height: isSimpleMode ? scale(125) : scale(105),
                             backgroundColor: mainColor,
-                            borderRadius: scale(22),
-                            padding: moderateScale(isSimpleMode ? 16 : 12),
-                            marginBottom: moderateScale(12),
+                            borderRadius: scale(24),
+                            padding: moderateScale(isSimpleMode ? 18 : 14),
+                            marginBottom: moderateScale(14),
                             justifyContent: 'space-between',
                             position: 'relative',
                             overflow: 'hidden',
-                            shadowColor: mainColor,
+                            shadowColor: shadowColor,
                             shadowOffset: { width: 0, height: 6 },
-                            shadowOpacity: 0.25,
+                            shadowOpacity: 0.3,
                             shadowRadius: 8,
-                            elevation: 6,
-                            borderWidth: 1,
+                            elevation: 8,
+                            borderWidth: 1.5,
                             borderColor: 'rgba(255,255,255,0.25)',
                             opacity: pressed ? 0.9 : 1,
                             transform: [{ scale: pressed ? 0.97 : 1 }]
@@ -589,30 +597,33 @@ const DashboardScreen = function (props) {
                         }}
                       >
                         {/* Premium Mesh Gradient Background */}
-                        {Platform.OS === 'web' && (
+                        {Platform.OS === 'web' ? (
                           <View style={{
                             position: 'absolute',
                             top: 0, left: 0, right: 0, bottom: 0,
                             backgroundImage: `linear-gradient(135deg, ${styleInfo.color} 0%, ${styleInfo.color2 || styleInfo.color} 100%)`
                           }} />
+                        ) : (
+                          /* Mobile: Subtle Glossy Highlight */
+                          <View style={{ position: 'absolute', top: -scale(30), left: -scale(30), width: scale(80), height: scale(80), borderRadius: scale(40), backgroundColor: 'rgba(255,255,255,0.1)' }} />
                         )}
 
-                        <View style={{ position: 'absolute', right: scale(-10), bottom: scale(-10), opacity: 0.12 }}>
-                           <BrandLogo type={acc.type} size={scale(isSimpleMode ? 85 : 65)} />
+                        <View style={{ position: 'absolute', right: scale(-8), bottom: scale(-8), opacity: 0.15 }}>
+                           <BrandLogo type={acc.type} size={scale(isSimpleMode ? 80 : 60)} />
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 1 }}>
-                          <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', padding: scale(5), borderRadius: scale(8), borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' }}>
-                            <BrandLogo type={acc.type} size={scale(20)} />
+                          <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', padding: scale(5), borderRadius: scale(9), borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.25)' }}>
+                            <BrandLogo type={acc.type} size={scale(18)} />
                           </View>
-                          <MaterialIcons name="edit" size={scale(14)} color="#FFFFFF" style={{ opacity: 0.8 }} />
+                          <MaterialIcons name="edit" size={scale(14)} color="#FFFFFF" style={{ opacity: 0.9 }} />
                         </View>
                         <View style={{ zIndex: 1 }}>
-                          <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4, marginBottom: 2 }}>
-                            <Text style={{ fontSize: scale(isSimpleMode ? 9 : 8), color: '#FFFFFF', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 }} numberOfLines={1}>
+                          <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 4 }}>
+                            <Text style={{ fontSize: scale(isSimpleMode ? 9.5 : 8.5), color: '#FFFFFF', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.8 }} numberOfLines={1}>
                               {acc.name}
                             </Text>
                           </View>
-                          <Text style={[{ fontSize: scale(isSimpleMode ? 19 : 16), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.1)' } : { textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>
+                          <Text style={[{ fontSize: scale(isSimpleMode ? 20 : 17), color: '#FFFFFF', fontWeight: '900' }, Platform.OS === 'web' ? { textShadow: '1px 1px 2px rgba(0,0,0,0.1)' } : { textShadowColor: 'rgba(0,0,0,0.1)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 }]}>
                             {maskAmount(acc.balance)}
                           </Text>
                         </View>
@@ -705,50 +716,51 @@ const DashboardScreen = function (props) {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding + FAB_SCROLL_BOTTOM_EXTRA }}>
 
-        {/* Header Block (Floating Card Style) */}
-        <View style={{ paddingTop: insets.top + moderateScale(16), paddingHorizontal: moderateScale(20), paddingBottom: moderateScale(10) }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(12) }}>
-              <Image source={logoImg} style={{ width: scale(44), height: scale(44), borderRadius: scale(22), borderWidth: 1, borderColor: theme.colors.border }} />
-              <View>
-                <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary, letterSpacing: 1 }}>PENNY</Text>
-                <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary }}>{greeting}, {userName}!</Text>
+        {/* Header Block (Modern Mobile Layout) */}
+        <View style={{ paddingTop: insets.top + moderateScale(12), paddingHorizontal: moderateScale(20), paddingBottom: moderateScale(15) }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(18) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10), flex: 1 }}>
+              <Image source={logoImg} style={{ width: scale(40), height: scale(40), borderRadius: scale(20), borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: scale(10), fontWeight: '800', color: theme.colors.textSecondary, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.8 }}>PENNY</Text>
+                <Text style={{ fontSize: scale(16), fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>{greeting}, {userName}!</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10) }}>
-            <TouchableOpacity
-              onPress={function () { triggerImpactHaptic('Light'); state.setShowOnboarding(true); }}
-              accessibilityLabel="Open app tour"
-              style={{ width: scale(44), height: scale(44), borderRadius: scale(22), backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <MaterialIcons name="help-outline" size={scale(22)} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
-              style={{ width: scale(44), height: scale(44), borderRadius: scale(22), backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <MaterialIcons name="notifications-active" size={scale(22)} color={theme.colors.primary} />
-              {hasNewAlerts && (
-                <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: theme.colors.error, borderRadius: scale(10), minWidth: scale(20), height: scale(20), paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#FFFFFF', fontSize: scale(9), fontWeight: 'bold' }}>
-                    {(currentAlertCount - lastSeenAlertCount) > 0 ? (currentAlertCount - lastSeenAlertCount) : '!'}
-                  </Text>
-                </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
+              {(state.archivedEnvelopes.length > 0 || state.archivedAccounts.length > 0) && (
+                <TouchableOpacity
+                  onPress={function () { triggerImpactHaptic('Light'); setShowArchiveModal(true); }}
+                  style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
+                >
+                  <MaterialIcons name="inventory" size={scale(20)} color={theme.colors.textSecondary} />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
+                style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
+              >
+                <MaterialIcons name="notifications-none" size={scale(22)} color={theme.colors.primary} />
+                {hasNewAlerts && (
+                  <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: theme.colors.error, borderRadius: scale(9), minWidth: scale(18), height: scale(18), paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ color: '#FFFFFF', fontSize: scale(8), fontWeight: '900' }}>
+                      {(currentAlertCount - lastSeenAlertCount) > 0 ? (currentAlertCount - lastSeenAlertCount) : '!'}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
           <View style={{
             backgroundColor: theme.colors.primary,
-            borderRadius: scale(24),
-            padding: moderateScale(24),
-            flexDirection: 'column',
-            gap: moderateScale(18),
+            borderRadius: scale(22),
+            padding: moderateScale(20),
             shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.25,
-            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.2,
+            shadowRadius: 10,
             elevation: 8,
             overflow: 'hidden'
           }}>
@@ -839,7 +851,7 @@ const DashboardScreen = function (props) {
 
         {/* Content Container with standard padding */}
       <Animated.View
-        style={{ paddingHorizontal: moderateScale(20), paddingTop: moderateScale(isSimpleMode ? 0 : 20), opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
+        style={{ paddingHorizontal: moderateScale(20), paddingTop: moderateScale(isSimpleMode ? 0 : 15), opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
         onLayout={function (e) { scrollContentY.current = e.nativeEvent.layout.y; }}
       >
 
@@ -882,20 +894,58 @@ const DashboardScreen = function (props) {
                 ) : (
                   state.userHistory.slice(0, 10).map(function (h) {
                       var acc = state.accounts.find(a => a.id === h.account_id);
-                      var isPositive = h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income');
+                      var isIncome = h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income');
+                      var isTransfer = h.expense_type === 'Transfer';
+
+                      var typeColor = isIncome ? '#16A34A' : (isTransfer ? '#2563EB' : '#DC2626');
+                      var typeBg = isIncome ? '#DCFCE7' : (isTransfer ? '#DBEAFE' : '#FEE2E2');
+                      var typeIcon = isIncome ? 'trending-up' : (isTransfer ? 'swap-horiz' : 'trending-down');
 
                       return (
-                        <TouchableOpacity key={h.id} onPress={function () { triggerImpactHaptic('Light'); setSpentFilter({ id: h.id }); setShowSpentModal(true); }} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.card, padding: 16, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
-                          <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: isPositive ? '#DCFCE7' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                            <MaterialIcons name={isPositive ? 'trending-up' : 'trending-down'} size={20} color={isPositive ? '#16A34A' : '#DC2626'} />
+                        <TouchableOpacity
+                          key={h.id}
+                          onPress={function () { triggerImpactHaptic('Light'); setSpentFilter({ id: h.id }); setShowSpentModal(true); }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: theme.colors.card,
+                            padding: moderateScale(14),
+                            borderRadius: scale(18),
+                            marginBottom: moderateScale(10),
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.04,
+                            shadowRadius: 5,
+                            elevation: 2
+                          }}
+                        >
+                          <View style={{
+                            width: scale(42),
+                            height: scale(42),
+                            borderRadius: scale(12),
+                            backgroundColor: typeBg,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: moderateScale(14)
+                          }}>
+                            <MaterialIcons name={typeIcon} size={scale(22)} color={typeColor} />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{h.expense_name}</Text>
-                            <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{h.date} • {acc ? acc.name : 'Wallet'}</Text>
+                            <Text style={{ fontSize: normalize(15), fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{h.expense_name}</Text>
+                            <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 3 }}>
+                              {h.date} • {acc ? acc.name : 'Wallet'}
+                            </Text>
                           </View>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: isPositive ? '#16A34A' : theme.colors.textPrimary }}>
-                            {isPositive ? '+' : '-'}{maskAmount(h.amount)}
-                          </Text>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: normalize(16), fontWeight: '900', color: typeColor }}>
+                              {isIncome ? '+' : (isTransfer ? '' : '-')}{maskAmount(h.amount)}
+                            </Text>
+                            {isTransfer && (
+                              <Text style={{ fontSize: normalize(10), color: theme.colors.textSecondary, fontWeight: 'bold', textTransform: 'uppercase', marginTop: 2 }}>Transfer</Text>
+                            )}
+                          </View>
                         </TouchableOpacity>
                       );
                   })
@@ -927,14 +977,6 @@ const DashboardScreen = function (props) {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 8 }}>Envelopes</Text>
-                  {state.archivedEnvelopes.length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => setShowArchiveModal(true)}
-                      style={{ backgroundColor: theme.colors.primary + '25', padding: 8, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.primary + '40' }}
-                    >
-                      <MaterialIcons name="archive" size={20} color={theme.colors.primary} />
-                    </TouchableOpacity>
-                  )}
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <TouchableOpacity onPress={toggleEnvelopeView} style={{ padding: 4, marginRight: 12 }}>
@@ -972,6 +1014,7 @@ const DashboardScreen = function (props) {
                     {state.envelopeBalances.map(function (env) {
                       var actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
                       var isOverspent = env.available < 0;
+                      var accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
 
                       return (
                         <Animated.View key={env.id} style={{ opacity: envelopesFade }}>
@@ -982,28 +1025,32 @@ const DashboardScreen = function (props) {
                             }}
                             style={function ({ pressed }) {
                               return {
-                                width: scale(200),
-                                height: scale(130),
+                                width: scale(210),
+                                height: scale(140),
                                 backgroundColor: theme.colors.card,
-                                borderRadius: scale(24),
-                                padding: moderateScale(18),
-                                marginRight: moderateScale(14),
+                                borderRadius: scale(28),
+                                padding: moderateScale(20),
+                                marginRight: moderateScale(16),
                                 justifyContent: 'space-between',
-                                shadowColor: isOverspent ? theme.colors.error : theme.colors.primary,
-                                shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.1,
-                                shadowRadius: 8,
-                                elevation: 4,
+                                shadowColor: accentColor,
+                                shadowOffset: { width: 0, height: 8 },
+                                shadowOpacity: 0.15,
+                                shadowRadius: 12,
+                                elevation: 6,
                                 borderWidth: 1.5,
-                                borderColor: isOverspent ? theme.colors.error + '44' : theme.colors.primary + '22',
-                                opacity: pressed ? 0.92 : 1,
-                                transform: [{ scale: pressed ? 0.98 : 1 }]
+                                borderColor: isOverspent ? theme.colors.error + '33' : theme.colors.primary + '15',
+                                opacity: pressed ? 0.94 : 1,
+                                transform: [{ scale: pressed ? 0.97 : 1 }],
+                                overflow: 'hidden'
                               };
                             }}
                           >
+                            {/* Subtle Background Accent */}
+                            <View style={{ position: 'absolute', top: -scale(30), right: -scale(30), width: scale(100), height: scale(100), borderRadius: scale(50), backgroundColor: accentColor + '08' }} />
+
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                               <View style={{ backgroundColor: isOverspent ? theme.colors.error + '15' : theme.colors.primary + '15', padding: scale(8), borderRadius: scale(12) }}>
-                                 <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(22)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                               <View style={{ backgroundColor: accentColor + '12', padding: scale(10), borderRadius: scale(14), borderWidth: 1, borderColor: accentColor + '15' }}>
+                                 <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(24)} color={accentColor} />
                                </View>
                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                   <TouchableOpacity
@@ -1040,24 +1087,33 @@ const DashboardScreen = function (props) {
                                         }
                                       });
                                     }}
-                                    style={{ padding: scale(6), backgroundColor: isOverspent ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.2)', borderRadius: scale(8) }}
+                                    style={{ padding: scale(7), backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: scale(10), borderWidth: 1, borderColor: theme.colors.border }}
                                   >
-                                    <MaterialIcons name="archive" size={scale(16)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                                    <MaterialIcons name="archive" size={scale(16)} color={theme.colors.textSecondary} />
                                   </TouchableOpacity>
                                   {isOverspent && (
-                                    <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(8) }}>
-                                      <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: 'bold' }}>OVERSPENT</Text>
+                                    <View style={{ backgroundColor: theme.colors.error, paddingHorizontal: 10, paddingVertical: 5, borderRadius: scale(8), shadowColor: theme.colors.error, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 }}>
+                                      <Text style={{ fontSize: scale(9), color: '#FFFFFF', fontWeight: '900', letterSpacing: 0.5 }}>OVERSPENT</Text>
                                     </View>
                                   )}
                                </View>
                             </View>
 
                             <View>
-                              <Text style={{ fontSize: scale(13), color: theme.colors.textPrimary, fontWeight: '700' }} numberOfLines={1}>{env.name}</Text>
-                              <Text style={{ fontSize: scale(20), color: isOverspent ? theme.colors.error : theme.colors.textPrimary, fontWeight: '800', marginTop: 2 }}>{maskAmount(env.available)}</Text>
+                              <Text style={{ fontSize: scale(13.5), color: theme.colors.textPrimary, fontWeight: '700', letterSpacing: 0.3 }} numberOfLines={1}>{env.name}</Text>
+                              <Text style={{ fontSize: scale(22), color: isOverspent ? theme.colors.error : theme.colors.textPrimary, fontWeight: '900', marginTop: 4 }}>{maskAmount(env.available)}</Text>
 
-                              <View style={{ height: scale(6), backgroundColor: theme.colors.border, borderRadius: scale(3), marginTop: 10, overflow: 'hidden' }}>
-                                <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
+                              <View style={{ height: scale(8), backgroundColor: theme.isDark ? '#262626' : '#F3F4F6', borderRadius: scale(4), marginTop: 12, overflow: 'hidden', borderWidth: 0.5, borderColor: theme.colors.border }}>
+                                <View style={{
+                                  width: `${Math.min(100, env.spentPct)}%`,
+                                  height: '100%',
+                                  backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary,
+                                  borderRadius: scale(4),
+                                  shadowColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary,
+                                  shadowOffset: { width: 0, height: 0 },
+                                  shadowOpacity: 0.5,
+                                  shadowRadius: 4
+                                }} />
                               </View>
                             </View>
                           </Pressable>
@@ -1072,6 +1128,7 @@ const DashboardScreen = function (props) {
                       var goalAmount = actualEnv.goal_amount || 0;
                       var goalPct = goalAmount > 0 ? Math.min(100, Math.round((env.available / goalAmount) * 100)) : 0;
                       var isOverspent = env.available < 0;
+                      var accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
 
                       return (
                         <TouchableOpacity key={env.id} onPress={function () {
@@ -1080,20 +1137,23 @@ const DashboardScreen = function (props) {
                         }} style={{
                           width: '48%',
                           backgroundColor: theme.colors.card,
-                          borderRadius: scale(20),
-                          padding: moderateScale(16),
+                          borderRadius: scale(24),
+                          padding: moderateScale(18),
                           marginBottom: moderateScale(16),
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.05,
-                          shadowRadius: 4,
-                          elevation: 2,
-                          borderWidth: 1,
-                          borderColor: isOverspent ? theme.colors.error + '44' : theme.colors.border
+                          shadowColor: accentColor,
+                          shadowOffset: { width: 0, height: 6 },
+                          shadowOpacity: 0.12,
+                          shadowRadius: 10,
+                          elevation: 4,
+                          borderWidth: 1.5,
+                          borderColor: isOverspent ? theme.colors.error + '25' : theme.colors.border,
+                          overflow: 'hidden'
                         }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(12) }}>
-                            <View style={{ backgroundColor: isOverspent ? theme.colors.error + '10' : theme.colors.primary + '10', padding: scale(6), borderRadius: scale(8) }}>
-                              <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(18)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                          <View style={{ position: 'absolute', top: -scale(20), right: -scale(20), width: scale(60), height: scale(60), borderRadius: scale(30), backgroundColor: accentColor + '05' }} />
+
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(14) }}>
+                            <View style={{ backgroundColor: accentColor + '12', padding: scale(8), borderRadius: scale(10), borderWidth: 1, borderColor: accentColor + '15' }}>
+                              <MaterialIcons name={getEnvelopeIcon(env.name)} size={scale(20)} color={accentColor} />
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(6) }}>
                               <TouchableOpacity onPress={function (e) {
@@ -1128,31 +1188,39 @@ const DashboardScreen = function (props) {
                                     );
                                   }
                                 });
-                              }} style={{ padding: scale(4), backgroundColor: isOverspent ? 'rgba(239,68,68,0.1)' : theme.colors.primary + '15', borderRadius: scale(6) }}>
-                                <MaterialIcons name="archive" size={scale(14)} color={isOverspent ? theme.colors.error : theme.colors.primary} />
+                              }} style={{ padding: scale(5), backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', borderRadius: scale(8), borderWidth: 1, borderColor: theme.colors.border }}>
+                                <MaterialIcons name="archive" size={scale(14)} color={theme.colors.textSecondary} />
                               </TouchableOpacity>
                             </View>
                           </View>
-                          <Text style={{ fontSize: scale(13), fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 }} numberOfLines={1}>{env.name}</Text>
-                          <Text style={{ fontSize: scale(16), fontWeight: '800', color: isOverspent ? theme.colors.error : theme.colors.textPrimary }}>{maskAmount(env.available)}</Text>
+                          <Text style={{ fontSize: scale(13.5), fontWeight: '700', color: theme.colors.textPrimary, marginBottom: 5 }} numberOfLines={1}>{env.name}</Text>
+                          <Text style={{ fontSize: scale(18), fontWeight: '900', color: isOverspent ? theme.colors.error : theme.colors.textPrimary }}>{maskAmount(env.available)}</Text>
 
                           {env.spentThisMonth > 0 && (
-                            <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, marginTop: 4, fontWeight: '600' }}>
-                              Spent this month: {formatCurrency(env.spentThisMonth)}
+                            <Text style={{ fontSize: scale(9.5), color: theme.colors.textSecondary, marginTop: 6, fontWeight: '700', opacity: 0.8 }}>
+                              Used: {formatCurrency(env.spentThisMonth)}
                             </Text>
                           )}
 
-                          <View style={{ height: scale(4), backgroundColor: theme.colors.border, borderRadius: scale(2), marginTop: 12, overflow: 'hidden' }}>
-                            <View style={{ width: `${env.spentPct}%`, height: '100%', backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary }} />
+                          <View style={{ height: scale(6), backgroundColor: theme.isDark ? '#262626' : '#F3F4F6', borderRadius: scale(3), marginTop: 12, overflow: 'hidden', borderWidth: 0.5, borderColor: theme.colors.border }}>
+                            <View style={{
+                              width: `${Math.min(100, env.spentPct)}%`,
+                              height: '100%',
+                              backgroundColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary,
+                              shadowColor: env.spentPct >= 100 ? theme.colors.error : theme.colors.primary,
+                              shadowOffset: { width: 0, height: 0 },
+                              shadowOpacity: 0.4,
+                              shadowRadius: 3
+                            }} />
                           </View>
 
                           {goalAmount > 0 ? (
-                            <View style={{ marginTop: 10, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)', borderRadius: scale(10), padding: scale(6), borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.15)' }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: 'bold' }}>GOAL</Text>
-                                <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: 'bold' }}>{goalPct}%</Text>
+                            <View style={{ marginTop: 12, backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)', borderRadius: scale(12), padding: scale(8), borderWidth: 1, borderColor: 'rgba(16, 185, 129, 0.15)' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: '900', letterSpacing: 0.5 }}>GOAL</Text>
+                                <Text style={{ fontSize: scale(8), color: '#059669', fontWeight: '900' }}>{goalPct}%</Text>
                               </View>
-                              <Text style={{ fontSize: scale(9), fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>
+                              <Text style={{ fontSize: scale(10), fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>
                                 {maskAmount(env.available)} / {formatCurrency(goalAmount)}
                               </Text>
                             </View>
@@ -1244,7 +1312,16 @@ const DashboardScreen = function (props) {
       <AddAccountModal visible={showAddAccountModal} onClose={() => setShowAddAccountModal(false)} accounts={state.accounts} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} setShowPremiumModal={setShowPremiumModal} />
       <EditAccountModal visible={showEditAccountModal} onClose={() => { setShowEditAccountModal(false); setSelectedAccount(null); }} account={selectedAccount} accounts={state.accounts} userSettings={state.userSettings} envelopeBalances={state.envelopeBalances} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} userHistory={state.userHistory} />
       <NotificationCenterModal visible={showNotificationCenter} onClose={function () { setShowNotificationCenter(false); }} state={state} theme={theme} insets={insets} smartInsights={smartInsights} />
-      <ArchiveManagerModal visible={showArchiveModal} onClose={() => setShowArchiveModal(false)} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} theme={theme} />
+      <ArchiveManagerModal
+        visible={showArchiveModal}
+        onClose={() => setShowArchiveModal(false)}
+        envelopes={state.envelopes}
+        accounts={state.allAccounts}
+        userSettings={state.userSettings}
+        mutateUpdateSettings={state.mutateUpdateSettings}
+        onSaved={state.refetchAll}
+        theme={theme}
+      />
       <PremiumPaywallModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}

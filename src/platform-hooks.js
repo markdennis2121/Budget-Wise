@@ -326,7 +326,8 @@ const sanitizeDb = (db) => {
           name,
           starting_balance,
           type: acc.type || 'Custom',
-          color: acc.color || '#0F766E'
+          color: acc.color || '#0F766E',
+          isArchived: !!(acc.isArchived || acc.archived || acc.is_archived)
         };
       }).filter(acc => !!acc.id);
     }

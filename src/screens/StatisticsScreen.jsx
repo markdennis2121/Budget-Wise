@@ -48,12 +48,16 @@ const StatisticsScreen = function(props) {
     return parseUserEnvelopes(userSettings);
   }, [userSettings]);
 
-  var accounts = useMemo(function() {
+  var allAccounts = useMemo(function() {
     return buildAccountsWithBalances({
       userSettings: userSettings,
       userHistory: userHistory
     });
   }, [userSettings, userHistory]);
+
+  var accounts = useMemo(function() {
+    return allAccounts.filter(function(a) { return !a.isArchived; });
+  }, [allAccounts]);
 
   var incomeSources = useMemo(function() {
     if (!userSettings) return [];

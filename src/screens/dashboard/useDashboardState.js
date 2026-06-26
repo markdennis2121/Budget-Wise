@@ -85,14 +85,23 @@ export function useDashboardState(userId) {
     return envelopes.filter(isEnvelopeArchived);
   }, [envelopes]);
 
-  var accounts = useMemo(function () {
+  var allAccounts = useMemo(function () {
     return buildAccountsWithBalances({
       userSettings: userSettings,
       userHistory: userHistory
     });
   }, [userSettings, userHistory]);
 
+  var accounts = useMemo(function() {
+    return allAccounts.filter(function(a) { return !a.isArchived; });
+  }, [allAccounts]);
+
+  var archivedAccounts = useMemo(function() {
+    return allAccounts.filter(function(a) { return a.isArchived; });
+  }, [allAccounts]);
+
   var totalAvailableMoney = useMemo(function () {
+    // We only sum active wallets for "Ready to Assign"
     return accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
   }, [accounts]);
 
@@ -229,7 +238,9 @@ export function useDashboardState(userId) {
     performMonthlySweep, skipMonthlySweep,
     oneTimeExpenses,
     totalSaved,
+    allAccounts,
     accounts,
+    archivedAccounts,
     totalAvailableMoney,
     userHistory,
     recurringExpenses

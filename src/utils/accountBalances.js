@@ -61,7 +61,8 @@ export function serializeAccountsForStorage(accounts) {
       name: (a.name && String(a.name).trim()) || 'Wallet',
       starting_balance: Math.max(0, parseFloat(a.starting_balance) || 0),
       type: a.type || 'Custom',
-      color: a.color || '#0F766E'
+      color: a.color || '#0F766E',
+      isArchived: !!(a.isArchived || a.archived || a.is_archived)
     };
 
     // Senior Developer: Apply auto-detection migration
@@ -91,6 +92,7 @@ export function buildAccountsWithBalances(opts) {
       starting_balance: parseFloat(a.starting_balance) || 0,
       type: a.type || 'Custom',
       color: a.color || '#0F766E',
+      isArchived: !!a.isArchived,
       balance: parseFloat(a.starting_balance) || 0
     };
   });

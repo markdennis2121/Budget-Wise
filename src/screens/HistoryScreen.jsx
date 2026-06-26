@@ -1,226 +1,247 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Image, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator, Platform, Modal, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from 'platform-hooks';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUser } from '../contexts/UserContext';
 import { formatCurrency, formatDate } from '../utils/helpers';
+import { triggerImpactHaptic } from '../utils/feedback';
 import { scale, moderateScale, normalize } from '../utils/responsive';
-import emptyHistoryImg from '../assets/empty_history.png';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 
 const HistoryScreen = function() {
-  var themeCtx = useTheme();
-  var theme = themeCtx.theme;
-  var userCtx = useUser();
-  var userId = userCtx.currentUser ? userCtx.currentUser.id : '';
-  var insets = useSafeAreaInsets();
-  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
-  var historyQuery = useQuery('expense_history');
-  var allHistory = historyQuery.data || [];
-  var userHistory = allHistory.filter(function(h) { return h.user_id === userId; });
-  var loading = historyQuery.loading;
-  var typeFilterState = useState('All');
-  var typeFilter = typeFilterState[0]; var setTypeFilter = typeFilterState[1];
-  var statusFilterState = useState('All');
-  var statusFilter = statusFilterState[0]; var setStatusFilter = statusFilterState[1];
-  var [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
-  var searchState = useState('');
-  var search = searchState[0]; var setSearch = searchState[1];
-  var [visibleCount, setVisibleCount] = useState(5);
+  const themeCtx = useTheme();
+  const theme = themeCtx.theme;
+  const userCtx = useUser();
+  const userId = userCtx.currentUser ? userCtx.currentUser.id : '';
+  const insets = useSafeAreaInsets();
+  const scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
+
+  const historyQuery = useQuery('expense_history');
+  const userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
+  const { loading } = historyQuery;
+
+  const oneTimeQuery = useQuery('one_time_expenses');
+  const userOneTime = (oneTimeQuery.data || []).filter(o => o.user_id === userId);
+
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
+  const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(15);
 
   useEffect(() => {
-    setVisibleCount(5);
+    setVisibleCount(15);
   }, [typeFilter, statusFilter, search]);
 
-  var oneTimeQuery = useQuery('one_time_expenses');
-  var allOneTime = oneTimeQuery.data || [];
-  var userOneTime = allOneTime.filter(function(o) { return o.user_id === userId; });
-  
-  var combinedHistory = useMemo(function() {
-    var histItems = userHistory.map(function(h) {
-      return { id: h.id, name: h.expense_name, amount: parseFloat(h.amount) || 0, type: h.expense_type, date: h.date, status: h.status, notes: h.notes };
-    });
-    var oneTimeItems = userOneTime.map(function(o) {
-      return { id: o.id, name: o.name, amount: parseFloat(o.amount) || 0, type: 'One-Time', date: o.date, status: 'Spent', notes: '' };
-    });
-    var allItems = histItems.concat(oneTimeItems);
-    var seen = {};
-    var seenKeys = {};
-    var unique = allItems.filter(function(item) {
-      if (seen[item.id]) return false;
-      seen[item.id] = true;
-      if (item.type === 'One-Time') {
-        var key = item.name + '_' + item.amount + '_' + item.date;
-        if (seenKeys[key]) return false;
-        seenKeys[key] = true;
-      }
+  const combinedHistory = useMemo(() => {
+    const histItems = userHistory.map(h => ({
+      id: h.id,
+      name: h.expense_name,
+      amount: parseFloat(h.amount) || 0,
+      type: h.expense_type,
+      date: h.date,
+      status: h.status,
+      notes: h.notes
+    }));
+
+    const oneTimeItems = userOneTime.map(o => ({
+      id: o.id,
+      name: o.name,
+      amount: parseFloat(o.amount) || 0,
+      type: 'One-Time',
+      date: o.date,
+      status: 'Spent',
+      notes: ''
+    }));
+
+    const allItems = [...histItems, ...oneTimeItems];
+    const seen = new Set();
+    const unique = allItems.filter(item => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
       return true;
     });
-    unique.sort(function(a, b) {
-      if (a.date > b.date) return -1;
-      if (a.date < b.date) return 1;
-      return 0;
-    });
-    return unique;
+
+    return unique.sort((a, b) => b.date.localeCompare(a.date));
   }, [userHistory, userOneTime]);
   
-  var filteredHistory = useMemo(function() {
-    return combinedHistory.filter(function(item) {
-      var matchType = typeFilter === 'All' || item.type === typeFilter;
-      var matchStatus = statusFilter === 'All' || item.status === statusFilter;
-      var matchSearch = !search || item.name.toLowerCase().indexOf(search.toLowerCase()) !== -1;
+  const filteredHistory = useMemo(() => {
+    return combinedHistory.filter(item => {
+      const matchType = typeFilter === 'All' || item.type === typeFilter;
+      const matchStatus = statusFilter === 'All' || item.status === statusFilter;
+      const matchSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
       return matchType && matchStatus && matchSearch;
     });
   }, [combinedHistory, typeFilter, statusFilter, search]);
   
-  var totalShown = useMemo(function() {
-    return filteredHistory.reduce(function(s, i) {
+  const totalShown = useMemo(() => {
+    return filteredHistory.reduce((s, i) => {
       if (i.type === 'Income') return s + i.amount;
-      if (i.type === 'Transfer') return s;
-      if (i.type === 'Adjustment') return s; // Adjustments are balancing entries, not net income/expense
+      if (['Transfer', 'Adjustment'].includes(i.type)) return s;
       return s - i.amount;
     }, 0);
   }, [filteredHistory]);
   
-  var getStatusColor = function(status) {
-    if (status === 'Received') return theme.colors.primary;
-    if (status === 'Paid') return theme.colors.primary;
-    if (status === 'Paid in Advance') return theme.colors.info;
-    if (status === 'Spent') return theme.colors.error;
-    if (status === 'Completed') return '#0284C7';
-    return theme.colors.warning;
+  const getStatusColor = (status) => {
+    const colors = {
+      'Received': '#10B981',
+      'Paid': '#10B981',
+      'Paid in Advance': '#3B82F6',
+      'Spent': '#EF4444',
+      'Completed': '#0EA5E9'
+    };
+    return colors[status] || '#F59E0B';
   };
   
-  var getTypeIcon = function(type) {
-    if (type === 'Income') return 'trending-up';
-    if (type === 'Transfer') return 'swap-horiz';
-    if (type === 'Adjustment') return 'tune';
-    return type === 'Recurring' ? 'repeat' : 'shopping-bag';
+  const getTypeIcon = (type) => {
+    const icons = {
+      'Income': 'trending-up',
+      'Transfer': 'swap-horiz',
+      'Adjustment': 'tune',
+      'Recurring': 'repeat'
+    };
+    return icons[type] || 'shopping-bag';
   };
   
-  return React.createElement(View, { testID: 'View-58', style: { flex: 1, backgroundColor: theme.colors.background }, componentId: 'history-screen' },
-    React.createElement(View, { testID: 'View-59', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(20), paddingHorizontal: moderateScale(20) }, componentId: 'history-header' },
-      React.createElement(Text, { testID: 'Text-80', style: { ...theme.typography.h2, color: '#FFFFFF' } }, 'Expense History'),
-      React.createElement(Text, { testID: 'Text-81', style: { ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginTop: 2 } }, String(filteredHistory.length) + ' records')
-    ),
-    React.createElement(View, { testID: 'View-60', style: { backgroundColor: theme.colors.card, paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(12), borderBottomWidth: 1, borderBottomColor: '#FED7AA' }, componentId: 'history-filters' },
-      React.createElement(View, { testID: 'View-61', style: { backgroundColor: theme.colors.background, borderRadius: scale(10), paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(2), flexDirection: 'row', alignItems: 'center', marginBottom: moderateScale(10) } },
-        React.createElement(MaterialIcons, { testID: 'MaterialIcons-12', name: 'search', size: scale(20), color: theme.colors.textSecondary }),
-        React.createElement(TextInput, { testID: 'TextInput-9', value: search, onChangeText: setSearch, placeholder: 'Search expenses...',
-          style: { flex: 1, paddingVertical: moderateScale(8), paddingLeft: moderateScale(8), fontSize: normalize(14), color: theme.colors.textPrimary },
-          componentId: 'history-search-input'
-        })
-      ),
-      React.createElement(View, { style: { marginBottom: moderateScale(10) } },
-        React.createElement(Text, { style: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'Type'),
-        React.createElement(ScrollView, { testID: 'ScrollView-10', horizontal: true, showsHorizontalScrollIndicator: false, style: { flexGrow: 'initial', marginBottom: moderateScale(10) } },
-          ['All','Recurring','One-Time','Income','Adjustment'].map(function(t) {
-            var count = t === 'All' ? combinedHistory.length : combinedHistory.filter(i => i.type === t).length;
-            return React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-23', key: t, onPress: function() { setTypeFilter(t); },
-              style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: moderateScale(12), paddingVertical: moderateScale(6), borderRadius: scale(16), marginRight: moderateScale(6), backgroundColor: typeFilter === t ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: typeFilter === t ? theme.colors.primary : '#FED7AA' },
-              componentId: 'type-filter-' + t
-            },
-              React.createElement(Text, { style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(12), fontWeight: '600' } }, t),
-              count > 0 ? React.createElement(View, { style: { marginLeft: moderateScale(6), backgroundColor: typeFilter === t ? 'rgba(255,255,255,0.2)' : '#FED7AA', borderRadius: scale(10), paddingHorizontal: moderateScale(6), paddingVertical: moderateScale(2) } },
-                React.createElement(Text, { style: { color: typeFilter === t ? '#FFFFFF' : theme.colors.primary, fontSize: normalize(11), fontWeight: 'bold' } }, String(count))
-              ) : null
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      {/* Premium Header */}
+      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(24), paddingHorizontal: moderateScale(20), shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 }}>
+        <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Expense History</Text>
+        <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '600' }}>
+          {filteredHistory.length} transaction records
+        </Text>
+      </View>
+
+      {/* Modern Filter Section */}
+      <View style={{ backgroundColor: theme.colors.card, paddingVertical: moderateScale(16), borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+        {/* Integrated Search */}
+        <View style={{ marginHorizontal: moderateScale(16), marginBottom: moderateScale(16), flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: scale(14), paddingHorizontal: moderateScale(12), borderWidth: 1, borderColor: theme.colors.border }}>
+          <MaterialIcons name="search" size={scale(20)} color={theme.colors.textSecondary} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name..."
+            placeholderTextColor={theme.colors.textSecondary}
+            style={{ flex: 1, paddingVertical: moderateScale(10), paddingLeft: moderateScale(8), fontSize: normalize(14), color: theme.colors.textPrimary, fontWeight: '500' }}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
+              <MaterialIcons name="cancel" size={scale(18)} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Type Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingBottom: moderateScale(4) }}>
+          {['All','Recurring','One-Time','Income','Adjustment'].map(t => {
+            const isActive = typeFilter === t;
+            return (
+              <TouchableOpacity
+                key={t}
+                onPress={() => { triggerImpactHaptic('Light'); setTypeFilter(t); }}
+                style={{
+                  paddingHorizontal: moderateScale(14),
+                  paddingVertical: moderateScale(8),
+                  borderRadius: scale(12),
+                  marginRight: moderateScale(8),
+                  backgroundColor: isActive ? theme.colors.primary : theme.colors.background,
+                  borderWidth: 1,
+                  borderColor: isActive ? theme.colors.primary : theme.colors.border
+                }}
+              >
+                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(12), fontWeight: 'bold' }}>{t}</Text>
+              </TouchableOpacity>
             );
-          })
-        )
-      ),
-      React.createElement(View, null,
-        React.createElement(Text, { style: { ...theme.typography.caption, color: theme.colors.textSecondary, marginBottom: moderateScale(6) } }, 'Status'),
-        React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-24', onPress: function() { setStatusDropdownVisible(true); },
-          style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: moderateScale(14), paddingVertical: moderateScale(12), borderRadius: scale(14), borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background }
-        },
-          React.createElement(Text, { style: { color: theme.colors.textPrimary, fontSize: normalize(14), fontWeight: '600' } }, statusFilter),
-          React.createElement(MaterialIcons, { name: 'keyboard-arrow-down', size: scale(22), color: theme.colors.textSecondary })
-        )
-      )
-    ),
-    React.createElement(Modal, { transparent: true, visible: statusDropdownVisible, animationType: 'fade', onRequestClose: function() { setStatusDropdownVisible(false); } },
-      React.createElement(TouchableOpacity, { onPress: function() { setStatusDropdownVisible(false); }, style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: moderateScale(20) } },
-        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: scale(16), overflow: 'hidden' } },
-          ['All','Pending','Paid','Paid in Advance','Spent','Received'].map(function(s) {
-            var isActive = statusFilter === s;
-            return React.createElement(TouchableOpacity, { key: s, onPress: function() { setStatusFilter(s); setStatusDropdownVisible(false); },
-              style: { paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(14), backgroundColor: isActive ? (theme.colors.primary + '15') : theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border }
-            },
-              React.createElement(Text, { style: { color: isActive ? theme.colors.primary : theme.colors.textPrimary, fontSize: normalize(15), fontWeight: isActive ? '700' : '600' } }, s)
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Summary Banner */}
+      <View style={{ backgroundColor: totalShown >= 0 ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: moderateScale(20), paddingVertical: moderateScale(12), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' }}>
+        <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(12), fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {totalShown >= 0 ? 'Net Income' : 'Net Expenses'}
+        </Text>
+        <Text style={{ color: totalShown >= 0 ? '#166534' : '#991B1B', fontSize: normalize(16), fontWeight: '900' }}>
+          {(totalShown >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalShown))}
+        </Text>
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredHistory.slice(0, visibleCount)}
+          keyExtractor={item => item.id}
+          contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingTop: moderateScale(16), paddingBottom: scrollBottomPadding }}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
+              <MaterialIcons name="history" size={64} color={theme.colors.border} />
+              <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginTop: 20, textAlign: 'center' }}>No Records Found</Text>
+              <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 }}>
+                Try adjusting your filters or search terms to find what you're looking for.
+              </Text>
+            </View>
+          }
+          ListFooterComponent={visibleCount < filteredHistory.length ? (
+            <TouchableOpacity onPress={() => setVisibleCount(v => v + 15)} style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: normalize(14) }}>
+                Show More ({filteredHistory.length - visibleCount} hidden)
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          renderItem={({ item }) => {
+            const isIncome = item.type === 'Income';
+            const isTransfer = item.type === 'Transfer';
+            const isAdjustment = item.type === 'Adjustment';
+
+            const typeColor = isIncome ? '#16A34A' : (isTransfer ? '#2563EB' : (isAdjustment ? theme.colors.textSecondary : '#DC2626'));
+            const typeBg = isIncome ? '#DCFCE7' : (isTransfer ? '#DBEAFE' : (isAdjustment ? theme.colors.border : '#FEE2E2'));
+
+            return (
+              <View style={{
+                backgroundColor: theme.colors.card,
+                borderRadius: scale(18),
+                padding: moderateScale(14),
+                marginBottom: moderateScale(10),
+                flexDirection: 'row',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1
+              }}>
+                 <View style={{ width: scale(42), height: scale(42), borderRadius: scale(12), backgroundColor: typeBg, alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(14) }}>
+                    <MaterialIcons name={getTypeIcon(item.type)} size={scale(22)} color={typeColor} />
+                 </View>
+                 <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: normalize(15), fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 3 }}>
+                       {formatDate(item.date)} • {item.type}
+                    </Text>
+                 </View>
+                 <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: normalize(16), fontWeight: '900', color: typeColor }}>
+                       {(isIncome ? '+' : (isTransfer ? '⇄ ' : (isAdjustment ? '± ' : '-'))) + formatCurrency(item.amount)}
+                    </Text>
+                    {item.status && (
+                       <View style={{ backgroundColor: getStatusColor(item.status) + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 5, borderWidth: 0.5, borderColor: getStatusColor(item.status) + '33' }}>
+                          <Text style={{ fontSize: normalize(10), color: getStatusColor(item.status), fontWeight: 'bold' }}>{item.status.toUpperCase()}</Text>
+                       </View>
+                    )}
+                 </View>
+              </View>
             );
-          })
-        )
-      )
-    ),
-    React.createElement(View, { testID: 'View-63', style: { backgroundColor: totalShown >= 0 ? '#E6F4EA' : '#FEF2F2', paddingHorizontal: moderateScale(20), paddingVertical: moderateScale(10), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, componentId: 'history-summary' },
-      React.createElement(Text, { testID: 'Text-84', style: { color: theme.colors.textSecondary, fontSize: normalize(13) } }, totalShown >= 0 ? 'Net Income shown:' : 'Net Expenses shown:'),
-      React.createElement(Text, { testID: 'Text-85', style: { color: totalShown >= 0 ? theme.colors.primary : theme.colors.error, fontSize: normalize(15), fontWeight: 'bold' } }, (totalShown >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalShown)))
-    ),
-    loading ? React.createElement(View, { testID: 'View-64', style: { flex: 1, alignItems: 'center', justifyContent: 'center' }, componentId: 'history-loading' },
-      React.createElement(ActivityIndicator, { testID: 'ActivityIndicator-5', size: 'large', color: theme.colors.primary })
-    ) :
-    React.createElement(FlatList, { testID: 'FlatList-1', data: filteredHistory.slice(0, visibleCount),
-      keyExtractor: function(item) { return item.id; },
-      contentContainerStyle: { paddingHorizontal: moderateScale(16), paddingTop: moderateScale(12), paddingBottom: scrollBottomPadding },
-      ListFooterComponent: visibleCount < filteredHistory.length ? React.createElement(TouchableOpacity, {
-        onPress: () => setVisibleCount(visibleCount + 5),
-        style: { alignItems: 'center', paddingVertical: moderateScale(16) }
-      }, React.createElement(Text, { style: { color: theme.colors.primary, fontWeight: 'bold', fontSize: normalize(14) } }, "See More (" + (filteredHistory.length - visibleCount) + " hidden)")) : null,
-      ListEmptyComponent: React.createElement(View, { testID: 'View-65', style: { alignItems: 'center', paddingTop: moderateScale(40), paddingHorizontal: moderateScale(30) }, componentId: 'history-empty' },
-        React.createElement(Text, { style: { fontSize: normalize(18), fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: moderateScale(8), textAlign: 'center' } }, 'Your history is a clean slate! ✨'),
-        React.createElement(Text, { testID: 'Text-86', style: { fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: normalize(22) } }, "It looks a bit quiet here right now. Tap the + button on the home screen to log your first transaction and start tracking your financial journey!")
-      ),
-      renderItem: function(itemData) {
-        var item = itemData.item;
-        var isIncome = item.type === 'Income';
-        var isTransfer = item.type === 'Transfer';
-        var isAdjustment = item.type === 'Adjustment';
-
-        // Senior Designer Choice: Semantic Fixed Colors for Transaction Types
-        var typeColor = '#DC2626'; // Default Red for Spent
-        var typeBg = '#FEE2E2';
-
-        if (isIncome) {
-          typeColor = '#16A34A'; // Green for Deposit
-          typeBg = '#DCFCE7';
-        } else if (isTransfer) {
-          typeColor = '#2563EB'; // Blue for Transfer
-          typeBg = '#DBEAFE';
-        } else if (isAdjustment) {
-          typeColor = theme.colors.textSecondary;
-          typeBg = theme.colors.border;
-        } else if (item.type === 'Recurring') {
-          // Keep recurring distinct but still "Spent" if not specified otherwise
-          typeColor = '#DC2626';
-          typeBg = '#FEE2E2';
-        }
-
-        return (
-          <View key={item.id} style={{ backgroundColor: theme.colors.card, borderRadius: scale(12), padding: moderateScale(14), marginBottom: moderateScale(10), flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1 }}>
-             <View style={{ width: scale(40), height: scale(40), borderRadius: scale(12), backgroundColor: typeBg, alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(12) }}>
-                <MaterialIcons name={getTypeIcon(item.type)} size={scale(20)} color={typeColor} />
-             </View>
-             <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: normalize(15), fontWeight: '600', color: theme.colors.textPrimary }}>{item.name}</Text>
-                <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 2 }}>{formatDate(item.date) + (item.notes ? ' • ' + item.notes : '') + ' • ' + item.type}</Text>
-             </View>
-             <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: normalize(15), fontWeight: 'bold', color: typeColor }}>{(isIncome ? '+' : (isTransfer ? '⇄ ' : (isAdjustment ? '± ' : '-'))) + formatCurrency(item.amount)}</Text>
-                {item.status ? (
-                <View style={{ backgroundColor: item.status === 'Received' ? '#DCFCE7' : (item.status === 'Spent' ? '#FEE2E2' : (item.status === 'Paid' ? '#DCFCE7' : (item.status === 'Paid in Advance' ? '#DBEAFE' : (item.status === 'Completed' ? '#DBEAFE' : '#FEF3C7')))), borderRadius: scale(12), paddingHorizontal: moderateScale(8), paddingVertical: moderateScale(3), marginTop: 4 }}>
-                   <Text style={{ fontSize: normalize(11), color: getStatusColor(item.status), fontWeight: '600' }}>{item.status}</Text>
-                </View>
-                ) : null}
-             </View>
-          </View>
-        );
-      }
-    })
+          }}
+        />
+      )}
+    </View>
   );
 };
 
