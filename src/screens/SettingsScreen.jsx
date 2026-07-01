@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, ActivityIndicator, Modal } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert, Platform, ActivityIndicator, Modal, Switch } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
@@ -20,11 +20,10 @@ import {
 import { parseUserEnvelopes } from '../utils/envelopeGuards';
 import { getStoredAccountsList, buildAccountsWithBalances } from '../utils/accountBalances';
 import { calculateArchiveRollup, applyArchiveToDatabase } from '../utils/dataArchive';
+import { scale, moderateScale, normalize } from '../utils/responsive';
 
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
-const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
-
 const PIN_LENGTH = 6;
 
 const THEME_COLORS = [
@@ -43,41 +42,135 @@ const THEME_COLORS = [
   { name: 'Mint Glow', color: ['#11998E', '#38EF7D'], premium: true }
 ];
 
+const SettingSection = ({ title, children, theme }) => (
+  <View style={{ marginBottom: 24 }}>
+    <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 12, marginLeft: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+      {title}
+    </Text>
+    <View style={{ backgroundColor: theme.colors.card, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border }}>
+      {children}
+    </View>
+  </View>
+);
+
+const SettingRow = ({ icon, iconColor, title, subtitle, onPress, rightContent, theme, isLast }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    disabled={!onPress}
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: isLast ? 0 : 1,
+      borderBottomColor: theme.colors.border
+    }}
+  >
+    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: (iconColor || theme.colors.primary) + '15', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+      <MaterialIcons name={icon} size={20} color={iconColor || theme.colors.primary} />
+    </View>
+    <View style={{ flex: 1, marginRight: 8 }}>
+      <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{title}</Text>
+      {subtitle ? <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{subtitle}</Text> : null}
+    </View>
+    {rightContent}
+    {onPress && !rightContent && <MaterialIcons name="chevron-right" size={20} color={theme.colors.textSecondary} />}
+  </TouchableOpacity>
+);
+
+const ToggleRow = ({ icon, iconColor, title, subtitle, value, onValueChange, theme, isLast }) => (
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: isLast ? 0 : 1,
+      borderBottomColor: theme.colors.border
+    }}
+  >
+    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: (iconColor || theme.colors.primary) + '15', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
+      <MaterialIcons name={icon} size={20} color={iconColor || theme.colors.primary} />
+    </View>
+    <View style={{ flex: 1, marginRight: 8 }}>
+      <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary }}>{title}</Text>
+      {subtitle ? <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{subtitle}</Text> : null}
+    </View>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => onValueChange(!value)}
+      style={{
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: value ? theme.colors.primary : (theme.isDark ? '#4B5563' : '#D1D5DB'),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: value ? 'flex-end' : 'flex-start',
+        padding: 2
+      }}
+    >
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          backgroundColor: '#FFFFFF',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 2,
+          elevation: 2
+        }}
+      />
+    </TouchableOpacity>
+  </View>
+);
+
 const SettingsScreen = function(props) {
-  var navigation = props.navigation;
-  var themeCtx = useTheme();
-  var theme = themeCtx.theme;
-  var toggleTheme = themeCtx.toggleTheme;
-  var setPrimaryColor = themeCtx.setPrimaryColor;
-  var isDark = theme.isDark;
-  var userCtx = useUser();
-  var currentUser = userCtx.currentUser;
-  var userId = currentUser ? currentUser.id : '';
-  var insets = useSafeAreaInsets();
-  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + 16);
-  var settingsQuery = useQuery('user_settings');
-  var allSettings = settingsQuery.data || [];
-  var userSettings = allSettings.find(function(s) { return s.user_id === userId; });
-  var refetch = settingsQuery.refetch;
-  var [pinMode, setPinMode] = useState(false);
-  var [newPin, setNewPin] = useState('');
-  var [showPinSaved, setShowPinSaved] = useState(false);
-  var [backupBusy, setBackupBusy] = useState(false);
-  var [backupNote, setBackupNote] = useState('');
-  var [lastExportUrl, setLastExportUrl] = useState(null);
-  var [lastExportFilename, setLastExportFilename] = useState('');
-  var [lastExportData, setLastExportData] = useState(null);
-  var [showAppTour, setShowAppTour] = useState(false);
+  const navigation = props.navigation;
+  const themeCtx = useTheme();
+  const theme = themeCtx.theme;
+  const { toggleTheme, setPrimaryColor, isDark } = themeCtx;
+  const userCtx = useUser();
+  const currentUser = userCtx.currentUser;
+  const userId = currentUser ? currentUser.id : '';
+  const insets = useSafeAreaInsets();
+  const scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + 16);
 
-  var updateSettings = useMutation('user_settings', 'update');
-  var mutateUpdate = updateSettings.mutate;
-  var insertSettings = useMutation('user_settings', 'insert');
-  var mutateInsert = insertSettings.mutate;
+  const settingsQuery = useQuery('user_settings');
+  const userSettings = (settingsQuery.data || []).find(s => s.user_id === userId);
+  const updateSettings = useMutation('user_settings', 'update');
+  const insertSettings = useMutation('user_settings', 'insert');
 
-  // Dynamically initialize settings for this user if none exists
+  const [pinMode, setPinMode] = useState(false);
+  const [newPin, setNewPin] = useState('');
+  const [showPinSaved, setShowPinSaved] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupNote, setBackupNote] = useState('');
+  const [showAppTour, setShowAppTour] = useState(false);
+  const [archiveModalVisible, setArchiveModalVisible] = useState(false);
+  const [selectedMonths, setSelectedMonths] = useState(12);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+
+  const historyQuery = useQuery('expense_history');
+  const userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
+
+  const accountsWithBalances = useMemo(() => {
+    if (!userSettings) return [];
+    return buildAccountsWithBalances({ userSettings: userSettings, userHistory: userHistory });
+  }, [userSettings, userHistory]);
+
+  const totalWalletBalance = accountsWithBalances.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  const isArchiveDisabled = Math.abs(totalWalletBalance) > 0.01;
+
+  const refetch = useCallback(() => {
+    settingsQuery.refetch();
+  }, [settingsQuery]);
+
   React.useEffect(() => {
     if (userId && !settingsQuery.loading && !userSettings) {
-      mutateInsert({
+      insertSettings.mutate({
         id: generateId(),
         user_id: userId,
         pin_code: null,
@@ -87,681 +180,481 @@ const SettingsScreen = function(props) {
     }
   }, [userId, settingsQuery.loading, userSettings]);
 
-  var handleSavePin = () => {
+  const handleSavePin = () => {
     if (newPin.length !== PIN_LENGTH) {
-      Platform.OS === 'web' ? window.alert('PIN must be 6 digits') : Alert.alert('Error', 'PIN must be 6 digits');
+      Alert.alert('Error', `PIN must be ${PIN_LENGTH} digits`);
       return;
     }
-    var duplicate = allSettings.find(function (s) {
-      return s.pin_code === newPin && s.user_id !== userId;
-    });
+    const duplicate = (settingsQuery.data || []).find(s => s.pin_code === newPin && s.user_id !== userId);
     if (duplicate) {
-      var msg = 'That PIN is already used by another account. Please choose a different PIN.';
-      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('PIN Already Taken', msg);
+      Alert.alert('PIN Already Taken', 'That PIN is already used by another account. Please choose a different PIN.');
       setNewPin('');
       return;
     }
     if (userSettings) {
       runSaveWithFeedback(
-        mutateUpdate({ id: userSettings.id, data: { pin_code: newPin } }),
+        updateSettings.mutate({ id: userSettings.id, data: { pin_code: newPin } }),
         {
           setShowSuccess: setShowPinSaved,
           onSaved: refetch,
           errorMessage: 'Could not save PIN. Please try again.'
         }
-      ).then(function () {
+      ).then(() => {
         setPinMode(false);
         setNewPin('');
       });
     }
   };
 
-  var handleRemovePin = () => {
-    var msg = 'Remove PIN lock?';
-    var onConfirm = () => {
-      if (userSettings) {
-        mutateUpdate({ id: userSettings.id, data: { pin_code: null, biometrics_enabled: false } }).then(() => refetch());
-      }
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm(msg)) onConfirm();
-    } else {
-      Alert.alert('Remove PIN', msg, [{ text: 'Cancel' }, { text: 'Remove', style: 'destructive', onPress: onConfirm }]);
-    }
-  };
-  
-  var showAlert = function (title, message) {
-    if (Platform.OS === 'web') {
-      window.alert(title + (message ? '\n\n' + message : ''));
-    } else {
-      Alert.alert(title, message || '');
-    }
+  const handleRemovePin = () => {
+    Alert.alert('Remove PIN', 'Are you sure you want to remove the PIN lock?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => {
+        updateSettings.mutate({ id: userSettings.id, data: { pin_code: null, biometrics_enabled: false } }).then(() => refetch());
+      }}
+    ]);
   };
 
-  var historyQuery = useQuery('expense_history');
-  var userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
-
-  var accountsWithBalances = useMemo(() => {
-    if (!userSettings) return [];
-    return buildAccountsWithBalances({ userSettings: userSettings, userHistory: userHistory });
-  }, [userSettings, userHistory]);
-
-  var totalWalletBalance = accountsWithBalances.reduce((sum, acc) => sum + (acc.balance || 0), 0);
-  var isArchiveDisabled = Math.abs(totalWalletBalance) > 0.01;
-
-  var handleExportExcel = function () {
-    if (!userId) {
-      showAlert('Error', 'Sign in to export your data.');
-      return;
-    }
-
-    // UI/UX Nudge: Check Premium for Exports
+  const handleExportExcel = () => {
     if (!userSettings?.is_premium) {
       navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
       return;
     }
-
     setBackupBusy(true);
-    setBackupNote('');
-
-    var envs = parseUserEnvelopes(userSettings);
-    var accs = getStoredAccountsList(userSettings);
-
+    const envs = parseUserEnvelopes(userSettings);
+    const accs = getStoredAccountsList(userSettings);
     downloadCsvFile(userHistory, envs, accs)
-      .then(function (result) {
-        setLastExportData({ content: generateCsvReport(userHistory, envs, accs), type: 'text/csv' });
-        if (result.method === 'download') {
-          setBackupNote('Excel file (.csv) generated and download started!');
-          if (result.url) {
-            setLastExportUrl(result.url);
-            setLastExportFilename(result.filename);
-          }
-        } else if (result.method === 'share') {
-          setBackupNote('Export ready! Select "Save to Files" or an app to save your spreadsheet.');
-        } else if (result.method === 'clipboard') {
-          setBackupNote('History copied to clipboard! You can now paste it directly into Excel or Google Sheets.');
-          showAlert('Copied to Clipboard', 'Your transaction history was copied because direct file export is limited on this device.');
-        } else {
-          setBackupNote('Excel file (.csv) ready.');
-        }
-      })
-      .catch(function (err) {
-        showAlert('Export failed', 'Could not export financial data.');
-      })
-      .then(function () {
-        setBackupBusy(false);
-      });
+      .then(() => setBackupNote('Excel file generated! Check your downloads.'))
+      .catch(() => Alert.alert('Export Failed', 'Could not export data.'))
+      .finally(() => setBackupBusy(false));
   };
 
-  var [archiveModalVisible, setArchiveModalVisible] = useState(false);
-  var [selectedMonths, setSelectedMonths] = useState(12);
-
-  var handleArchiveData = function () {
-    if (!userId) {
-      showAlert('Error', 'Sign in to use this feature.');
-      return;
-    }
-
-    // UI/UX Nudge: Check Premium for Archive/Compression
+  const handleArchiveData = () => {
     if (!userSettings?.is_premium) {
       navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
       return;
     }
-
     if (isArchiveDisabled) {
-      showAlert('Archive Locked', 'Wallets must be empty (₱0.00) to compress history. This ensures your final balances remain 100% accurate after detail removal.');
+      Alert.alert('Archive Locked', 'Wallets must be empty (₱0.00) to compress history. This ensures your final balances remain accurate.');
       return;
     }
-
     setArchiveModalVisible(true);
   };
 
-  var startCompressionFlow = function (monthsAgo) {
+  const startCompressionFlow = (monthsAgo) => {
     setArchiveModalVisible(false);
-    var cutoffDate = new Date();
+    const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - monthsAgo);
-    var cutoffStr = cutoffDate.toISOString().split('T')[0];
-
-    var envs = parseUserEnvelopes(userSettings);
-    var accs = getStoredAccountsList(userSettings);
-
-    var rollupResult = calculateArchiveRollup(userHistory, cutoffStr, userId);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    const rollupResult = calculateArchiveRollup(userHistory, cutoffStr, userId);
 
     if (rollupResult.historyIdsToDelete.length === 0) {
-      showAlert('No Data Found', 'No transactions found older than ' + monthsAgo + ' months.');
+      Alert.alert('No Data Found', `No transactions found older than ${monthsAgo} months.`);
       return;
     }
 
-    var performArchive = function () {
-      setBackupBusy(true);
-      downloadCsvFile(rollupResult.archivedHistory, envs, accs)
-        .then(function () {
-          var db = getDatabase();
-          var updatedDb = applyArchiveToDatabase(db, userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
-
-          if (updatedDb) {
-            persistDatabase(updatedDb);
-            refetch();
-            historyQuery.refetch();
-            showAlert('Success', `${rollupResult.historyIdsToDelete.length} transactions compressed! A backup CSV has been saved to your device.`);
-          }
-        })
-        .catch(function () {
-          showAlert('Safety Cancel', 'Backup failed. Compression cancelled to prevent data loss.');
-        })
-        .finally(function () {
-          setBackupBusy(false);
-        });
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Warning: This will merge ${rollupResult.historyIdsToDelete.length} transactions into monthly summaries. This cannot be undone. Continue?`)) performArchive();
-    } else {
-      Alert.alert('Final Confirmation', `Are you sure? ${rollupResult.historyIdsToDelete.length} transactions will be permanently compressed.`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Compress Now', onPress: performArchive, style: 'destructive' }
-      ]);
-    }
+    Alert.alert('Final Confirmation', `Are you sure? ${rollupResult.historyIdsToDelete.length} transactions will be permanently compressed. A backup CSV will be saved.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Compress Now', style: 'destructive', onPress: () => {
+        setBackupBusy(true);
+        downloadCsvFile(rollupResult.archivedHistory, parseUserEnvelopes(userSettings), getStoredAccountsList(userSettings))
+          .then(() => {
+            const db = getDatabase();
+            const updatedDb = applyArchiveToDatabase(db, userId, rollupResult.summaryTransactions, rollupResult.historyIdsToDelete);
+            if (updatedDb) {
+              persistDatabase(updatedDb);
+              refetch();
+              historyQuery.refetch();
+              Alert.alert('Success', 'History compressed successfully!');
+            }
+          })
+          .finally(() => setBackupBusy(false));
+      }}
+    ]);
   };
 
-  var handleLogout = function() {
-    var msg = 'Are you sure you want to sign out?';
-    if (Platform.OS === 'web') {
-      if (window.confirm(msg)) { userCtx.setCurrentUser(null); navigation.replace('Login'); }
-    } else {
-      Alert.alert('Sign Out', msg, [
-        { text: 'Cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: function() { userCtx.setCurrentUser(null); navigation.replace('Login'); } }
-      ]);
-    }
-  };
-  
-  var handleToggleBiometrics = async () => {
-    var isNative = Capacitor.isNativePlatform();
-    if (!isNative && Platform.OS === 'web') {
-      showAlert('Not Supported', 'Biometrics are only available on the mobile app.');
-      return;
-    }
-
+  const handleToggleBiometrics = async () => {
     if (!userSettings?.is_premium) {
       navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
       return;
     }
-
     try {
       const result = await NativeBiometric.isAvailable();
       if (!result.isAvailable) {
-        showAlert('Not Available', 'Biometric authentication is not supported or set up on this device.');
+        Alert.alert('Not Available', 'Biometric authentication is not supported or set up on this device.');
         return;
       }
-      if (userSettings) {
-        mutateUpdate({
-          id: userSettings.id,
-          data: { biometrics_enabled: !userSettings?.biometrics_enabled }
-        }).then(() => refetch());
-      }
+      updateSettings.mutate({
+        id: userSettings.id,
+        data: { biometrics_enabled: !userSettings?.biometrics_enabled }
+      }).then(() => refetch());
     } catch (e) {
-      showAlert('Error', 'Could not access biometric settings.');
+      Alert.alert('Error', 'Could not access biometric settings.');
     }
   };
 
-  var [showResetConfirm, setShowResetConfirm] = useState(false);
-  var [resetConfirmText, setResetConfirmText] = useState('');
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: () => {
+        userCtx.setCurrentUser(null);
+        navigation.replace('Login');
+      }}
+    ]);
+  };
 
-  return React.createElement(View, { testID: 'View-71', style: { flex: 1, backgroundColor: theme.colors.background, position: 'relative' }, componentId: 'settings-screen' },
-    React.createElement(OnboardingModal, {
-      visible: showAppTour,
-      onClose: function () { setShowAppTour(false); refetch(); },
-      userSettings: userSettings,
-      mutateUpdateSettings: mutateUpdate
-    }),
-    React.createElement(SaveSuccessOverlay, { visible: showPinSaved, theme: theme, message: 'PIN saved!' }),
+  const handleFactoryReset = () => {
+    const performReset = () => {
+      const db = getDatabase();
+      if (db) {
+        db.expense_history = (db.expense_history || []).filter(h => h.user_id !== userId);
+        db.recurring_expenses = (db.recurring_expenses || []).filter(r => r.user_id !== userId);
+        db.one_time_expenses = (db.one_time_expenses || []).filter(o => o.user_id !== userId);
+        db.user_settings = (db.user_settings || []).map(s => {
+          if (s.user_id === userId) {
+            return { ...s, envelopes: [], accounts: [], accounts_customized: false, savings: [], monthly_salary: 0 };
+          }
+          return s;
+        });
+        persistDatabase(db);
+        refetch();
+        historyQuery.refetch();
+        setShowResetConfirm(false);
+        setResetConfirmText('');
+        Alert.alert('Reset Complete', 'Your account has been cleared.');
+      }
+    };
+    performReset();
+  };
 
-    React.createElement(Modal, {
-      visible: archiveModalVisible,
-      transparent: true,
-      animationType: 'fade',
-      onRequestClose: () => setArchiveModalVisible(false)
-    },
-      React.createElement(View, { style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 } },
-        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 28, padding: 24, borderWidth: 2, borderColor: '#EF4444', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 15 } },
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <OnboardingModal
+        visible={showAppTour}
+        onClose={() => { setShowAppTour(false); refetch(); }}
+        userSettings={userSettings}
+        mutateUpdateSettings={updateSettings.mutate}
+      />
+      <SaveSuccessOverlay visible={showPinSaved} theme={theme} message="PIN saved!" />
 
-          React.createElement(View, { style: { backgroundColor: isDark ? '#451A1A' : '#FEF2F2', borderRadius: 20, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5' } },
-            React.createElement(View, { style: { width: 64, height: 64, borderRadius: 32, backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 } },
-              React.createElement(MaterialIcons, { name: 'auto-delete', size: 36, color: '#EF4444' })
-            ),
-            React.createElement(Text, { style: { fontSize: 20, fontWeight: '900', color: isDark ? '#FECACA' : '#B91C1C', textAlign: 'center', marginBottom: 8 } }, 'HISTORY COMPRESSION'),
-            React.createElement(Text, { style: { fontSize: 14, color: isDark ? '#FCA5A5' : '#B91C1C', textAlign: 'center', lineHeight: 20 } },
-              'This will merge all detailed transactions into single monthly totals. This action is permanent and cannot be reversed.'
-            )
-          ),
+      {/* Header */}
+      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }}>
+        <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>Settings</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>{currentUser?.email}</Text>
+      </View>
 
-          React.createElement(Text, { style: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' } }, 'Select Timeframe to keep'),
-          React.createElement(View, { style: { flexDirection: 'row', gap: 8, marginBottom: 24 } },
-            [3, 6, 12].map(m => (
-              React.createElement(TouchableOpacity, {
-                key: m,
-                onPress: () => setSelectedMonths(m),
-                style: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: selectedMonths === m ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: selectedMonths === m ? theme.colors.primary : theme.colors.border, alignItems: 'center' }
-              },
-                React.createElement(Text, { style: { fontWeight: 'bold', color: selectedMonths === m ? '#FFFFFF' : theme.colors.textPrimary } }, m + 'm')
-              )
-            ))
-          ),
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: scrollBottomPadding }}>
 
-          React.createElement(View, { style: { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.1)' : '#FFFBEB', borderRadius: 12, padding: 12, marginBottom: 24, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7' } },
-            React.createElement(MaterialIcons, { name: 'security', size: 20, color: '#B45309', style: { marginRight: 10 } }),
-            React.createElement(Text, { style: { flex: 1, fontSize: 12, color: '#B45309', fontWeight: '600' } }, 'A full CSV backup will be automatically saved before compression starts.')
-          ),
+        {/* Profile Section */}
+        <View style={{ backgroundColor: theme.colors.card, borderRadius: 24, padding: 20, marginBottom: 24, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 }}>
+          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 24, fontWeight: 'bold' }}>{currentUser?.name?.[0].toUpperCase() || 'U'}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.textPrimary }}>{currentUser?.name}</Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textSecondary }}>Member since {formatDate(currentUser?.created_at || new Date())}</Text>
+          </View>
+          {userSettings?.is_premium && (
+            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#F59E0B' }}>
+              <Text style={{ color: '#B45309', fontSize: 10, fontWeight: 'bold' }}>LUXE</Text>
+            </View>
+          )}
+        </View>
 
-          React.createElement(View, { style: { flexDirection: 'row', gap: 12 } },
-            React.createElement(TouchableOpacity, {
-              onPress: () => setArchiveModalVisible(false),
-              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }
-            },
-              React.createElement(Text, { style: { fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Cancel')
-            ),
-            React.createElement(TouchableOpacity, {
-              onPress: () => startCompressionFlow(selectedMonths),
-              style: { flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }
-            },
-              React.createElement(Text, { style: { fontWeight: 'bold', color: '#FFFFFF' } }, 'Compress Now')
-            )
-          )
-        )
-      )
-    ),
+        {/* Preferences Section */}
+        <SettingSection title="Preferences" theme={theme}>
+          <SettingRow
+            icon="tune"
+            title="Budgeting Style"
+            subtitle={userSettings?.budgeting_style === 'simple' ? 'Simple Mode (Busy Tracker)' : 'Envelope Mode (Detailed Planner)'}
+            onPress={() => setBudgetModalVisible(true)}
+            theme={theme}
+          />
+          <SettingRow
+            icon="school"
+            title="Replay Welcome Tour"
+            subtitle="Learn how to use Penny again"
+            onPress={() => setShowAppTour(true)}
+            theme={theme}
+            isLast={true}
+          />
+        </SettingSection>
 
-    React.createElement(Modal, {
-      visible: showResetConfirm,
-      transparent: true,
-      animationType: 'fade',
-      onRequestClose: () => setShowResetConfirm(false)
-    },
-      React.createElement(View, { style: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 } },
-        React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 24, padding: 24, borderWidth: 2, borderColor: '#EF4444' } },
-          React.createElement(View, { style: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 } },
-            React.createElement(MaterialIcons, { name: 'report-problem', size: 36, color: '#EF4444' })
-          ),
-          React.createElement(Text, { style: { fontSize: 20, fontWeight: '900', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 } }, 'FACTORY RESET'),
-          React.createElement(Text, { style: { fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20, lineHeight: 20 } },
-            'This will permanently delete all your Wallets, Envelopes, and Transaction History. This action is irreversible.'
-          ),
-          React.createElement(Text, { style: { fontSize: 12, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' } }, 'Type "RESET" to confirm:'),
-          React.createElement(TextInput, {
-            value: resetConfirmText,
-            onChangeText: setResetConfirmText,
-            placeholder: 'RESET',
-            placeholderTextColor: theme.colors.textSecondary,
-            style: { backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, textAlign: 'center', fontSize: 16, fontWeight: 'bold', color: '#EF4444', marginBottom: 20 }
-          }),
-          React.createElement(View, { style: { flexDirection: 'row', gap: 12 } },
-            React.createElement(TouchableOpacity, {
-              onPress: () => { setShowResetConfirm(false); setResetConfirmText(''); },
-              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }
-            },
-              React.createElement(Text, { style: { fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Cancel')
-            ),
-            React.createElement(TouchableOpacity, {
-              disabled: resetConfirmText !== 'RESET',
-              onPress: function() {
-                var performReset = function() {
-                  var db = getDatabase();
-                  if (db) {
-                    db.expense_history = (db.expense_history || []).filter(function(h) { return h.user_id !== userId; });
-                    db.recurring_expenses = (db.recurring_expenses || []).filter(function(r) { return r.user_id !== userId; });
-                    db.one_time_expenses = (db.one_time_expenses || []).filter(function(o) { return o.user_id !== userId; });
-                    db.user_settings = (db.user_settings || []).map(function(s) {
-                      if (s.user_id === userId) {
-                        return Object.assign({}, s, { envelopes: [], accounts: [], accounts_customized: false, savings: [], monthly_salary: 0 });
-                      }
-                      return s;
-                    });
-                    persistDatabase(db);
-                    refetch();
-                    historyQuery.refetch();
-                    setShowResetConfirm(false);
-                    setResetConfirmText('');
-                    if (Platform.OS === 'web') window.alert("Account cleared.");
-                    else Alert.alert("Reset Complete", "Your account has been cleared.");
-                  }
-                };
-                performReset();
-              },
-              style: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: resetConfirmText === 'RESET' ? '#EF4444' : theme.colors.border, alignItems: 'center' }
-            },
-              React.createElement(Text, { style: { fontWeight: 'bold', color: '#FFFFFF' } }, 'Delete All')
-            )
-          )
-        )
-      )
-    ),
-
-    React.createElement(View, { testID: 'View-72', style: { backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 24, paddingHorizontal: 20 }, componentId: 'settings-header' },
-      React.createElement(Text, { testID: 'Text-91', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, 'Settings'),
-      React.createElement(Text, { testID: 'Text-92', style: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 2 } }, currentUser ? currentUser.email : '')
-    ),
-    React.createElement(ScrollView, { testID: 'ScrollView-11', style: { flex: 1 },
-      contentContainerStyle: { paddingTop: 20, paddingHorizontal: 20, paddingBottom: scrollBottomPadding }
-    },
-      currentUser ? React.createElement(View, { testID: 'View-73', style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'profile-card' },
-        React.createElement(View, { testID: 'View-74', style: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 } },
-          React.createElement(View, { testID: 'View-75', style: { width: 52, height: 52, borderRadius: 26, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
-            React.createElement(Text, { testID: 'Text-93', style: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' } }, currentUser.name ? currentUser.name[0].toUpperCase() : 'U')
-          ),
-          React.createElement(View, { testID: 'View-76' },
-            React.createElement(Text, { testID: 'Text-94', style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, currentUser.name),
-            React.createElement(Text, { testID: 'Text-95', style: { fontSize: 13, color: theme.colors.textSecondary, marginTop: 2 } }, currentUser.email)
-          )
-        )
-      ) : null,
-
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { name: 'tune', size: 22, color: theme.colors.primary })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Budgeting Style')
-        ),
-        React.createElement(View, { style: { flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: theme.colors.border } },
-          React.createElement(TouchableOpacity, {
-            onPress: () => mutateUpdate({ id: userSettings.id, data: { budgeting_style: 'envelope' } }).then(() => refetch()),
-            style: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', backgroundColor: (userSettings?.budgeting_style !== 'simple') ? theme.colors.primary : 'transparent' }
-          },
-            React.createElement(Text, { style: { fontWeight: 'bold', color: (userSettings?.budgeting_style !== 'simple') ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 14 } }, 'Envelope Mode')
-          ),
-          React.createElement(TouchableOpacity, {
-            onPress: () => mutateUpdate({ id: userSettings.id, data: { budgeting_style: 'simple' } }).then(() => refetch()),
-            style: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center', backgroundColor: (userSettings?.budgeting_style === 'simple') ? theme.colors.primary : 'transparent' }
-          },
-            React.createElement(Text, { style: { fontWeight: 'bold', color: (userSettings?.budgeting_style === 'simple') ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 14 } }, 'Simple Mode')
-          )
-        ),
-        React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 12, lineHeight: 18 } },
-          userSettings?.budgeting_style === 'simple'
-            ? 'Busy Mode: Hides envelopes and focuses on your wallets and accounts. Perfect for quick expense tracking.'
-            : 'Detailed Mode: Use the envelope system to assign every peso a job and plan your spending.'
-        )
-      ),
-
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(251,146,60,0.18)' : '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { name: 'security', size: 22, color: theme.colors.info })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Security')
-        ),
-        React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
-          React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'App PIN Lock'),
-            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, userSettings?.pin_code ? '6-Digit PIN Enabled' : 'Disabled')
-          ),
-          userSettings?.pin_code ?
-            React.createElement(TouchableOpacity, { onPress: handleRemovePin, style: { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEF2F2', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
-              React.createElement(Text, { color: theme.colors.error, fontWeight: 'bold', fontSize: 13 } , 'Remove PIN')
-            )
-          :
-            React.createElement(TouchableOpacity, { onPress: () => setPinMode(!pinMode), style: { backgroundColor: theme.colors.info, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 } },
-              React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 } }, pinMode ? 'Cancel' : 'Set PIN')
-            )
-        ),
-        pinMode && !userSettings?.pin_code ? React.createElement(View, { style: { marginTop: 16, backgroundColor: theme.colors.inputBg, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border } },
-          React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.textPrimary, marginBottom: 4 } }, 'Enter 6-digit PIN'),
-          React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginBottom: 10 } }, 'Must be unique — PINs are shared across all accounts on this device.'),
-          React.createElement(View, { style: { flexDirection: 'row', gap: 10 } },
-            React.createElement(TextInput, {
-              value: newPin,
-              onChangeText: setNewPin,
-              placeholder: '',
-
-              placeholderTextColor: theme.colors.textSecondary,
-              keyboardType: 'numeric',
-              maxLength: 6,
-              secureTextEntry: true,
-              style: { flex: 1, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 18, color: theme.colors.textPrimary, letterSpacing: 8 }
-            }),
-            React.createElement(TouchableOpacity, { onPress: handleSavePin, style: { backgroundColor: theme.colors.info, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' } },
-              React.createElement(Text, { style: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 } }, 'Save')
-            )
-          )
-        ) : null,
-        userSettings?.pin_code ? React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 16 } },
-          React.createElement(View, null,
-            React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-              React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Biometric Lock'),
-              !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 } },
-                React.createElement(Text, { style: { color: '#B45309', fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
+        {/* Security Section */}
+        <SettingSection title="Security" theme={theme}>
+          <SettingRow
+            icon="lock-outline"
+            iconColor={theme.colors.info}
+            title="PIN Code Lock"
+            subtitle={userSettings?.pin_code ? '6-Digit PIN enabled' : 'Not set up'}
+            onPress={() => setPinMode(!pinMode)}
+            rightContent={
+              userSettings?.pin_code ? (
+                <TouchableOpacity onPress={handleRemovePin}>
+                  <Text style={{ color: theme.colors.error, fontWeight: 'bold', fontSize: 13 }}>Remove</Text>
+                </TouchableOpacity>
               ) : null
-            ),
-            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, 'Fingerprint / Face ID authentication')
-          ),
-          React.createElement(TouchableOpacity, { 
-            onPress: handleToggleBiometrics,
-            style: { width: 50, height: 28, borderRadius: 14, backgroundColor: userSettings?.biometrics_enabled ? theme.colors.primary : theme.colors.border, justifyContent: 'center', padding: 2 } 
-          },
-            React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: userSettings?.biometrics_enabled ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
-          )
-        ) : null
-      ),
-
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#FFEDD5', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { name: 'palette', size: 22, color: theme.colors.primary })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Appearance')
-        ),
-        React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
-          React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Dark Mode'),
-            React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary } }, 'Switch to a darker theme')
-          ),
-          React.createElement(TouchableOpacity, { onPress: toggleTheme, style: { width: 50, height: 28, borderRadius: 14, backgroundColor: isDark ? theme.colors.primary : theme.colors.border, justifyContent: 'center', padding: 2 } },
-            React.createElement(View, { style: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', alignSelf: isDark ? 'flex-end' : 'flex-start', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 2, elevation: 2 } })
-          )
-        ),
-        React.createElement(View, { style: { marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: theme.colors.border } },
-          React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 4 } }, 'App Accent Color'),
-          React.createElement(Text, { style: { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 12 } }, 'Personalize your budgeting experience'),
-          React.createElement(ScrollView, { horizontal: true, showsHorizontalScrollIndicator: false, style: { flexDirection: 'row' } },
-            THEME_COLORS.map(c => {
-              var isArr = Array.isArray(c.color);
-              var baseStr = isArr ? c.color[0] : c.color;
-              var isSelected = theme.colors.primary === baseStr;
-              var isBlackLightMode = (baseStr === '#111827' && !theme.isDark);
-              var checkColor = isBlackLightMode ? '#FFFFFF' : (baseStr === '#FFFFFF' ? '#000000' : '#FFFFFF');
-              var isPremiumLocked = c.premium && !userSettings?.is_premium;
-
-              return React.createElement(TouchableOpacity, { 
-                key: baseStr, 
-                onPress: () => {
-                  if (isPremiumLocked) {
-                    navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } });
-                  } else {
-                    setPrimaryColor(c.color);
-                  }
-                },
-                style: { width: 50, height: 50, borderRadius: 25, backgroundColor: isArr ? 'transparent' : baseStr, overflow: 'hidden', marginRight: 12, alignItems: 'center', justifyContent: 'center', shadowColor: baseStr, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }
-              },
-                isArr ? React.createElement(View, {
-                  style: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 25, backgroundImage: 'linear-gradient(135deg, ' + c.color[0] + ', ' + c.color[1] + ')' }
-                }) : null,
-                isSelected ? React.createElement(MaterialIcons, { name: 'check', size: 24, color: checkColor, style: { zIndex: 1 } }) : null,
-                isPremiumLocked ? React.createElement(View, { style: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.3)', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' } },
-                  React.createElement(MaterialIcons, { name: 'workspace-premium', size: 18, color: '#F59E0B' })
-                ) : null
-              )
-            })
-          )
-        )
-      ),
-
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 } },
-        React.createElement(View, { style: { padding: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border } },
-          React.createElement(Text, { style: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 } }, 'HELP')
-        ),
-        React.createElement(TouchableOpacity, {
-          onPress: function () { setShowAppTour(true); },
-          style: { padding: 16, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: theme.colors.border }
-        },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: theme.colors.primary + '18', alignItems: 'center', justifyContent: 'center', marginRight: 14 } },
-            React.createElement(MaterialIcons, { name: 'school', size: 22, color: theme.colors.primary })
-          ),
-          React.createElement(View, { style: { flex: 1 } },
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Replay welcome tour'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 } }, 'Envelope budgeting, taps, privacy & quick start')
-          ),
-          React.createElement(MaterialIcons, { name: 'chevron-right', size: 22, color: theme.colors.textSecondary })
-        ),
-      ),
-
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'data-backup-card' },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 } },
-          React.createElement(View, { style: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(59, 130, 246, 0.12)', alignItems: 'center', justifyContent: 'center', marginRight: 12 } },
-            React.createElement(MaterialIcons, { name: 'file-download', size: 22, color: '#3B82F6' })
-          ),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Data Export')
-        ),
-        React.createElement(View, { style: { backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.2)' } },
-          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'flex-start' } },
-            React.createElement(MaterialIcons, { name: 'info-outline', size: 18, color: '#3B82F6', style: { marginRight: 10, marginTop: 1 } }),
-            React.createElement(Text, { style: { flex: 1, fontSize: 13, color: theme.colors.textSecondary, lineHeight: 20 } },
-              'Penny stores your data locally. Use the button below to export your complete transaction history to an Excel-ready CSV file for your own records.'
-            )
-          )
-        ),
-        backupNote ? React.createElement(Text, { style: { fontSize: 12, color: theme.colors.primary, marginBottom: 12, lineHeight: 18 } }, backupNote) : null,
-        lastExportUrl || lastExportData ? React.createElement(TouchableOpacity, {
-          onPress: function() {
-            if (Platform.OS === 'web' && lastExportUrl) {
-              var link = document.createElement('a');
-              link.href = lastExportUrl;
-              link.download = lastExportFilename;
-              link.click();
-            } else if (lastExportData) {
-              downloadFile(lastExportData.content, lastExportData.type);
             }
-          },
-          style: { backgroundColor: theme.isDark ? 'rgba(16, 185, 129, 0.1)' : '#ECFDF5', borderRadius: 12, paddingVertical: 10, alignItems: 'center', marginBottom: 16, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.primary }
-        },
-          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-            React.createElement(MaterialIcons, { name: 'description', size: 18, color: theme.colors.primary, style: { marginRight: 8 } }),
-            React.createElement(Text, { style: { color: theme.colors.primary, fontSize: 13, fontWeight: 'bold' } },
-              Platform.OS === 'web' ? 'Download ' + lastExportFilename : 'Share Spreadsheet Again'
-            )
-          )
-        ) : null,
-        React.createElement(TouchableOpacity, {
-          onPress: handleExportExcel,
-          disabled: backupBusy,
-          style: { backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: backupBusy ? 0.7 : 1 }
-        },
-          backupBusy
-            ? React.createElement(ActivityIndicator, { color: '#FFFFFF', size: 'small' })
-            : React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-                React.createElement(MaterialIcons, { name: 'description', size: 20, color: '#FFFFFF', style: { marginRight: 8 } }),
-                React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' } }, 'Export to Excel (.csv)'),
-                !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#FFFFFF' } },
-                  React.createElement(Text, { style: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
-                ) : null
-              )
-        ),
-        React.createElement(TouchableOpacity, {
-          onPress: handleArchiveData,
-          disabled: backupBusy || isArchiveDisabled,
-          style: { backgroundColor: '#FEF2F2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10, minHeight: 48, opacity: (backupBusy || isArchiveDisabled) ? 0.6 : 1 }
-        },
-          React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center' } },
-            React.createElement(MaterialIcons, { name: isArchiveDisabled ? 'lock' : 'auto-delete', size: 20, color: theme.colors.error, style: { marginRight: 8 } }),
-            React.createElement(Text, { style: { color: theme.colors.error, fontSize: 15, fontWeight: 'bold' } }, isArchiveDisabled ? 'Archive Locked (Balance > 0)' : 'Compress Old Data'),
-            !userSettings?.is_premium ? React.createElement(View, { style: { marginLeft: 8, backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: theme.colors.error } },
-              React.createElement(Text, { style: { color: theme.colors.error, fontSize: 10, fontWeight: 'bold' } }, 'PREMIUM')
-            ) : null
-          )
-        ),
-        isArchiveDisabled ? React.createElement(Text, { style: { fontSize: 10, color: theme.colors.error, textAlign: 'center', marginBottom: 10, fontStyle: 'italic' } }, 'Empty your wallets to enable history compression.') : null,
-        React.createElement(Text, { style: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 10, lineHeight: 16, textAlign: 'center' } },
-          'Your data is private and stays on this device.'
-        )
+            theme={theme}
+          />
 
-      ),
+          {pinMode && !userSettings?.pin_code && (
+            <View style={{ padding: 16, backgroundColor: theme.colors.background, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+              <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginBottom: 12 }}>Enter a unique 6-digit code to protect your data.</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TextInput
+                  value={newPin}
+                  onChangeText={setNewPin}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  secureTextEntry={true}
+                  style={{ flex: 1, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, fontSize: 18, color: theme.colors.textPrimary, letterSpacing: 8 }}
+                />
+                <TouchableOpacity onPress={handleSavePin} style={{ backgroundColor: theme.colors.info, borderRadius: 12, paddingHorizontal: 20, justifyContent: 'center' }}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
-      React.createElement(View, { testID: 'View-83', style: { backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }, componentId: 'app-info-card' },
-        React.createElement(View, { testID: 'View-84', style: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
-          React.createElement(Text, { testID: 'Text-101', style: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.5 } }, 'APP INFO')
-        ),
-        React.createElement(View, { testID: 'View-85', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#FED7AA' } },
-          React.createElement(Text, { testID: 'Text-102', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'App Name'),
-          React.createElement(Text, { testID: 'Text-103', style: { color: theme.colors.textSecondary, fontSize: 15 } }, 'Penny')
-        ),
-        React.createElement(View, { testID: 'View-86', style: { padding: 16, flexDirection: 'row', justifyContent: 'space-between' } },
-          React.createElement(Text, { testID: 'Text-104', style: { color: theme.colors.textPrimary, fontSize: 15 } }, 'Version'),
-          React.createElement(Text, { testID: 'Text-105', style: { color: theme.colors.textSecondary, fontSize: 15 } }, '5.5.2')
-        )
-      ),
-      React.createElement(View, { style: { backgroundColor: theme.colors.card, borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#FCA5A5', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(MaterialIcons, { name: 'report-problem', size: 22, color: theme.colors.error, style: { marginRight: 12 } }),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Danger Zone')
-        ),
+          <ToggleRow
+            icon="fingerprint"
+            iconColor={theme.colors.primary}
+            title="Biometrics"
+            subtitle="Face ID / Fingerprint"
+            value={!!userSettings?.biometrics_enabled}
+            onValueChange={handleToggleBiometrics}
+            theme={theme}
+            isLast={true}
+          />
+        </SettingSection>
 
-        React.createElement(TouchableOpacity, {
-          onPress: function() {
-            setShowResetConfirm(true);
-          },
-          style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border }
-        },
-          React.createElement(MaterialIcons, { name: 'refresh', size: 20, color: theme.colors.error, style: { marginRight: 14 } }),
-          React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Factory Reset Data'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Wipe everything & start fresh')
-          )
-        ),
+        {/* Appearance Section */}
+        <SettingSection title="Appearance" theme={theme}>
+          <ToggleRow
+            icon="brightness-4"
+            title="Dark Mode"
+            subtitle="Easier on the eyes"
+            value={isDark}
+            onValueChange={toggleTheme}
+            theme={theme}
+          />
+          <View style={{ padding: 16 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 12 }}>Accent Color</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                {THEME_COLORS.map(c => {
+                  const isArr = Array.isArray(c.color);
+                  const baseStr = isArr ? c.color[0] : c.color;
+                  const isSelected = theme.colors.primary === baseStr;
+                  const isPremiumLocked = c.premium && !userSettings?.is_premium;
 
-        React.createElement(TouchableOpacity, {
-          onPress: function() {
-            userCtx.setCurrentUser(null);
-            navigation.replace('Register');
-          },
-          style: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, marginTop: 4 }
-        },
-          React.createElement(MaterialIcons, { name: 'person-add', size: 20, color: theme.colors.textPrimary, style: { marginRight: 14 } }),
-          React.createElement(View, null,
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Create New Account'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Sign up with a different email')
-          )
-        )
-      ),
+                  return (
+                    <TouchableOpacity
+                      key={baseStr}
+                      onPress={() => isPremiumLocked ? navigation.navigate('MainApp', { screen: 'Dashboard', params: { showPremium: true } }) : setPrimaryColor(c.color)}
+                      style={{
+                        width: 44, height: 44, borderRadius: 22,
+                        backgroundColor: isArr ? baseStr : c.color,
+                        borderWidth: 2,
+                        borderColor: isSelected ? theme.colors.textPrimary : 'transparent',
+                        alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                      {isPremiumLocked && <MaterialIcons name="lock" size={14} color="#FFFFFF" style={{ opacity: 0.8 }} />}
+                      {isSelected && <MaterialIcons name="check" size={20} color="#FFFFFF" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        </SettingSection>
 
-      React.createElement(View, { style: { backgroundColor: theme.isDark ? '#1E293B' : '#F8FAFC', borderRadius: 16, padding: 20, marginBottom: 20, borderStyle: 'dashed', borderWidth: 2, borderColor: '#CBD5E1' } },
-        React.createElement(View, { style: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 } },
-          React.createElement(MaterialIcons, { name: 'bug-report', size: 22, color: '#64748B', style: { marginRight: 12 } }),
-          React.createElement(Text, { style: { fontSize: 17, fontWeight: 'bold', color: theme.colors.textPrimary } }, 'Developer Testing Center')
-        ),
-        React.createElement(View, { style: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' } },
-          React.createElement(View, { style: { flex: 1 } },
-            React.createElement(Text, { style: { fontSize: 15, fontWeight: '600', color: theme.colors.textPrimary } }, 'Premium Status'),
-            React.createElement(Text, { style: { fontSize: 12, color: theme.colors.textSecondary } }, 'Toggle Basic vs Premium UI')
-          ),
-          React.createElement(TouchableOpacity, {
-            onPress: () => {
-              mutateUpdate({ id: userSettings?.id, data: { is_premium: !userSettings?.is_premium } }).then(() => refetch());
-            },
-            style: { backgroundColor: userSettings?.is_premium ? '#F59E0B' : '#E2E8F0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 }
-          },
-            React.createElement(Text, { style: { color: userSettings?.is_premium ? '#FFFFFF' : '#475569', fontWeight: 'bold', fontSize: 13 } }, userSettings?.is_premium ? 'PREMIUM ACTIVE' : 'SWITCH TO PREMIUM')
-          )
-        )
-      ),
+        {/* Data Management Section */}
+        <SettingSection title="Data & Backup" theme={theme}>
+          <SettingRow
+            icon="file-download"
+            iconColor="#3B82F6"
+            title="Export to Excel"
+            subtitle="Download your history as .CSV"
+            onPress={handleExportExcel}
+            theme={theme}
+          />
+          <SettingRow
+            icon="auto-delete"
+            iconColor={theme.colors.error}
+            title="Compress Old Data"
+            subtitle="Merge old history to save space"
+            onPress={handleArchiveData}
+            theme={theme}
+            isLast={true}
+          />
+        </SettingSection>
 
-      React.createElement(TouchableOpacity, { testID: 'TouchableOpacity-26', onPress: handleLogout,
-        style: { backgroundColor: '#FEF2F2', borderRadius: 14, padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FECACA' },
-        componentId: 'logout-btn'
-      },
-        React.createElement(MaterialIcons, { testID: 'MaterialIcons-17', name: 'logout', size: 22, color: theme.colors.error }),
-        React.createElement(Text, { testID: 'Text-106', style: { color: theme.colors.error, fontSize: 16, fontWeight: 'bold', marginLeft: 10 } }, 'Sign Out')
-      )
-    )
+        {/* Danger Zone */}
+        <SettingSection title="Danger Zone" theme={theme}>
+          <SettingRow
+            icon="refresh"
+            iconColor={theme.colors.error}
+            title="Factory Reset"
+            subtitle="Wipe everything & start fresh"
+            onPress={() => setShowResetConfirm(true)}
+            theme={theme}
+          />
+          <SettingRow
+            icon="logout"
+            iconColor={theme.colors.error}
+            title="Sign Out"
+            onPress={handleLogout}
+            theme={theme}
+            isLast={true}
+          />
+        </SettingSection>
+
+        {/* Developer Center */}
+        <View style={{ marginTop: 8, padding: 16, backgroundColor: isDark ? '#1E293B' : '#F1F5F9', borderRadius: 20, borderStyle: 'dashed', borderWidth: 1, borderColor: theme.colors.border }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <MaterialIcons name="bug-report" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: theme.colors.textSecondary }}>DEVELOPER TESTING CENTER</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => updateSettings.mutate({ id: userSettings?.id, data: { is_premium: !userSettings?.is_premium } }).then(() => refetch())}
+            style={{ backgroundColor: userSettings?.is_premium ? '#F59E0B' : theme.colors.background, padding: 12, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border }}
+          >
+            <Text style={{ color: userSettings?.is_premium ? '#FFFFFF' : theme.colors.textPrimary, fontWeight: 'bold', fontSize: 12 }}>
+              {userSettings?.is_premium ? 'DISABLE PREMIUM MODE' : 'ENABLE PREMIUM MODE'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 10, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 12 }}>Penny v5.5.2 • Build 38</Text>
+        </View>
+
+      </ScrollView>
+
+      {/* Budgeting Style Selection Modal (Dropdown Style) */}
+      <Modal visible={budgetModalVisible} transparent animationType="slide" onRequestClose={() => setBudgetModalVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: insets.bottom + 20, paddingHorizontal: 20 }}>
+            <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginVertical: 12, opacity: 0.5 }} />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingTop: 8 }}>
+              <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.textPrimary }}>Select Budgeting Style</Text>
+              <TouchableOpacity onPress={() => setBudgetModalVisible(false)} style={{ padding: 8, backgroundColor: theme.colors.background, borderRadius: 12 }}>
+                <MaterialIcons name="close" size={20} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                updateSettings.mutate({ id: userSettings.id, data: { budgeting_style: 'envelope' } }).then(() => {
+                  refetch();
+                  setBudgetModalVisible(false);
+                });
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: userSettings?.budgeting_style !== 'simple' ? theme.colors.primary + '10' : 'transparent',
+                padding: 16,
+                borderRadius: 20,
+                marginBottom: 12,
+                borderWidth: 2,
+                borderColor: userSettings?.budgeting_style !== 'simple' ? theme.colors.primary : theme.colors.border
+              }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                <MaterialIcons name="all-inbox" size={24} color="#15803D" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary }}>Detailed Planner</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Plan every peso using the envelope system.</Text>
+              </View>
+              {userSettings?.budgeting_style !== 'simple' && <MaterialIcons name="check-circle" size={24} color={theme.colors.primary} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                updateSettings.mutate({ id: userSettings.id, data: { budgeting_style: 'simple' } }).then(() => {
+                  refetch();
+                  setBudgetModalVisible(false);
+                });
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: userSettings?.budgeting_style === 'simple' ? theme.colors.primary + '10' : 'transparent',
+                padding: 16,
+                borderRadius: 20,
+                marginBottom: 20,
+                borderWidth: 2,
+                borderColor: userSettings?.budgeting_style === 'simple' ? theme.colors.primary : theme.colors.border
+              }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                <MaterialIcons name="speed" size={24} color="#0369A1" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.colors.textPrimary }}>Busy Tracker</Text>
+                <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>Simple view focused on wallets and spending.</Text>
+              </View>
+              {userSettings?.budgeting_style === 'simple' && <MaterialIcons name="check-circle" size={24} color={theme.colors.primary} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* History Compression Modal */}
+      <Modal visible={archiveModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 28, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15 }}>
+            <MaterialIcons name="auto-delete" size={48} color={theme.colors.error} style={{ alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>Compress History</Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>Detailed transactions will be merged into monthly totals. This is permanent.</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+              {[3, 6, 12].map(m => (
+                <TouchableOpacity key={m} onPress={() => setSelectedMonths(m)} style={{ flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: selectedMonths === m ? theme.colors.primary : theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}>
+                  <Text style={{ fontWeight: 'bold', color: selectedMonths === m ? '#FFFFFF' : theme.colors.textPrimary }}>{m}m</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => setArchiveModalVisible(false)} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => startCompressionFlow(selectedMonths)} style={{ flex: 1.5, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.error, alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>Compress Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Factory Reset Modal */}
+      <Modal visible={showResetConfirm} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 28, padding: 24, borderWidth: 1, borderColor: theme.colors.error }}>
+            <MaterialIcons name="report-problem" size={48} color={theme.colors.error} style={{ alignSelf: 'center', marginBottom: 16 }} />
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary, textAlign: 'center', marginBottom: 8 }}>Factory Reset</Text>
+            <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 20 }}>This will wipe ALL your data. This cannot be undone.</Text>
+            <TextInput
+              value={resetConfirmText}
+              onChangeText={setResetConfirmText}
+              placeholder='Type "RESET"'
+              placeholderTextColor={theme.colors.textSecondary}
+              style={{ backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12, textAlign: 'center', fontWeight: 'bold', marginBottom: 20, color: theme.colors.error }}
+            />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity onPress={() => { setShowResetConfirm(false); setResetConfirmText(''); }} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', color: theme.colors.textPrimary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity disabled={resetConfirmText !== 'RESET'} onPress={handleFactoryReset} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: resetConfirmText === 'RESET' ? theme.colors.error : theme.colors.border, alignItems: 'center' }}>
+                <Text style={{ fontWeight: 'bold', color: '#FFFFFF' }}>Delete All</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 

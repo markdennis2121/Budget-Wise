@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation } from 'platform-hooks';
-import { getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue } from '../../utils/helpers';
+import { getTodayStr, getCurrentMonthStr, getMonthStr, isWithin5Days, isOverdue } from '../../utils/helpers';
 import { getOrphanPendingBills, sumBillAmounts, isEnvelopeArchived } from '../../utils/envelopeBudget';
 import { parseUserEnvelopes, computeEnvelopeBalances } from '../../utils/envelopeGuards';
 import { buildAccountsWithBalances } from '../../utils/accountBalances';
@@ -54,6 +54,35 @@ export function useDashboardState(userId) {
 
   var [showAddModal, setShowAddModal] = useState(false);
   var [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Senior Developer: Habit-Building Streak Logic
+  useEffect(function () {
+    if (!userSettings || !userId) return;
+
+    var today = getTodayStr();
+    var lastActive = userSettings.last_active_date;
+    var currentStreak = parseInt(userSettings.streak_count) || 0;
+
+    if (lastActive === today) return; // Already checked today
+
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    var yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    var newStreak = 1;
+    if (lastActive === yesterdayStr) {
+      newStreak = currentStreak + 1;
+    }
+
+    // Update streak in database silently
+    mutateUpdateSettings({
+      id: userSettings.id,
+      data: {
+        last_active_date: today,
+        streak_count: newStreak
+      }
+    });
+  }, [userSettings, userId]);
 
   useEffect(function () {
     if (!userSettings || userSettings.has_seen_penny_tour) return;
@@ -180,6 +209,17 @@ export function useDashboardState(userId) {
 
     return totalAvailableMoney - totalReduction - orphanPendingTotal;
   }, [totalAvailableMoney, envelopeBalances, orphanPendingTotal]);
+
+  var safeToSpend = useMemo(function() {
+    var now = new Date();
+    var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var daysLeft = (lastDay - now.getDate()) + 1;
+
+    // We base "Safe to Spend" on Ready to Assign funds divided by remaining days.
+    // This encourages users to keep a buffer in RTA or treats RTA as their pocket money.
+    var daily = readyToAssign / Math.max(1, daysLeft);
+    return Math.max(0, daily);
+  }, [readyToAssign]);
 
   var refetchAll = useCallback(function () {
     settingsQuery.refetch();

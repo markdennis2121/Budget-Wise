@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Platform, ActivityIndicator, Image, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation } from 'platform-hooks';
@@ -16,12 +16,17 @@ import { triggerImpactHaptic } from '../utils/feedback';
 import { buildAccountsWithBalances } from '../utils/accountBalances';
 import { scale, moderateScale, normalize } from '../utils/responsive';
 
+import { getEnvelopeIcon } from './dashboard/envelopeUtils';
+
 const TAB_MENU_HEIGHT = Platform.OS === 'web' ? 56 : 81;
 const SCROLL_EXTRA_PADDING = 16;
 const WEB_TAB_MENU_PADDING = 90;
 const FAB_SPACING = 16;
 
 const RecurringScreen = function(props) {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width > 1024;
+
   const themeCtx = useTheme();
   const theme = themeCtx.theme;
   const userCtx = useUser();
@@ -46,8 +51,6 @@ const RecurringScreen = function(props) {
   const isSimpleMode = userSettings?.budgeting_style === 'simple';
 
   const curMonth = getCurrentMonthStr();
-  const oneTimeQuery = useQuery('one_time_expenses');
-  const userOneTime = (oneTimeQuery.data || []).filter(o => o.user_id === userId);
   const userHistory = (historyQuery.data || []).filter(h => h.user_id === userId);
 
   const envelopes = useMemo(() => {
@@ -79,6 +82,20 @@ const RecurringScreen = function(props) {
   useEffect(() => {
     setVisibleCount(10);
   }, [filter]);
+
+  const stats = useMemo(() => {
+    const pending = recurringExpenses.filter(r => r.status === 'Pending');
+    const totalPendingAmount = pending.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+    const paid = recurringExpenses.filter(r => r.status === 'Paid' || r.status === 'Paid in Advance');
+    const totalPaidAmount = paid.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0);
+    return {
+      pendingCount: pending.length,
+      pendingAmount: totalPendingAmount,
+      paidCount: paid.length,
+      paidAmount: totalPaidAmount,
+      totalCount: recurringExpenses.length
+    };
+  }, [recurringExpenses]);
 
   const afterRecurringAction = (message, promise) => {
     runSaveWithFeedback(promise || Promise.resolve(), {
@@ -169,16 +186,38 @@ const RecurringScreen = function(props) {
       <SaveSuccessOverlay visible={showSaveSuccess} theme={theme} message={successMessage} />
 
       {/* Premium Header */}
-      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(24), paddingHorizontal: moderateScale(20), shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 }}>
-        <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Recurring Bills</Text>
-        <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '600' }}>
-          Managing {recurringExpenses.length} active subscriptions
-        </Text>
+      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + 16, paddingBottom: 20, paddingHorizontal: 20 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <View>
+            <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Recurring Bills</Text>
+            <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', fontWeight: '600' }}>
+              {stats.pendingCount} Pending • {stats.paidCount} Paid
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { triggerImpactHaptic('Medium'); setShowAdd(true); }}
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 12 }}
+          >
+            <MaterialIcons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats Cards */}
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800' }}>TO PAY</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{formatCurrency(stats.pendingAmount)}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800' }}>PAID THIS MONTH</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{formatCurrency(stats.paidAmount)}</Text>
+          </View>
+        </View>
       </View>
 
       {/* Modern Filter Bar */}
       <View style={{ backgroundColor: theme.colors.card, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(14) }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}>
           {filters.map(f => {
             const isActive = filter === f;
             const count = f === 'All' ? recurringExpenses.length : recurringExpenses.filter(r => r.status === f).length;
@@ -189,24 +228,19 @@ const RecurringScreen = function(props) {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingHorizontal: moderateScale(16),
-                  paddingVertical: moderateScale(8),
-                  borderRadius: scale(20),
-                  marginRight: moderateScale(10),
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  marginRight: 10,
                   backgroundColor: isActive ? theme.colors.primary : theme.colors.background,
                   borderWidth: 1,
                   borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                  shadowColor: isActive ? theme.colors.primary : '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: isActive ? 0.2 : 0.05,
-                  shadowRadius: 4,
-                  elevation: 2
                 }}
               >
-                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(13), fontWeight: 'bold' }}>{f}</Text>
+                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: 'bold' }}>{f}</Text>
                 {count > 0 && (
                   <View style={{ marginLeft: 8, backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : theme.colors.border, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 }}>
-                    <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textPrimary, fontSize: normalize(10), fontWeight: '800' }}>{count}</Text>
+                    <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textPrimary, fontSize: 9, fontWeight: '800' }}>{count}</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -220,89 +254,91 @@ const RecurringScreen = function(props) {
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: moderateScale(20), paddingHorizontal: moderateScale(16), paddingBottom: scrollBottomPadding }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: scrollBottomPadding }}>
           {filtered.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingTop: moderateScale(60), paddingHorizontal: moderateScale(40) }}>
+            <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
               <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
                  <MaterialIcons name="done-all" size={48} color={theme.colors.primary} />
               </View>
-              <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 12, textAlign: 'center' }}>All Caught Up! 🎉</Text>
-              <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22, opacity: 0.8 }}>
-                No {filter.toLowerCase()} bills found. High five for staying on top of your finances!
+              <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>No bills found</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', lineHeight: 22 }}>
+                {filter === 'All' ? "You haven't added any recurring bills yet." : `No ${filter.toLowerCase()} bills found.`}
               </Text>
             </View>
           ) : (
-            filtered.slice(0, visibleCount).map((expense, idx) => {
+            filtered.slice(0, visibleCount).map((expense) => {
               const isPending = expense.status === 'Pending';
               const overdue = isOverdue(expense.due_date) && isPending;
               const upcoming = isWithin5Days(expense.due_date) && !overdue && isPending;
               const statusColor = getStatusColor(expense.status);
+              const statusBg = getStatusBg(expense.status);
+
+              const env = envelopes.find(e => e.id === expense.category);
+              const categoryName = env ? env.name : (isSimpleMode ? 'General' : 'Uncategorized');
+              const iconName = getEnvelopeIcon(categoryName);
 
               return (
                 <View key={expense.id} style={{
                   backgroundColor: theme.colors.card,
-                  borderRadius: scale(20),
-                  padding: moderateScale(18),
-                  marginBottom: moderateScale(14),
-                  borderWidth: 1.5,
-                  borderColor: overdue ? theme.colors.error + '44' : (upcoming ? theme.colors.warning + '44' : theme.colors.border),
-                  shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3
+                  borderRadius: 24,
+                  padding: 16,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: overdue ? theme.colors.error : (upcoming ? theme.colors.warning : theme.colors.border),
                 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <View style={{ flex: 1, marginRight: 12 }}>
-                      <Text style={{ fontSize: normalize(16), fontWeight: '900', color: theme.colors.textPrimary }} numberOfLines={1}>{expense.name}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-                        <MaterialIcons name="event" size={14} color={theme.colors.textSecondary} style={{ marginRight: 4 }} />
-                        <Text style={{ fontSize: normalize(13), color: theme.colors.textSecondary, fontWeight: '600' }}>Due {formatDate(expense.due_date)}</Text>
-                      </View>
-
-                      {overdue && (
-                        <View style={{ alignSelf: 'flex-start', backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center' }}>
-                           <MaterialIcons name="error-outline" size={14} color="#DC2626" style={{ marginRight: 4 }} />
-                           <Text style={{ fontSize: normalize(11), color: '#DC2626', fontWeight: 'bold' }}>OVERDUE</Text>
-                        </View>
-                      )}
-                      {upcoming && (
-                        <View style={{ alignSelf: 'flex-start', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center' }}>
-                           <MaterialIcons name="access-time" size={14} color="#B45309" style={{ marginRight: 4 }} />
-                           <Text style={{ fontSize: normalize(11), color: '#B45309', fontWeight: 'bold' }}>DUE SOON</Text>
-                        </View>
-                      )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', marginRight: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+                      <MaterialIcons name={iconName} size={22} color={theme.colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary }} numberOfLines={1}>{expense.name}</Text>
+                      <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{categoryName} • Due {formatDate(expense.due_date)}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: normalize(20), fontWeight: '900', color: theme.colors.textPrimary }}>{formatCurrency(expense.amount)}</Text>
-                      <View style={{ backgroundColor: getStatusBg(expense.status), borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5, marginTop: 8, borderWidth: 1, borderColor: statusColor + '22' }}>
-                        <Text style={{ fontSize: normalize(11), color: statusColor, fontWeight: '900', textTransform: 'uppercase' }}>{expense.status}</Text>
+                      <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.textPrimary }}>{formatCurrency(expense.amount)}</Text>
+                      <View style={{ backgroundColor: statusBg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 4 }}>
+                        <Text style={{ fontSize: 9, color: statusColor, fontWeight: '900', textTransform: 'uppercase' }}>{expense.status}</Text>
                       </View>
                     </View>
                   </View>
 
-                  <View style={{ height: 1, backgroundColor: theme.colors.border, marginVertical: 18, opacity: 0.5 }} />
+                  {overdue && (
+                    <View style={{ backgroundColor: '#FEF2F2', padding: 8, borderRadius: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
+                       <MaterialIcons name="error-outline" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+                       <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: 'bold' }}>OVERDUE</Text>
+                    </View>
+                  )}
+                  {upcoming && (
+                    <View style={{ backgroundColor: '#FFFBEB', padding: 8, borderRadius: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
+                       <MaterialIcons name="access-time" size={14} color="#D97706" style={{ marginRight: 6 }} />
+                       <Text style={{ fontSize: 11, color: '#D97706', fontWeight: 'bold' }}>DUE SOON</Text>
+                    </View>
+                  )}
 
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
                     {isPending ? (
                       <TouchableOpacity
                         onPress={() => { triggerImpactHaptic('Medium'); handlePayPress(expense); }}
-                        style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+                        style={{ flex: 1, backgroundColor: theme.colors.primary, borderRadius: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <MaterialIcons name="check-circle" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                        <Text style={{ color: '#FFFFFF', fontSize: normalize(14), fontWeight: '900' }}>Mark as Paid</Text>
+                        <MaterialIcons name="check" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '800' }}>Mark as Paid</Text>
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity
                         onPress={() => handleResetStatus(expense)}
-                        style={{ flex: 1, backgroundColor: theme.colors.background, borderRadius: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.colors.border }}
+                        style={{ flex: 1, backgroundColor: theme.colors.background, borderRadius: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
                       >
-                        <MaterialIcons name="undo" size={18} color={theme.colors.textSecondary} style={{ marginRight: 8 }} />
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(14), fontWeight: 'bold' }}>Undo Payment</Text>
+                        <MaterialIcons name="undo" size={18} color={theme.colors.textSecondary} style={{ marginRight: 6 }} />
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 14, fontWeight: '700' }}>Undo Payment</Text>
                       </TouchableOpacity>
                     )}
 
                     <TouchableOpacity
                       onPress={() => handleDelete(expense)}
-                      style={{ width: scale(48), height: scale(48), borderRadius: 14, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FCA5A5' }}
+                      style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FEE2E2' }}
                     >
-                      <MaterialIcons name="delete-outline" size={24} color="#EF4444" />
+                      <MaterialIcons name="delete-outline" size={20} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -312,8 +348,8 @@ const RecurringScreen = function(props) {
 
           {visibleCount < filtered.length && (
             <TouchableOpacity onPress={() => setVisibleCount(v => v + 10)} style={{ alignItems: 'center', paddingVertical: 20 }}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: normalize(14) }}>
-                Load {filtered.length - visibleCount} More Bills
+              <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 14 }}>
+                Show More Bills
               </Text>
             </TouchableOpacity>
           )}
@@ -321,19 +357,21 @@ const RecurringScreen = function(props) {
       )}
 
       {/* Floating Add Button */}
-      <TouchableOpacity
-        onPress={() => {
-          triggerImpactHaptic('Medium');
-          if (!isSimpleMode && !hasUserEnvelopes(userSettings)) {
-            showEnvelopeRequiredAlert();
-            return;
-          }
-          setShowAdd(true);
-        }}
-        style={{ position: 'absolute', right: scale(20), bottom: fabBottom, width: scale(60), height: scale(60), borderRadius: scale(30), backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 }}
-      >
-        <MaterialIcons name="add" size={scale(32)} color="#FFFFFF" />
-      </TouchableOpacity>
+      {!isDesktopWeb && (
+        <TouchableOpacity
+          onPress={() => {
+            triggerImpactHaptic('Medium');
+            if (!isSimpleMode && !hasUserEnvelopes(userSettings)) {
+              showEnvelopeRequiredAlert();
+              return;
+            }
+            setShowAdd(true);
+          }}
+          style={{ position: 'absolute', right: 20, bottom: fabBottom, width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 }}
+        >
+          <MaterialIcons name="add" size={32} color="#FFFFFF" />
+        </TouchableOpacity>
+      )}
 
       <PayModal
         visible={showPayModal}

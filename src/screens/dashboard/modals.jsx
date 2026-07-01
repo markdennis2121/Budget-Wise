@@ -250,7 +250,23 @@ const AddEnvelopeModal = function ({ visible, onClose, envelopes, readyToAssign,
 
   var handleCreate = function () {
     if (isSaving || !name.trim()) return;
+
+    var isPremium = userSettings?.is_premium || false;
     var activeEnvs = (envelopes || []).filter(e => !isEnvelopeArchived(e));
+
+    // CEO Logic: Strict limit on Envelopes for Basic users (Max 5)
+    if (activeEnvs.length >= 5 && !isPremium) {
+      // Logic for nudging upgrade
+      if (typeof props.setShowPremiumModal === 'function') {
+        onClose();
+        props.setShowPremiumModal(true);
+      } else {
+        // Fallback if prop not passed
+        Alert.alert("Upgrade Required", "Basic accounts are limited to 5 active envelopes. Upgrade to Premium for unlimited budgeting categories!");
+      }
+      return;
+    }
+
     if (activeEnvs.find(e => e.name.toLowerCase() === name.trim().toLowerCase())) {
       return Alert.alert('Error', 'Envelope already exists!');
     }
@@ -636,18 +652,43 @@ const SavingsManagerModal = function ({ visible, onClose, state, userSettings, m
           <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>AMOUNT</Text>
           <AmountInput value={amount} onChangeText={setAmount} theme={theme} containerStyle={{ marginBottom: moderateScale(20) }} />
 
-          <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>{amount.startsWith('-') || amount === '' ? 'TARGET WALLET' : 'FUND FROM WALLET'}</Text>
+          <Text style={{ fontSize: normalize(12), fontWeight: 'bold', color: theme.colors.textSecondary, marginBottom: moderateScale(8), letterSpacing: 0.5 }}>{(!amount || amount === '' || parseAmount(amount) > 0) ? 'FUND FROM WALLET' : 'TARGET WALLET'}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: moderateScale(24) }}>
             {accountsList.map(acc => {
               var isSelected = selectedSource === acc.id;
+              var bal = parseFloat(acc.balance) || 0;
               return (
-                <TouchableOpacity key={acc.id} onPress={() => setSelectedSource(acc.id)} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isSelected ? theme.colors.primary : theme.colors.background, paddingHorizontal: moderateScale(14), paddingVertical: moderateScale(10), borderRadius: scale(12), marginRight: 8, borderWidth: 1, borderColor: isSelected ? theme.colors.primary : theme.colors.border }}>
+                <TouchableOpacity
+                  key={acc.id}
+                  onPress={() => setSelectedSource(acc.id)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: isSelected ? theme.colors.primary : theme.colors.background,
+                    paddingHorizontal: moderateScale(14),
+                    paddingVertical: moderateScale(10),
+                    borderRadius: scale(12),
+                    marginRight: 8,
+                    borderWidth: 1,
+                    borderColor: isSelected ? theme.colors.primary : theme.colors.border
+                  }}
+                >
                   <BrandLogo type={acc.type} size={16} style={{ marginRight: 8 }} />
-                  <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isSelected ? '#FFFFFF' : theme.colors.textPrimary }}>{acc.name}</Text>
+                  <View>
+                    <Text style={{ fontSize: normalize(13), fontWeight: 'bold', color: isSelected ? '#FFFFFF' : theme.colors.textPrimary }}>{acc.name}</Text>
+                    <Text style={{ fontSize: normalize(10), color: isSelected ? 'rgba(255,255,255,0.8)' : theme.colors.textSecondary }}>{formatCurrency(bal)}</Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
+
+          {addExceedsSource && amount && parseAmount(amount) > 0 && (
+            <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 10, borderRadius: 10, marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
+              <MaterialIcons name="error-outline" size={16} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: normalize(11), color: '#DC2626', fontWeight: 'bold' }}>Not enough money in {selectedAccountObj?.name || 'wallet'}!</Text>
+            </View>
+          )}
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
             <TouchableOpacity onPress={handleWithdraw} disabled={isSaving || currentSavings <= 0} style={{ flex: 1, backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border, borderRadius: scale(12), paddingVertical: moderateScale(14), alignItems: 'center', opacity: currentSavings <= 0 ? 0.5 : 1 }}>
@@ -3044,7 +3085,7 @@ const PremiumPaywallModal = function ({ visible, onClose, theme, userSettings, m
       });
       if (onSaved) onSaved();
       triggerImpactHaptic('Heavy');
-      Alert.alert("Premium Unlocked!", "Developer mode: You now have full access to Luxe features.");
+      Alert.alert("Premium Unlocked!", "Developer mode: You now have full access to Premium features.");
       onClose();
     } catch (e) {
       Alert.alert("Error", "Could not unlock premium.");
@@ -3054,11 +3095,13 @@ const PremiumPaywallModal = function ({ visible, onClose, theme, userSettings, m
   };
 
   const features = [
-    { icon: 'account-balance-wallet', text: 'Unlimited Wallets & Bank Accounts', sub: 'Track every single account you own.' },
-    { icon: 'insert-chart', text: 'Advanced Analytics', sub: 'Deep dive into your spending habits.' },
+    { icon: 'event-available', text: 'Daily Safe-to-Spend Limit', sub: 'Know exactly what you can afford today.' },
+    { icon: 'psychology', text: 'Behavioral Personas', sub: 'Reveal if you are a Bill Ninja or Weekend Warrior.' },
+    { icon: 'all-inclusive', text: 'Unlimited Wallets & Envelopes', sub: 'Scale your budget as your life grows.' },
+    { icon: 'insert-chart', text: 'Advanced Analytics', sub: 'Deep dive into 6-month wealth trends.' },
     { icon: 'security', text: 'Biometric Security', sub: 'Lock your data with Fingerprint/FaceID.' },
     { icon: 'file-download', text: 'PDF & Excel Exports', sub: 'Professional reports for your finances.' },
-    { icon: 'palette', text: 'Exclusive Premium Themes', sub: 'Emerald, Gold, and Midnight designs.' }
+    { icon: 'palette', text: 'Exclusive Premium Themes', sub: 'Rose Gold, Cosmic Purple, and more.' }
   ];
 
   return (

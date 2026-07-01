@@ -14,7 +14,7 @@ import { runSaveWithFeedback } from '../utils/saveSuccess';
 import { deleteEnvelopeAndCleanup } from '../utils/envelopeBudget';
 import { hasUserEnvelopes, showEnvelopeRequiredAlert } from '../utils/envelopeGuards';
 import logoImg from '../assets/logo.png';
-import { formatCurrency, getCurrentMonthStr } from '../utils/helpers';
+import { formatCurrency, getCurrentMonthStr, getTodayStr, formatDate } from '../utils/helpers';
 import { triggerImpactHaptic } from '../utils/feedback';
 import { scale, moderateScale, normalize, SCREEN_WIDTH } from '../utils/responsive';
 import {
@@ -48,33 +48,33 @@ const DashboardScreen = function (props) {
   const { width } = useWindowDimensions();
   const isDesktopWeb = Platform.OS === 'web' && width > 1024;
 
-  var themeCtx = useTheme();
-  var theme = themeCtx.theme;
-  var userCtx = useUser();
-  var userId = userCtx.currentUser ? userCtx.currentUser.id : '';
-  var userName = userCtx.currentUser ? userCtx.currentUser.name : 'User';
-  var insets = useSafeAreaInsets();
-  var state = useDashboardState(userId);
+  const themeCtx = useTheme();
+  const theme = themeCtx.theme;
+  const userCtx = useUser();
+  const userId = userCtx.currentUser ? userCtx.currentUser.id : '';
+  const userName = userCtx.currentUser ? userCtx.currentUser.name : 'User';
+  const insets = useSafeAreaInsets();
+  const state = useDashboardState(userId);
 
-  var isSimpleMode = state.userSettings && state.userSettings.budgeting_style === 'simple';
+  const isSimpleMode = state.userSettings && state.userSettings.budgeting_style === 'simple';
 
-  var [balancesVisible, setBalancesVisible] = useState(function() {
+  const [balancesVisible, setBalancesVisible] = useState(function() {
     try {
-      var saved = localStorage.getItem('penny_balances_visible');
+      const saved = localStorage.getItem('penny_balances_visible');
       return saved !== null ? JSON.parse(saved) : true;
     } catch (e) { return true; }
   });
 
-  var [walletViewMode, setWalletViewMode] = useState(function() {
+  const [walletViewMode, setWalletViewMode] = useState(function() {
     try {
-      var saved = localStorage.getItem('penny_wallet_view_mode');
+      const saved = localStorage.getItem('penny_wallet_view_mode');
       return saved || 'carousel';
     } catch (e) { return 'carousel'; }
   });
 
-  var [envelopeViewMode, setEnvelopeViewMode] = useState(function() {
+  const [envelopeViewMode, setEnvelopeViewMode] = useState(function() {
     try {
-      var saved = localStorage.getItem('penny_envelope_view_mode');
+      const saved = localStorage.getItem('penny_envelope_view_mode');
       return saved || 'grid';
     } catch (e) { return 'grid'; }
   });
@@ -87,33 +87,33 @@ const DashboardScreen = function (props) {
     } catch (e) {}
   }, [balancesVisible, walletViewMode, envelopeViewMode]);
 
-  var toggleBalances = function() {
+  const toggleBalances = function() {
     triggerImpactHaptic('Medium');
     setBalancesVisible(!balancesVisible);
   };
-  var toggleWalletView = function() {
+  const toggleWalletView = function() {
     triggerImpactHaptic('Light');
     setWalletViewMode(walletViewMode === 'carousel' ? 'grid' : 'carousel');
   };
-  var toggleEnvelopeView = function() {
+  const toggleEnvelopeView = function() {
     triggerImpactHaptic('Light');
     setEnvelopeViewMode(envelopeViewMode === 'grid' ? 'carousel' : 'grid');
   };
-  var maskAmount = function(amt) {
+  const maskAmount = function(amt) {
     return balancesVisible ? formatCurrency(amt) : '••••••';
   };
 
-  var isStealthDark = theme.isDark && theme.colors.primary === '#111827';
-  var safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
+  const isStealthDark = theme.isDark && theme.colors.primary === '#111827';
+  const safePrimary = isStealthDark ? '#E5E7EB' : theme.colors.primary;
 
-  var smartInsights = useMemo(function () {
-    var insights = [];
-    var today = new Date().toISOString().split('T')[0];
+  const smartInsights = useMemo(function () {
+    const insights = [];
+    const today = new Date().toISOString().split('T')[0];
 
     // 1. Low Envelopes warning
     state.envelopeBalances.forEach(function (env) {
       if (env.assigned > 0 && env.spent > 0) {
-        var pct = (env.available / env.assigned) * 100;
+        const pct = (env.available / env.assigned) * 100;
         if (pct < 15 && pct >= 0) {
           insights.push({
             type: 'warning',
@@ -136,9 +136,9 @@ const DashboardScreen = function (props) {
     }
 
     // 4. Overall spending ratio nudge
-    var baseIncome = state.incomeSources.reduce(function (sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
+    const baseIncome = state.incomeSources.reduce(function (sum, src) { return sum + (parseFloat(src.amount) || 0); }, 0);
     if (baseIncome > 0) {
-      var spendRatio = (state.totalExpenses / baseIncome) * 100;
+      const spendRatio = (state.totalExpenses / baseIncome) * 100;
       if (spendRatio > 70) {
         insights.push({
           type: 'info',
@@ -157,7 +157,7 @@ const DashboardScreen = function (props) {
     }
 
     // 4. Overdue bills
-    var overdueCount = state.recurringExpenses ? state.recurringExpenses.filter(r => r.status === 'Pending' && r.due_date < today).length : 0;
+    const overdueCount = state.recurringExpenses ? state.recurringExpenses.filter(r => r.status === 'Pending' && r.due_date < today).length : 0;
     if (overdueCount > 0) {
       insights.push({
         type: 'danger',
@@ -181,9 +181,9 @@ const DashboardScreen = function (props) {
   }, [state.envelopeBalances, state.incomeSources, state.totalExpenses, state.recurringExpenses, state.readyToAssign, theme]);
 
   // Entrance Animations
-  var contentFade = useRef(new Animated.Value(0)).current;
-  var walletsFade = useRef(new Animated.Value(0)).current;
-  var envelopesFade = useRef(new Animated.Value(0)).current;
+  const contentFade = useRef(new Animated.Value(0)).current;
+  const walletsFade = useRef(new Animated.Value(0)).current;
+  const envelopesFade = useRef(new Animated.Value(0)).current;
 
   useEffect(function() {
     Animated.stagger(150, [
@@ -194,12 +194,12 @@ const DashboardScreen = function (props) {
   }, []);
 
   // FAB Animation
-  var fabScale = useRef(new Animated.Value(1)).current;
-  var animatedFabStyle = {
+  const fabScale = useRef(new Animated.Value(1)).current;
+  const animatedFabStyle = {
     transform: [{ scale: fabScale }]
   };
 
-  var onPressFab = function() {
+  const onPressFab = function() {
     triggerImpactHaptic('Medium');
     Animated.sequence([
       Animated.spring(fabScale, { toValue: 1.15, useNativeDriver: Platform.OS !== 'web' }),
@@ -212,19 +212,19 @@ const DashboardScreen = function (props) {
     }
     state.setShowAddModal(true);
   };
-  var [showSpentModal, setShowSpentModal] = useState(false);
-  var [spentFilter, setSpentFilter] = useState(null);
-  var [showIncomeModal, setShowIncomeModal] = useState(false);
-  var [showAddEnvModal, setShowAddEnvModal] = useState(false);
-  var [showEditEnvModal, setShowEditEnvModal] = useState(false);
-  var [selectedEnvelope, setSelectedEnvelope] = useState(null);
-  var [showAddAccountModal, setShowAddAccountModal] = useState(false);
-  var [showEditAccountModal, setShowEditAccountModal] = useState(false);
-  var [selectedAccount, setSelectedAccount] = useState(null);
-  var [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
-  var [showNotificationCenter, setShowNotificationCenter] = useState(false);
-  var [showArchiveModal, setShowArchiveModal] = useState(false);
-  var [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showSpentModal, setShowSpentModal] = useState(false);
+  const [spentFilter, setSpentFilter] = useState(null);
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [showAddEnvModal, setShowAddEnvModal] = useState(false);
+  const [showEditEnvModal, setShowEditEnvModal] = useState(false);
+  const [selectedEnvelope, setSelectedEnvelope] = useState(null);
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [showEditAccountModal, setShowEditAccountModal] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState(null);
+  const [showSavingsManagerModal, setShowSavingsManagerModal] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   // UI/UX Hook: Allow other screens to trigger the paywall
   useEffect(() => {
@@ -236,16 +236,16 @@ const DashboardScreen = function (props) {
   }, [props.route?.params]);
 
   // High-End Alert Persistence: Track how many alerts the user has already acknowledged
-  var [lastSeenAlertCount, setLastSeenAlertCount] = useState(function() {
+  const [lastSeenAlertCount, setLastSeenAlertCount] = useState(function() {
     try {
       return parseInt(localStorage.getItem('penny_last_seen_alert_count')) || 0;
     } catch (e) { return 0; }
   });
 
   // Calculate the current total number of active alerts/reminders
-  var currentAlertCount = useMemo(function() {
-    var insightCount = smartInsights.filter(i => i.type !== 'info').length;
-    var billCount = state.recurringExpenses ? state.recurringExpenses.filter(r => r.status === 'Pending').length : 0;
+  const currentAlertCount = useMemo(function() {
+    const insightCount = smartInsights.filter(i => i.type !== 'info').length;
+    const billCount = state.recurringExpenses ? state.recurringExpenses.filter(r => r.status === 'Pending').length : 0;
     return insightCount + billCount;
   }, [smartInsights, state.recurringExpenses]);
 
@@ -259,54 +259,168 @@ const DashboardScreen = function (props) {
     }
   }, [showNotificationCenter, currentAlertCount]);
 
-  var hasNewAlerts = currentAlertCount > lastSeenAlertCount;
+  const hasNewAlerts = currentAlertCount > lastSeenAlertCount;
 
-  var [showTransferEnvModal, setShowTransferEnvModal] = useState(false);
-  var [showTransferWalletModal, setShowTransferWalletModal] = useState(false);
-  var [insightIndex, setInsightIndex] = useState(0);
-  var [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
-  var [showQuickAddModal, setShowQuickAddModal] = useState(false);
-  var [quickAddEnv, setQuickAddEnv] = useState(null);
-  var [showScreenSaveSuccess, setShowScreenSaveSuccess] = useState(false);
-  var [screenSuccessMessage, setScreenSuccessMessage] = useState('Saved!');
-  var scrollRef = useRef(null);
-  var scrollContentY = useRef(0);
-  var envelopeRowY = useRef(0);
-  var scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
-  var fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
+  const [showTransferEnvModal, setShowTransferEnvModal] = useState(false);
+  const [showTransferWalletModal, setShowTransferWalletModal] = useState(false);
+  const [insightIndex, setInsightIndex] = useState(0);
+  const [infoModalConfig, setInfoModalConfig] = useState({ visible: false, title: '', content: null });
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+  const [quickAddEnv, setQuickAddEnv] = useState(null);
+  const [showScreenSaveSuccess, setShowScreenSaveSuccess] = useState(false);
+  const [screenSuccessMessage, setScreenSuccessMessage] = useState('Saved!');
+  const scrollRef = useRef(null);
+  const scrollContentY = useRef(0);
+  const envelopeRowY = useRef(0);
+  const scrollBottomPadding = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + SCROLL_EXTRA_PADDING);
+  const fabBottom = Platform.OS === 'web' ? WEB_TAB_MENU_PADDING : (TAB_MENU_HEIGHT + insets.bottom + FAB_SPACING);
 
-  var totalAvailableMoney = state.accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
-  var totalActualMoney = totalAvailableMoney;
-  var rtaColor = state.readyToAssign === 0 ? '#10B981' : (state.readyToAssign > 0 ? theme.colors.primary : theme.colors.error);
+  const totalAvailableMoney = state.accounts.reduce(function (sum, acc) { return sum + acc.balance; }, 0);
+  const totalActualMoney = totalAvailableMoney;
+  const rtaColor = state.readyToAssign === 0 ? '#10B981' : (state.readyToAssign > 0 ? theme.colors.primary : theme.colors.error);
+
+  // --- DASHBOARD ENGAGEMENT LOGIC (S2) ---
+
+  const streakCount = state.userSettings ? parseInt(state.userSettings.streak_count) || 0 : 0;
+
+  const getWeeklyProgress = useMemo(function() {
+    const last7Days = (state.userHistory || []).filter(h => {
+      const d = new Date(h.date);
+      const now = new Date();
+      return (now - d) / (1000 * 60 * 60 * 24) <= 7;
+    });
+    const count = last7Days.length;
+    if (count === 0) return { label: 'Quiet Week', icon: 'bedtime', color: '#94A3B8' };
+    if (count < 5) return { label: 'Active Week', icon: 'auto-awesome', color: '#3B82F6' };
+    return { label: 'Power Week!', icon: 'bolt', color: '#10B981' };
+  }, [state.userHistory]);
+
+  const spendingWeather = useMemo(function() {
+    if (state.totalIncome === 0) return { icon: 'wb-sunny', color: '#10B981', label: 'Clear Skies', sub: 'Log some income to see your budget vibe!' };
+
+    const ratio = state.totalExpenses / state.totalIncome;
+    if (ratio <= 0.4) return { icon: 'wb-sunny', color: '#10B981', label: 'Sunny', sub: 'You are saving like a pro!' };
+    if (ratio <= 0.8) return { icon: 'cloud-queue', color: '#3B82F6', label: 'Cloudy', sub: 'Spending is normal. Keep it up.' };
+    return { icon: 'thunderstorm', color: '#F59E0B', label: 'Stormy', sub: 'Careful! Spending is very high.' };
+  }, [state.totalExpenses, state.totalIncome]);
+
+  const userLevel = useMemo(function() {
+    const saved = state.totalSaved || 0;
+    if (saved < 1000) return { name: 'Penny Pincher', next: 1000, icon: 'eco' };
+    if (saved < 10000) return { name: 'Budget Boss', next: 10000, icon: 'shield' };
+    return { name: 'Wealth Wizard', next: 100000, icon: 'auto-fix-high' };
+  }, [state.totalSaved]);
+
+  const financialPersona = useMemo(function() {
+    const isPremiumUser = state.userSettings?.is_premium;
+    const history = state.userHistory || [];
+
+    // Basic Users stay as "Consistent" or "Newcomer"
+    if (!isPremiumUser) {
+       return history.length < 5
+        ? { name: 'Newcomer', icon: 'face', desc: 'Log more to reveal your style.' }
+        : { name: 'Member', icon: 'person', desc: 'Standard tracking mode active.' };
+    }
+
+    if (history.length < 5) return { name: 'The Newcomer', icon: 'face', desc: 'Log more to reveal your style.' };
+
+    let weekendSpend = 0;
+    let totalSpendCount = 0;
+
+    history.forEach(h => {
+      if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
+        totalSpendCount++;
+        const date = new Date(h.date);
+        const day = date.getDay();
+        if (day === 0 || day === 5 || day === 6) weekendSpend++; // Fri, Sat, Sun
+      }
+    });
+
+    const billCount = state.recurringExpenses.length;
+    const paidEarly = state.recurringExpenses.filter(r => r.status === 'Paid' || r.status === 'Paid in Advance').length;
+
+    if (billCount > 0 && (paidEarly / billCount) > 0.8) return { name: 'The Bill Ninja', icon: 'visibility-off', desc: 'You never let a deadline slip!' };
+    if (totalSpendCount > 0 && (weekendSpend / totalSpendCount) > 0.6) return { name: 'Weekend Warrior', icon: 'celebration', desc: 'Most of your action happens on weekends.' };
+    if (state.totalIncome > 0 && (state.totalSaved / state.totalIncome) > 0.25) return { name: 'The Master Saver', icon: 'account-balance', desc: 'Future you is going to be very rich.' };
+
+    return { name: 'The Consistent One', icon: 'insights', desc: 'Steady tracking, day in and day out.' };
+  }, [state.userHistory, state.recurringExpenses, state.totalSaved, state.totalIncome]);
+
+  const renderSavingsJar = function() {
+    const saved = state.totalSaved || 0;
+    const capacity = userLevel.next || 1000;
+    const fillPct = Math.min(100, (saved / capacity) * 100);
+    const isFull = fillPct >= 100;
+
+    return (
+      <View style={{ marginBottom: moderateScale(24) }}>
+        <TouchableOpacity
+          onPress={() => setShowSavingsManagerModal(true)}
+          style={{
+            backgroundColor: theme.colors.card,
+            borderRadius: scale(20),
+            padding: moderateScale(18),
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2
+          }}
+        >
+          <View style={{ width: scale(42), height: scale(42), borderRadius: scale(10), backgroundColor: '#3B82F615', alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
+            <MaterialIcons name="savings" size={scale(22)} color="#3B82F6" />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 6 }}>
+              <View>
+                <Text style={{ fontSize: scale(9), fontWeight: '800', color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Savings Progress</Text>
+                <Text style={{ fontSize: scale(18), fontWeight: '900', color: theme.colors.textPrimary }}>{maskAmount(saved)}</Text>
+              </View>
+              <Text style={{ fontSize: scale(11), fontWeight: 'bold', color: theme.colors.textSecondary }}>{Math.round(fillPct)}%</Text>
+            </View>
+            <View style={{ height: 6, backgroundColor: theme.colors.border, borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{ width: fillPct + '%', height: '100%', backgroundColor: isFull ? '#F59E0B' : '#3B82F6' }} />
+            </View>
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color={theme.colors.textSecondary} style={{ marginLeft: 10 }} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   // New Month Assistant Logic
-  var curMonth = getCurrentMonthStr();
-  var needsSettlement = !isSimpleMode &&
+  const curMonth = getCurrentMonthStr();
+  const needsSettlement = !isSimpleMode &&
                         state.userSettings &&
                         state.userSettings.last_settled_month !== curMonth &&
                         state.envelopeBalances.some(env => env.available > 0);
 
-  var totalLeftover = useMemo(function() {
+  const totalLeftover = useMemo(function() {
     return state.envelopeBalances.reduce((sum, env) => sum + Math.max(0, env.available), 0);
   }, [state.envelopeBalances]);
 
-  var hasNoAccounts = state.accounts.length === 0;
-  var hasNoEnvelopes = state.envelopeBalances.length === 0;
-  var hasNoIncome = state.totalIncome <= 0;
+  const hasNoAccounts = state.accounts.length === 0;
+  const hasNoEnvelopes = state.envelopeBalances.length === 0;
+  const hasNoIncome = state.totalIncome <= 0 && state.incomeSources.every(s => (parseFloat(s.amount) || 0) <= 0) && hasNoAccounts;
 
-  var handleRtaNudgePress = function () {
+  const handleRtaNudgePress = function () {
     if (hasNoEnvelopes) {
       setShowAddEnvModal(true);
       return;
     }
     if (scrollRef.current) {
-      var targetY = scrollContentY.current + envelopeRowY.current - 12;
+      const targetY = scrollContentY.current + envelopeRowY.current - 12;
       scrollRef.current.scrollTo({ y: Math.max(0, targetY), animated: true });
     }
   };
 
-  var handleTotalMoneyInfo = function () {
-    var accountsList = state.accounts.map(a => ({ name: a.name, amount: a.balance }));
+  const handleTotalMoneyInfo = function () {
+    const accountsList = state.accounts.map(a => ({ name: a.name, amount: a.balance }));
     setInfoModalConfig({
       visible: true,
       title: 'Total Current Money',
@@ -328,10 +442,10 @@ const DashboardScreen = function (props) {
     });
   };
 
-  var handleTransferWalletPress = function () {
+  const handleTransferWalletPress = function () {
     triggerImpactHaptic('Light');
     if (state.accounts.length < 2) {
-      var msg = "Add another wallet or bank account so you can move money between them.";
+      const msg = "Add another wallet or bank account so you can move money between them.";
       if (Platform.OS === 'web') {
         if (window.confirm("Add Another Account?\n\n" + msg)) {
           setShowAddAccountModal(true);
@@ -347,10 +461,10 @@ const DashboardScreen = function (props) {
     setShowTransferWalletModal(true);
   };
 
-  var handleTransferEnvPress = function () {
+  const handleTransferEnvPress = function () {
     triggerImpactHaptic('Light');
     if (state.envelopes.length < 2) {
-      var msg = "Add another envelope so you can move budget between your categories.";
+      const msg = "Add another envelope so you can move budget between your categories.";
       if (Platform.OS === 'web') {
         if (window.confirm("Add Another Envelope?\n\n" + msg)) {
           setShowAddEnvModal(true);
@@ -366,8 +480,8 @@ const DashboardScreen = function (props) {
     setShowTransferEnvModal(true);
   };
 
-  var handleReadyToAssignInfo = function () {
-    var orphanNote = state.orphanPendingTotal > 0 ? (
+  const handleReadyToAssignInfo = function () {
+    const orphanNote = state.orphanPendingTotal > 0 ? (
       <View style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
         <Text style={{ fontSize: 13, color: theme.colors.warning, fontWeight: '600', lineHeight: 20 }}>
           {formatCurrency(state.orphanPendingTotal)} is held for pending bills whose envelope was removed. Reassign those bills on the Bills tab or delete them to free this amount.
@@ -394,7 +508,7 @@ const DashboardScreen = function (props) {
     });
   };
 
-  var handleWalletsInfo = function () {
+  const handleWalletsInfo = function () {
     setInfoModalConfig({
       visible: true,
       title: 'Wallets & Accounts',
@@ -417,24 +531,77 @@ const DashboardScreen = function (props) {
     });
   };
 
-  var activeInsight = smartInsights[insightIndex % smartInsights.length] || smartInsights[0];
+  const activeInsight = smartInsights[insightIndex % smartInsights.length] || smartInsights[0];
 
-  var currentHour = new Date().getHours();
-  var greeting = "Good Evening";
-  var aiMessage = "You're doing great. 🌙";
+  const currentHour = new Date().getHours();
+  let greeting = "Good Evening";
   if (currentHour < 12) {
     greeting = "Good Morning";
-    aiMessage = "Let's crush those savings goals today! ☕";
   } else if (currentHour < 18) {
     greeting = "Good Afternoon";
-    aiMessage = "Stay on track, you've got this! ✨";
   }
 
-  // --- RENDERING SUB-BLOCKS ---
+  const [showDailyAudit, setShowDailyAudit] = useState(false);
 
-  var renderWalletsSection = function() {
+  const dailyStats = useMemo(() => {
+    const today = getTodayStr();
+    const todayHistory = state.userHistory.filter(h => h.date === today);
+
+    let spent = 0;
+    let earned = 0;
+
+    todayHistory.forEach(h => {
+      const amt = parseFloat(h.amount) || 0;
+      if (h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income')) {
+        earned += amt;
+      } else if (h.expense_type === 'One-Time' || h.expense_type === 'Recurring') {
+        spent += amt;
+      }
+    });
+
+    return { spent, earned, count: todayHistory.length, history: todayHistory };
+  }, [state.userHistory]);
+
+  const renderDailyAuditButton = function() {
     return (
-      <Animated.View style={{ marginBottom: 24, opacity: walletsFade, transform: [{ translateX: walletsFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+      <View style={{ marginBottom: moderateScale(20) }}>
+        <TouchableOpacity
+          onPress={() => { triggerImpactHaptic('Medium'); setShowDailyAudit(true); }}
+          style={{
+            backgroundColor: theme.colors.card,
+            borderRadius: scale(20),
+            padding: moderateScale(16),
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2
+          }}
+        >
+          <View style={{ width: scale(40), height: scale(40), borderRadius: scale(10), backgroundColor: theme.colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+            <MaterialIcons name="summarize" size={scale(20)} color={theme.colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: scale(9), fontWeight: '800', color: theme.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Today's Financial Audit</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: scale(14), fontWeight: '800', color: '#10B981' }}>+{formatCurrency(dailyStats.earned)}</Text>
+              <View style={{ width: 1, height: 10, backgroundColor: theme.colors.border, marginHorizontal: 8 }} />
+              <Text style={{ fontSize: scale(14), fontWeight: '800', color: '#EF4444' }}>-{formatCurrency(dailyStats.spent)}</Text>
+            </View>
+          </View>
+          <MaterialIcons name="chevron-right" size={24} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderWalletsSection = function() {
+    return (
+      <Animated.View style={{ marginBottom: isSimpleMode ? moderateScale(24) : 24, opacity: walletsFade, transform: [{ translateX: walletsFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <TouchableOpacity onPress={handleWalletsInfo} style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 6 }}>{isSimpleMode ? 'Wallets & Bank Accounts' : 'Wallets & Accounts'}</Text>
@@ -476,8 +643,7 @@ const DashboardScreen = function (props) {
               contentContainerStyle={{ paddingVertical: 4, paddingRight: 8, alignItems: 'center' }}
             >
               {state.accounts.map(function (acc) {
-                var walletStyle = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-                var openWalletEditor = function () {
+                const openWalletEditor = function () {
                   triggerImpactHaptic('Light');
                   setSelectedAccount(acc);
                   setShowEditAccountModal(true);
@@ -487,9 +653,9 @@ const DashboardScreen = function (props) {
                         <Pressable
                           onPress={openWalletEditor}
                           style={function ({ pressed }) {
-                            var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-                            var mainColor = acc.color || styleInfo.color;
-                            var shadowColor = mainColor;
+                            const styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
+                            const mainColor = acc.color || styleInfo.color;
+                            const shadowColor = mainColor;
 
                             return {
                               width: scale(190),
@@ -513,7 +679,6 @@ const DashboardScreen = function (props) {
                             };
                           }}
                         >
-                          {/* Premium Mesh Gradient Background */}
                           {Platform.OS === 'web' ? (
                             <View style={{
                               position: 'absolute',
@@ -521,11 +686,9 @@ const DashboardScreen = function (props) {
                               backgroundImage: `linear-gradient(135deg, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 0%, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color2 || (WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 100%)`
                             }} />
                           ) : (
-                            /* Mobile: Subtle Glossy Highlight */
                             <View style={{ position: 'absolute', top: -scale(40), left: -scale(40), width: scale(100), height: scale(100), borderRadius: scale(50), backgroundColor: 'rgba(255,255,255,0.12)' }} />
                           )}
 
-                          {/* Background Watermark Icon */}
                           <View style={{ position: 'absolute', right: scale(-12), bottom: scale(-12), opacity: 0.15 }}>
                              <BrandLogo type={acc.type} size={scale(85)} />
                           </View>
@@ -557,10 +720,7 @@ const DashboardScreen = function (props) {
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                   {state.accounts.map(function (acc) {
-                    var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-                    var mainColor = acc.color || styleInfo.color;
-
-                    var openWalletEditor = function () {
+                    const openWalletEditor = function () {
                       triggerImpactHaptic('Light');
                       setSelectedAccount(acc);
                       setShowEditAccountModal(true);
@@ -570,9 +730,9 @@ const DashboardScreen = function (props) {
                         key={acc.id}
                         onPress={openWalletEditor}
                         style={function ({ pressed }) {
-                          var styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
-                          var mainColor = acc.color || styleInfo.color;
-                          var shadowColor = mainColor;
+                          const styleInfo = WALLET_STYLES[acc.type] || WALLET_STYLES.Custom;
+                          const mainColor = acc.color || styleInfo.color;
+                          const shadowColor = mainColor;
 
                           return {
                             width: '48%',
@@ -596,15 +756,13 @@ const DashboardScreen = function (props) {
                           };
                         }}
                       >
-                        {/* Premium Mesh Gradient Background */}
                         {Platform.OS === 'web' ? (
                           <View style={{
                             position: 'absolute',
                             top: 0, left: 0, right: 0, bottom: 0,
-                            backgroundImage: `linear-gradient(135deg, ${styleInfo.color} 0%, ${styleInfo.color2 || styleInfo.color} 100%)`
+                            backgroundImage: `linear-gradient(135deg, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 0%, ${(WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color2 || (WALLET_STYLES[acc.type] || WALLET_STYLES.Custom).color} 100%)`
                           }} />
                         ) : (
-                          /* Mobile: Subtle Glossy Highlight */
                           <View style={{ position: 'absolute', top: -scale(30), left: -scale(30), width: scale(80), height: scale(80), borderRadius: scale(40), backgroundColor: 'rgba(255,255,255,0.1)' }} />
                         )}
 
@@ -637,10 +795,10 @@ const DashboardScreen = function (props) {
     );
   };
 
-  var renderMonthlyStats = function() {
+  const renderMonthlyStats = function() {
     return (
       <View style={{ backgroundColor: theme.colors.card, borderRadius: scale(24), padding: moderateScale(20), marginBottom: moderateScale(20), shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 4, borderWidth: 1, borderColor: theme.colors.border }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(18) }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(20) }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ width: scale(32), height: scale(32), borderRadius: scale(10), backgroundColor: safePrimary + '15', alignItems: 'center', justifyContent: 'center', marginRight: scale(10) }}>
               <MaterialIcons name="auto-graph" size={scale(18)} color={safePrimary} />
@@ -653,34 +811,55 @@ const DashboardScreen = function (props) {
         </View>
 
         <View style={{ flexDirection: 'row', gap: moderateScale(10), marginBottom: isSimpleMode ? 0 : moderateScale(20) }}>
-          {/* Income Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setShowIncomeModal(true); }}
-            style={{ flex: 1, backgroundColor: '#10B981', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.background,
+              borderRadius: scale(16),
+              padding: moderateScale(14),
+              borderWidth: 1.5,
+              borderColor: '#10B98133',
+              alignItems: 'center'
+            }}
           >
-            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>INCOME</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
-            <MaterialIcons name="add-circle" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
+            <MaterialIcons name="trending-up" size={scale(18)} color="#10B981" style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, fontWeight: '800', marginBottom: 2, letterSpacing: 0.5 }}>INCOME</Text>
+            <Text style={{ fontSize: scale(15), fontWeight: '900', color: '#10B981' }} numberOfLines={1}>{maskAmount(state.totalIncome)}</Text>
           </TouchableOpacity>
 
-          {/* Spent Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}
-            style={{ flex: 1, backgroundColor: '#EF4444', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.background,
+              borderRadius: scale(16),
+              padding: moderateScale(14),
+              borderWidth: 1.5,
+              borderColor: '#EF444433',
+              alignItems: 'center'
+            }}
           >
-            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SPENT</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
-            <MaterialIcons name="visibility" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
+            <MaterialIcons name="trending-down" size={scale(18)} color="#EF4444" style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, fontWeight: '800', marginBottom: 2, letterSpacing: 0.5 }}>SPENT</Text>
+            <Text style={{ fontSize: scale(15), fontWeight: '900', color: '#EF4444' }} numberOfLines={1}>{maskAmount(state.totalExpenses)}</Text>
           </TouchableOpacity>
 
-          {/* Savings Block */}
           <TouchableOpacity
             onPress={function () { triggerImpactHaptic('Light'); setShowSavingsManagerModal(true); }}
-            style={{ flex: 1, backgroundColor: '#3B82F6', borderRadius: scale(16), padding: moderateScale(12), shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+            style={{
+              flex: 1,
+              backgroundColor: theme.colors.background,
+              borderRadius: scale(16),
+              padding: moderateScale(14),
+              borderWidth: 1.5,
+              borderColor: '#3B82F633',
+              alignItems: 'center'
+            }}
           >
-            <Text style={{ fontSize: scale(10), color: 'rgba(255,255,255,0.85)', fontWeight: '800', marginBottom: 6, letterSpacing: 0.5 }}>SAVINGS</Text>
-            <Text style={{ fontSize: scale(16), fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
-            <MaterialIcons name="account-balance-wallet" size={scale(14)} color="#FFFFFF" style={{ position: 'absolute', top: 12, right: 12, opacity: 0.8 }} />
+            <MaterialIcons name="savings" size={scale(18)} color="#3B82F6" style={{ marginBottom: 6 }} />
+            <Text style={{ fontSize: scale(10), color: theme.colors.textSecondary, fontWeight: '800', marginBottom: 2, letterSpacing: 0.5 }}>SAVINGS</Text>
+            <Text style={{ fontSize: scale(15), fontWeight: '900', color: '#3B82F6' }} numberOfLines={1}>{maskAmount(state.totalSaved)}</Text>
           </TouchableOpacity>
         </View>
 
@@ -716,91 +895,103 @@ const DashboardScreen = function (props) {
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: scrollBottomPadding + FAB_SCROLL_BOTTOM_EXTRA }}>
 
-        {/* Header Block (Modern Mobile Layout) */}
-        <View style={{ paddingTop: insets.top + moderateScale(12), paddingHorizontal: moderateScale(20), paddingBottom: moderateScale(15) }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(18) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10), flex: 1 }}>
-              <Image source={logoImg} style={{ width: scale(40), height: scale(40), borderRadius: scale(20), borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)' }} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: scale(10), fontWeight: '800', color: theme.colors.textSecondary, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.8 }}>PENNY</Text>
-                <Text style={{ fontSize: scale(16), fontWeight: 'bold', color: theme.colors.textPrimary }} numberOfLines={1}>{greeting}, {userName}!</Text>
-              </View>
-            </View>
+        <View style={{
+          backgroundColor: theme.colors.primary,
+          paddingTop: insets.top + moderateScale(15),
+          paddingBottom: moderateScale(25),
+          borderBottomLeftRadius: scale(35),
+          borderBottomRightRadius: scale(35),
+          shadowColor: theme.colors.primary,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.25,
+          shadowRadius: 15,
+          elevation: 10,
+          overflow: 'hidden'
+        }}>
+          <View style={{ position: 'absolute', top: scale(-50), right: scale(-30), width: scale(160), height: scale(160), borderRadius: scale(80), backgroundColor: 'rgba(255,255,255,0.08)' }} />
+          <View style={{ position: 'absolute', bottom: scale(-40), left: scale(-20), width: scale(120), height: scale(120), borderRadius: scale(60), backgroundColor: 'rgba(255,255,255,0.05)' }} />
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
-              {(state.archivedEnvelopes.length > 0 || state.archivedAccounts.length > 0) && (
-                <TouchableOpacity
-                  onPress={function () { triggerImpactHaptic('Light'); setShowArchiveModal(true); }}
-                  style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: moderateScale(25), marginBottom: moderateScale(20) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Image source={logoImg} style={{ width: scale(32), height: scale(32), borderRadius: scale(16), borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.3)' }} />
+              <Text style={{ fontSize: scale(12), fontWeight: '900', color: '#FFFFFF', letterSpacing: 2 }}>PENNY</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+               <TouchableOpacity
+                  onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
+                  style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <MaterialIcons name="inventory" size={scale(20)} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                onPress={function () { triggerImpactHaptic('Light'); setShowNotificationCenter(true); }}
-                style={{ width: scale(38), height: scale(38), borderRadius: scale(19), backgroundColor: theme.colors.card, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}
-              >
-                <MaterialIcons name="notifications-none" size={scale(22)} color={safePrimary} />
-                {hasNewAlerts && (
-                  <View style={{ position: 'absolute', top: -2, right: -2, backgroundColor: theme.colors.error, borderRadius: scale(9), minWidth: scale(18), height: scale(18), paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ color: '#FFFFFF', fontSize: scale(8), fontWeight: '900' }}>
-                      {(currentAlertCount - lastSeenAlertCount) > 0 ? (currentAlertCount - lastSeenAlertCount) : '!'}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                  <MaterialIcons name="notifications-none" size={scale(22)} color="#FFFFFF" />
+                  {hasNewAlerts && (
+                    <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: '#EF4444', borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: theme.colors.primary }}>
+                       <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' }} />
+                    </View>
+                  )}
+               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={{
-            backgroundColor: theme.colors.primary,
-            borderRadius: scale(22),
-            padding: moderateScale(20),
-            shadowColor: theme.colors.primary,
-            shadowOffset: { width: 0, height: 6 },
-            shadowOpacity: 0.2,
-            shadowRadius: 10,
-            elevation: 8,
-            overflow: 'hidden'
-          }}>
-            {/* Background overlapping circles for depth */}
-            <View style={{ position: 'absolute', top: scale(-40), right: scale(-20), width: scale(140), height: scale(140), borderRadius: scale(70), backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            <View style={{ position: 'absolute', bottom: scale(-50), left: scale(-30), width: scale(120), height: scale(120), borderRadius: scale(60), backgroundColor: 'rgba(255,255,255,0.05)' }} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View>
-                <TouchableOpacity onPress={handleTotalMoneyInfo} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={{ ...theme.typography.caption, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>TOTAL NET WORTH</Text>
-                  <MaterialIcons name="info-outline" size={scale(14)} color="rgba(255,255,255,0.8)" style={{ marginLeft: 4 }} />
+          <View style={{ paddingHorizontal: moderateScale(25), marginBottom: moderateScale(20) }}>
+             <TouchableOpacity onPress={handleTotalMoneyInfo} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, opacity: 0.8 }}>
+                <Text style={{ fontSize: scale(10), fontWeight: '800', color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: 1 }}>Total Liquid Worth</Text>
+                <MaterialIcons name="info-outline" size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
+             </TouchableOpacity>
+             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: scale(34), fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 }}>{maskAmount(totalActualMoney)}</Text>
+                <TouchableOpacity onPress={toggleBalances} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                   <MaterialIcons name={balancesVisible ? "visibility" : "visibility-off"} size={22} color="#FFFFFF" />
                 </TouchableOpacity>
-                <Text style={{ ...theme.typography.h1, color: '#FFFFFF' }}>{maskAmount(totalActualMoney)}</Text>
-              </View>
-              <TouchableOpacity
-                onPress={toggleBalances}
-                style={{ width: scale(40), height: scale(40), borderRadius: scale(20), backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <MaterialIcons name={balancesVisible ? "visibility" : "visibility-off"} size={scale(22)} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 2, display: isSimpleMode ? 'none' : 'flex' }} />
-
-            {!isSimpleMode && (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <TouchableOpacity onPress={handleReadyToAssignInfo} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={{ fontSize: scale(11), color: 'rgba(255,255,255,0.7)', fontWeight: '600', textTransform: 'uppercase' }}>Ready to Budget</Text>
-                  <Text style={{ fontSize: scale(13), color: '#6EE7B7', fontWeight: 'bold', marginLeft: 8 }}>{maskAmount(state.readyToAssign)}</Text>
-                </TouchableOpacity>
-
-                {state.readyToAssign < 0 && (
-                  <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: scale(6) }}>
-                    <Text style={{ fontSize: scale(10), color: '#FECACA', fontWeight: 'bold' }}>OVER-ASSIGNED</Text>
-                  </View>
-                )}
-              </View>
-            )}
+             </View>
           </View>
+
+          <View style={{ flexDirection: 'row', paddingHorizontal: moderateScale(25), gap: 10, marginBottom: moderateScale(20) }}>
+             {streakCount > 0 && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
+                   <MaterialIcons name="local-fire-department" size={14} color="#FF9F1C" />
+                   <Text style={{ marginLeft: 4, fontSize: 11, fontWeight: '900', color: '#FFFFFF' }}>{streakCount}</Text>
+                </View>
+             )}
+             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
+                <MaterialIcons name={spendingWeather.icon} size={14} color="#FFFFFF" />
+                <Text style={{ marginLeft: 5, fontSize: 11, fontWeight: '900', color: '#FFFFFF', textTransform: 'uppercase' }}>{spendingWeather.label}</Text>
+             </View>
+             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
+                <MaterialIcons name={financialPersona.icon} size={14} color="#FFFFFF" />
+                <Text style={{ marginLeft: 5, fontSize: 11, fontWeight: '900', color: '#FFFFFF', textTransform: 'uppercase' }}>{financialPersona.name}</Text>
+             </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => {
+              if (!state.userSettings?.is_premium) {
+                setShowPremiumModal(true);
+              } else {
+                state.setShowAddModal(true);
+              }
+            }}
+            style={{
+              marginHorizontal: moderateScale(25),
+              backgroundColor: state.userSettings?.is_premium ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
+              borderRadius: 15,
+              paddingVertical: 12,
+              paddingHorizontal: 15,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: state.userSettings?.is_premium ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.08)'
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+               <MaterialIcons name={state.userSettings?.is_premium ? "bolt" : "lock"} size={18} color={state.userSettings?.is_premium ? "#FBBF24" : "rgba(255,255,255,0.6)"} style={{ marginRight: 8 }} />
+               {state.userSettings?.is_premium ? (
+                  <Text style={{ fontSize: 12, fontWeight: 'bold', color: 'rgba(255,255,255,0.9)' }}>Safe to spend <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>{maskAmount(state.safeToSpend)}</Text> today</Text>
+               ) : (
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Unlock Daily Spend Limit</Text>
+               )}
+            </View>
+            <MaterialIcons name={state.userSettings?.is_premium ? "add-circle" : "workspace-premium"} size={20} color={state.userSettings?.is_premium ? "#FFFFFF" : "#F59E0B"} />
+          </TouchableOpacity>
         </View>
 
         {needsSettlement && (
@@ -849,13 +1040,11 @@ const DashboardScreen = function (props) {
           </View>
         )}
 
-        {/* Content Container with standard padding */}
       <Animated.View
-        style={{ paddingHorizontal: moderateScale(20), paddingTop: moderateScale(isSimpleMode ? 0 : 15), opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
+        style={{ paddingHorizontal: moderateScale(20), paddingTop: moderateScale(isSimpleMode ? 16 : 15), opacity: contentFade, transform: [{ translateY: contentFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
         onLayout={function (e) { scrollContentY.current = e.nativeEvent.layout.y; }}
       >
 
-          {/* Conditional Ordering for Simple Mode */}
           {isSimpleMode ? (
             <>
               {renderWalletsSection()}
@@ -874,87 +1063,17 @@ const DashboardScreen = function (props) {
 
               {renderMonthlyStats()}
 
-              <View style={{ marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={{ ...theme.typography.h3, color: theme.colors.textPrimary, marginRight: 8 }}>Recent History</Text>
-                    <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}>
-                      <MaterialIcons name="search" size={20} color={safePrimary} />
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity onPress={function () { triggerImpactHaptic('Light'); setSpentFilter(null); setShowSpentModal(true); }}>
-                    <Text style={{ color: safePrimary, fontWeight: 'bold', fontSize: 14 }}>View All</Text>
-                  </TouchableOpacity>
-                </View>
-                {state.userHistory.length === 0 ? (
-                  <View style={{ backgroundColor: theme.colors.card, borderRadius: 20, padding: 30, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border }}>
-                    <MaterialIcons name="history" size={40} color={theme.colors.border} />
-                    <Text style={{ marginTop: 12, color: theme.colors.textSecondary, textAlign: 'center' }}>No transactions recorded yet.</Text>
-                  </View>
-                ) : (
-                  state.userHistory.slice(0, 10).map(function (h) {
-                      var acc = state.accounts.find(a => a.id === h.account_id);
-                      var isIncome = h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income');
-                      var isTransfer = h.expense_type === 'Transfer';
+              {renderDailyAuditButton()}
 
-                      var typeColor = isIncome ? '#16A34A' : (isTransfer ? '#2563EB' : '#DC2626');
-                      var typeBg = isIncome ? '#DCFCE7' : (isTransfer ? '#DBEAFE' : '#FEE2E2');
-                      var typeIcon = isIncome ? 'trending-up' : (isTransfer ? 'swap-horiz' : 'trending-down');
-
-                      return (
-                        <TouchableOpacity
-                          key={h.id}
-                          onPress={function () { triggerImpactHaptic('Light'); setSpentFilter({ id: h.id }); setShowSpentModal(true); }}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            backgroundColor: theme.colors.card,
-                            padding: moderateScale(14),
-                            borderRadius: scale(18),
-                            marginBottom: moderateScale(10),
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.04,
-                            shadowRadius: 5,
-                            elevation: 2
-                          }}
-                        >
-                          <View style={{
-                            width: scale(42),
-                            height: scale(42),
-                            borderRadius: scale(12),
-                            backgroundColor: typeBg,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginRight: moderateScale(14)
-                          }}>
-                            <MaterialIcons name={typeIcon} size={scale(22)} color={typeColor} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: normalize(15), fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{h.expense_name}</Text>
-                            <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 3 }}>
-                              {h.date} • {acc ? acc.name : 'Wallet'}
-                            </Text>
-                          </View>
-                          <View style={{ alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: normalize(16), fontWeight: '900', color: typeColor }}>
-                              {isIncome ? '+' : (isTransfer ? '' : '-')}{maskAmount(h.amount)}
-                            </Text>
-                            {isTransfer && (
-                              <Text style={{ fontSize: normalize(10), color: theme.colors.textSecondary, fontWeight: 'bold', textTransform: 'uppercase', marginTop: 2 }}>Transfer</Text>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                  })
-                )}
-              </View>
+              {renderSavingsJar()}
             </>
           ) : (
             <>
               {renderMonthlyStats()}
+
+              {renderDailyAuditButton()}
+
+              {renderSavingsJar()}
 
               {hasNoIncome ? (
                 <EmptyStateCard
@@ -970,7 +1089,6 @@ const DashboardScreen = function (props) {
 
               {renderWalletsSection()}
 
-              {/* Envelopes Section */}
               <Animated.View
                 onLayout={function (e) { envelopeRowY.current = e.nativeEvent.layout.y; }}
                 style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, opacity: envelopesFade, transform: [{ translateX: envelopesFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}
@@ -1012,9 +1130,9 @@ const DashboardScreen = function (props) {
                     contentContainerStyle={{ paddingVertical: 4, paddingRight: 8, alignItems: 'center' }}
                   >
                     {state.envelopeBalances.map(function (env) {
-                      var actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
-                      var isOverspent = env.available < 0;
-                      var accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
+                      const actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
+                      const isOverspent = env.available < 0;
+                      const accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
 
                       return (
                         <Animated.View key={env.id} style={{ opacity: envelopesFade }}>
@@ -1045,7 +1163,6 @@ const DashboardScreen = function (props) {
                               };
                             }}
                           >
-                            {/* Subtle Background Accent */}
                             <View style={{ position: 'absolute', top: -scale(30), right: -scale(30), width: scale(100), height: scale(100), borderRadius: scale(50), backgroundColor: accentColor + '08' }} />
 
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1124,11 +1241,11 @@ const DashboardScreen = function (props) {
                 ) : (
                   <Animated.View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', opacity: envelopesFade, transform: [{ translateY: envelopesFade.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
                     {state.envelopeBalances.map(env => {
-                      var actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
-                      var goalAmount = actualEnv.goal_amount || 0;
-                      var goalPct = goalAmount > 0 ? Math.min(100, Math.round((env.available / goalAmount) * 100)) : 0;
-                      var isOverspent = env.available < 0;
-                      var accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
+                      const actualEnv = state.envelopes.find(ev => ev.id === env.id) || {};
+                      const goalAmount = actualEnv.goal_amount || 0;
+                      const goalPct = goalAmount > 0 ? Math.min(100, Math.round((env.available / goalAmount) * 100)) : 0;
+                      const isOverspent = env.available < 0;
+                      const accentColor = isOverspent ? theme.colors.error : theme.colors.primary;
 
                       return (
                         <TouchableOpacity key={env.id} onPress={function () {
@@ -1294,7 +1411,7 @@ const DashboardScreen = function (props) {
         incomeSources={state.incomeSources}
         mutateUpdateSettings={state.mutateUpdateSettings}
       />
-      <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} />
+      <AddEnvelopeModal visible={showAddEnvModal} onClose={function () { setShowAddEnvModal(false); }} envelopes={state.envelopes} readyToAssign={state.readyToAssign} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} userId={userId} setShowPremiumModal={setShowPremiumModal} />
       <EditEnvelopeModal visible={showEditEnvModal} onClose={function () { setShowEditEnvModal(false); setSelectedEnvelope(null); }} envelope={selectedEnvelope} readyToAssign={state.readyToAssign} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} mutateUpdateRecurring={state.mutateUpdateRecurring} mutateDeleteRecurring={state.mutateDeleteRecurring} recurringExpenses={state.recurringExpenses} onSaved={state.refetchAll} userHistory={state.userHistory} mutateUpdateHistory={state.mutateUpdateHistory} />
       <TransferEnvelopeModal visible={showTransferEnvModal} onClose={function () { setShowTransferEnvModal(false); }} envelopes={state.envelopes} userSettings={state.userSettings} mutateUpdateSettings={state.mutateUpdateSettings} onSaved={state.refetchAll} />
       <TransferWalletModal
@@ -1351,6 +1468,67 @@ const DashboardScreen = function (props) {
 
       <SaveSuccessOverlay visible={showScreenSaveSuccess} theme={theme} message={screenSuccessMessage} />
 
+      <Modal visible={showDailyAudit} animationType="slide" transparent={true} onRequestClose={() => setShowDailyAudit(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: theme.colors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 24, paddingTop: 12, paddingBottom: insets.bottom + 30, maxHeight: '80%' }}>
+            <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 20, opacity: 0.5 }} />
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <View>
+                <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.textPrimary }}>Daily Audit</Text>
+                <Text style={{ fontSize: 13, color: theme.colors.textSecondary, fontWeight: '600' }}>{formatDate(getTodayStr())}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDailyAudit(false)} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border }}>
+                <MaterialIcons name="close" size={24} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+              <View style={{ flex: 1, backgroundColor: '#DCFCE7', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                 <Text style={{ fontSize: 10, fontWeight: '900', color: '#166534', textTransform: 'uppercase', marginBottom: 4 }}>Earned Today</Text>
+                 <Text style={{ fontSize: 18, fontWeight: '900', color: '#166534' }}>{formatCurrency(dailyStats.earned)}</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#FEE2E2', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#FECACA' }}>
+                 <Text style={{ fontSize: 10, fontWeight: '900', color: '#991B1B', textTransform: 'uppercase', marginBottom: 4 }}>Spent Today</Text>
+                 <Text style={{ fontSize: 18, fontWeight: '900', color: '#991B1B' }}>{formatCurrency(dailyStats.spent)}</Text>
+              </View>
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: '900', color: theme.colors.textSecondary, textTransform: 'uppercase', marginBottom: 12, letterSpacing: 1 }}>Transaction Breakdown</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {dailyStats.history.length === 0 ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <MaterialIcons name="history" size={48} color={theme.colors.border} />
+                  <Text style={{ marginTop: 12, color: theme.colors.textSecondary, fontWeight: '600' }}>No activity logged today.</Text>
+                </View>
+              ) : (
+                dailyStats.history.map((h) => {
+                  const isIncome = h.expense_type === 'Income' || (h.expense_type === 'Adjustment' && h.category === 'Income');
+                  const isTransfer = h.expense_type === 'Transfer';
+                  const color = isIncome ? '#16A34A' : (isTransfer ? '#2563EB' : '#DC2626');
+                  const bg = isIncome ? '#DCFCE7' : (isTransfer ? '#DBEAFE' : '#FEE2E2');
+
+                  return (
+                    <View key={h.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, padding: 14, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: theme.colors.border }}>
+                      <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: bg, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <MaterialIcons name={isIncome ? 'trending-up' : (isTransfer ? 'swap-horiz' : 'trending-down')} size={20} color={color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{h.expense_name}</Text>
+                        <Text style={{ fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 }}>{h.expense_type}</Text>
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '900', color: color }}>
+                        {isIncome ? '+' : (isTransfer ? '' : '-')}{formatCurrency(h.amount)}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

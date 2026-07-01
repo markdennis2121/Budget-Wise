@@ -172,7 +172,7 @@ export const ThemeProvider = function(props) {
     };
   }, [isDark, customPrimary]);
 
-  var value = useMemo(() => ({ theme, toggleTheme, setTheme, setPrimaryColor }), [theme, toggleTheme, setTheme, setPrimaryColor]);
+  var value = useMemo(() => ({ theme, toggleTheme, setTheme, setPrimaryColor, isDark }), [theme, toggleTheme, setTheme, setPrimaryColor, isDark]);
 
   return React.createElement(ThemeContext.Provider, { testID: 'Provider-2', value: value }, props.children);
 };

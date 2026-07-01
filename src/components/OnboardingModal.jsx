@@ -13,7 +13,7 @@ export var ONBOARDING_STEPS = [
     icon: 'celebration',
     accent: '#FFEDD5',
     title: 'Welcome to Penny',
-    subtitle: 'Luxe Financial Command Center.',
+    subtitle: 'Premium Financial Command Center.',
     body: 'A premium, private budgeting experience designed to adapt to your lifestyle—whether you are a detailed planner or a busy tracker.',
     showLogo: true
   },
@@ -29,7 +29,7 @@ export var ONBOARDING_STEPS = [
     id: 'visuals',
     icon: 'account-balance-wallet',
     accent: '#EDE9FE',
-    title: 'Modern Luxe UI',
+    title: 'Modern Premium UI',
     subtitle: 'Beauty meets function.',
     body: 'Your wallets now feature premium mesh gradients. Experience our new mobile-first vertical Transfer flow with smart logo detection and real-time balance previews.'
   },
@@ -45,7 +45,7 @@ export var ONBOARDING_STEPS = [
     id: 'insights',
     icon: 'show-chart',
     accent: '#F3E8FF',
-    title: 'Luxe Analytics',
+    title: 'Premium Analytics',
     subtitle: 'Visualize your wealth.',
     body: 'Watch your wealth grow with smooth Beziér line charts. Track total net worth and compare 6-month trends to master your cash flow.'
   },

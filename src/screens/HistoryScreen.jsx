@@ -33,6 +33,7 @@ const HistoryScreen = function() {
   const [statusDropdownVisible, setStatusDropdownVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [visibleCount, setVisibleCount] = useState(15);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   useEffect(() => {
     setVisibleCount(15);
@@ -46,7 +47,8 @@ const HistoryScreen = function() {
       type: h.expense_type,
       date: h.date,
       status: h.status,
-      notes: h.notes
+      notes: h.notes,
+      category: h.category
     }));
 
     const oneTimeItems = userOneTime.map(o => ({
@@ -56,7 +58,8 @@ const HistoryScreen = function() {
       type: 'One-Time',
       date: o.date,
       status: 'Spent',
-      notes: ''
+      notes: o.notes || '',
+      category: o.category
     }));
 
     const allItems = [...histItems, ...oneTimeItems];
@@ -78,13 +81,25 @@ const HistoryScreen = function() {
       return matchType && matchStatus && matchSearch;
     });
   }, [combinedHistory, typeFilter, statusFilter, search]);
-  
-  const totalShown = useMemo(() => {
-    return filteredHistory.reduce((s, i) => {
-      if (i.type === 'Income') return s + i.amount;
-      if (['Transfer', 'Adjustment'].includes(i.type)) return s;
-      return s - i.amount;
-    }, 0);
+
+  const groupedHistory = useMemo(() => {
+    const groups = {};
+    filteredHistory.slice(0, visibleCount).forEach(item => {
+      const date = item.date.split('T')[0];
+      if (!groups[date]) groups[date] = [];
+      groups[date].push(item);
+    });
+    return Object.entries(groups).map(([date, items]) => ({ date, items }));
+  }, [filteredHistory, visibleCount]);
+
+  const stats = useMemo(() => {
+    let income = 0;
+    let expenses = 0;
+    filteredHistory.forEach(i => {
+      if (i.type === 'Income') income += i.amount;
+      else if (!['Transfer', 'Adjustment'].includes(i.type)) expenses += i.amount;
+    });
+    return { income, expenses, net: income - expenses };
   }, [filteredHistory]);
   
   const getStatusColor = (status) => {
@@ -111,65 +126,76 @@ const HistoryScreen = function() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
       {/* Premium Header */}
-      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(24), paddingHorizontal: moderateScale(20), shadowColor: theme.colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 5 }}>
-        <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>Expense History</Text>
-        <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '600' }}>
-          {filteredHistory.length} transaction records
-        </Text>
+      <View style={{ backgroundColor: theme.colors.primary, paddingTop: insets.top + moderateScale(16), paddingBottom: moderateScale(20), paddingHorizontal: moderateScale(20) }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={{ ...theme.typography.h2, color: '#FFFFFF' }}>History</Text>
+            <Text style={{ ...theme.typography.bodySmall, color: 'rgba(255,255,255,0.8)', fontWeight: '600' }}>
+              {filteredHistory.length} Transactions
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setStatusDropdownVisible(!statusDropdownVisible)}
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 12 }}
+          >
+            <MaterialIcons name="filter-list" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats Cards */}
+        <View style={{ flexDirection: 'row', marginTop: 20, gap: 12 }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800' }}>INCOME</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{formatCurrency(stats.income)}</Text>
+          </View>
+          <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 16, padding: 12 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 10, fontWeight: '800' }}>EXPENSES</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{formatCurrency(stats.expenses)}</Text>
+          </View>
+        </View>
       </View>
 
       {/* Modern Filter Section */}
-      <View style={{ backgroundColor: theme.colors.card, paddingVertical: moderateScale(16), borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
+      <View style={{ backgroundColor: theme.colors.card, paddingVertical: moderateScale(12), borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
         {/* Integrated Search */}
-        <View style={{ marginHorizontal: moderateScale(16), marginBottom: moderateScale(16), flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: scale(14), paddingHorizontal: moderateScale(12), borderWidth: 1, borderColor: theme.colors.border }}>
-          <MaterialIcons name="search" size={scale(20)} color={theme.colors.textSecondary} />
+        <View style={{ marginHorizontal: moderateScale(16), marginBottom: moderateScale(12), flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+          <MaterialIcons name="search" size={20} color={theme.colors.textSecondary} />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name..."
+            placeholder="Search transactions..."
             placeholderTextColor={theme.colors.textSecondary}
-            style={{ flex: 1, paddingVertical: moderateScale(10), paddingLeft: moderateScale(8), fontSize: normalize(14), color: theme.colors.textPrimary, fontWeight: '500' }}
+            style={{ flex: 1, paddingVertical: 10, paddingLeft: 8, fontSize: 14, color: theme.colors.textPrimary, fontWeight: '500' }}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
-              <MaterialIcons name="cancel" size={scale(18)} color={theme.colors.textSecondary} />
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <MaterialIcons name="cancel" size={18} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Type Filter Pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingBottom: moderateScale(4) }}>
-          {['All','Recurring','One-Time','Income','Adjustment'].map(t => {
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+          {['All','Income','Recurring','One-Time','Adjustment'].map(t => {
             const isActive = typeFilter === t;
             return (
               <TouchableOpacity
                 key={t}
                 onPress={() => { triggerImpactHaptic('Light'); setTypeFilter(t); }}
                 style={{
-                  paddingHorizontal: moderateScale(14),
-                  paddingVertical: moderateScale(8),
-                  borderRadius: scale(12),
-                  marginRight: moderateScale(8),
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                  marginRight: 8,
                   backgroundColor: isActive ? theme.colors.primary : theme.colors.background,
                   borderWidth: 1,
                   borderColor: isActive ? theme.colors.primary : theme.colors.border
                 }}
               >
-                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: normalize(12), fontWeight: 'bold' }}>{t}</Text>
+                <Text style={{ color: isActive ? '#FFFFFF' : theme.colors.textSecondary, fontSize: 12, fontWeight: 'bold' }}>{t}</Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
-      </View>
-
-      {/* Summary Banner */}
-      <View style={{ backgroundColor: totalShown >= 0 ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: moderateScale(20), paddingVertical: moderateScale(12), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' }}>
-        <Text style={{ color: theme.colors.textSecondary, fontSize: normalize(12), fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {totalShown >= 0 ? 'Net Income' : 'Net Expenses'}
-        </Text>
-        <Text style={{ color: totalShown >= 0 ? '#166534' : '#991B1B', fontSize: normalize(16), fontWeight: '900' }}>
-          {(totalShown >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalShown))}
-        </Text>
       </View>
 
       {loading ? (
@@ -180,69 +206,152 @@ const HistoryScreen = function() {
         <FlatList
           data={filteredHistory.slice(0, visibleCount)}
           keyExtractor={item => item.id}
-          contentContainerStyle={{ paddingHorizontal: moderateScale(16), paddingTop: moderateScale(16), paddingBottom: scrollBottomPadding }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: scrollBottomPadding }}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
               <MaterialIcons name="history" size={64} color={theme.colors.border} />
-              <Text style={{ fontSize: normalize(18), fontWeight: '900', color: theme.colors.textPrimary, marginTop: 20, textAlign: 'center' }}>No Records Found</Text>
-              <Text style={{ fontSize: normalize(14), color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8, lineHeight: 22 }}>
-                Try adjusting your filters or search terms to find what you're looking for.
+              <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.textPrimary, marginTop: 20 }}>No Records</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+                We couldn't find any transactions matching your filters.
               </Text>
             </View>
           }
           ListFooterComponent={visibleCount < filteredHistory.length ? (
-            <TouchableOpacity onPress={() => setVisibleCount(v => v + 15)} style={{ alignItems: 'center', paddingVertical: 24 }}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: normalize(14) }}>
-                Show More ({filteredHistory.length - visibleCount} hidden)
+            <TouchableOpacity onPress={() => setVisibleCount(v => v + 15)} style={{ alignItems: 'center', paddingVertical: 24, backgroundColor: theme.colors.card, marginHorizontal: 20, borderRadius: 16, marginTop: 10 }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 14 }}>
+                Show More Transactions
               </Text>
             </TouchableOpacity>
           ) : null}
-          renderItem={({ item }) => {
+          renderItem={({ item, index }) => {
             const isIncome = item.type === 'Income';
             const isTransfer = item.type === 'Transfer';
             const isAdjustment = item.type === 'Adjustment';
+            const typeColor = isIncome ? '#10B981' : (isTransfer ? '#3B82F6' : (isAdjustment ? theme.colors.textSecondary : '#EF4444'));
+            const typeBg = isIncome ? '#ECFDF5' : (isTransfer ? '#EFF6FF' : (isAdjustment ? '#F3F4F6' : '#FEF2F2'));
 
-            const typeColor = isIncome ? '#16A34A' : (isTransfer ? '#2563EB' : (isAdjustment ? theme.colors.textSecondary : '#DC2626'));
-            const typeBg = isIncome ? '#DCFCE7' : (isTransfer ? '#DBEAFE' : (isAdjustment ? theme.colors.border : '#FEE2E2'));
+            // Show date header if first item or date changed
+            const showDateHeader = index === 0 || filteredHistory[index - 1].date.split('T')[0] !== item.date.split('T')[0];
 
             return (
-              <View style={{
-                backgroundColor: theme.colors.card,
-                borderRadius: scale(18),
-                padding: moderateScale(14),
-                marginBottom: moderateScale(10),
-                flexDirection: 'row',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1
-              }}>
-                 <View style={{ width: scale(42), height: scale(42), borderRadius: scale(12), backgroundColor: typeBg, alignItems: 'center', justifyContent: 'center', marginRight: moderateScale(14) }}>
-                    <MaterialIcons name={getTypeIcon(item.type)} size={scale(22)} color={typeColor} />
-                 </View>
-                 <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: normalize(15), fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{item.name}</Text>
-                    <Text style={{ fontSize: normalize(12), color: theme.colors.textSecondary, marginTop: 3 }}>
-                       {formatDate(item.date)} • {item.type}
-                    </Text>
-                 </View>
-                 <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: normalize(16), fontWeight: '900', color: typeColor }}>
-                       {(isIncome ? '+' : (isTransfer ? '⇄ ' : (isAdjustment ? '± ' : '-'))) + formatCurrency(item.amount)}
+              <View>
+                {showDateHeader && (
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: theme.colors.textSecondary, marginTop: index === 0 ? 0 : 20, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {formatDate(item.date)}
+                  </Text>
+                )}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => { triggerImpactHaptic('Light'); setSelectedItem(item); }}
+                  style={{
+                    backgroundColor: theme.colors.card,
+                    borderRadius: 20,
+                    padding: 16,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                  }}
+                >
+                  <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: typeBg, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                    <MaterialIcons name={getTypeIcon(item.type)} size={24} color={typeColor} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.textPrimary }} numberOfLines={1}>{item.name}</Text>
+                    <Text style={{ fontSize: 12, color: theme.colors.textSecondary, marginTop: 2 }}>{item.type}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: typeColor }}>
+                      {(isIncome ? '+' : (isTransfer ? '' : (isAdjustment ? '±' : '-'))) + formatCurrency(item.amount)}
                     </Text>
                     {item.status && (
-                       <View style={{ backgroundColor: getStatusColor(item.status) + '15', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2, marginTop: 5, borderWidth: 0.5, borderColor: getStatusColor(item.status) + '33' }}>
-                          <Text style={{ fontSize: normalize(10), color: getStatusColor(item.status), fontWeight: 'bold' }}>{item.status.toUpperCase()}</Text>
-                       </View>
+                       <Text style={{ fontSize: 10, color: getStatusColor(item.status), fontWeight: '800', marginTop: 4 }}>{item.status.toUpperCase()}</Text>
                     )}
-                 </View>
+                  </View>
+                </TouchableOpacity>
               </View>
             );
           }}
         />
       )}
+
+      {/* Transaction Detail Modal */}
+      <Modal
+        visible={!!selectedItem}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedItem(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: theme.colors.background, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: insets.bottom + 24 }}>
+            <View style={{ width: 40, height: 5, backgroundColor: theme.colors.border, borderRadius: 3, alignSelf: 'center', marginBottom: 20 }} />
+
+            {selectedItem && (
+              <>
+                <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                  <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: selectedItem.type === 'Income' ? '#ECFDF5' : '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <MaterialIcons name={getTypeIcon(selectedItem.type)} size={32} color={selectedItem.type === 'Income' ? '#10B981' : '#EF4444'} />
+                  </View>
+                  <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.textPrimary }}>{formatCurrency(selectedItem.amount)}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.textSecondary, marginTop: 4 }}>{selectedItem.name}</Text>
+                </View>
+
+                <View style={{ backgroundColor: theme.colors.card, borderRadius: 24, padding: 20, gap: 16 }}>
+                  <DetailRow label="Date" value={formatDate(selectedItem.date)} icon="event" theme={theme} />
+                  <DetailRow label="Type" value={selectedItem.type} icon="category" theme={theme} />
+                  {selectedItem.status && <DetailRow label="Status" value={selectedItem.status} icon="info" theme={theme} />}
+                  {selectedItem.notes ? <DetailRow label="Notes" value={selectedItem.notes} icon="notes" theme={theme} /> : null}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => setSelectedItem(null)}
+                  style={{ backgroundColor: theme.colors.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 24 }}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Status Filter Modal */}
+      <Modal visible={statusDropdownVisible} transparent animationType="fade" onRequestClose={() => setStatusDropdownVisible(false)}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setStatusDropdownVisible(false)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}
+        >
+          <View style={{ width: '80%', backgroundColor: theme.colors.card, borderRadius: 24, padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.textPrimary, marginBottom: 16 }}>Filter by Status</Text>
+            {['All', 'Paid', 'Spent', 'Received', 'Pending'].map(s => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => { setStatusFilter(s); setStatusDropdownVisible(false); }}
+                style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <Text style={{ fontSize: 16, color: statusFilter === s ? theme.colors.primary : theme.colors.textPrimary, fontWeight: statusFilter === s ? '800' : '600' }}>{s}</Text>
+                {statusFilter === s && <MaterialIcons name="check" size={20} color={theme.colors.primary} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
+
+const DetailRow = ({ label, value, icon, theme }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+      <MaterialIcons name={icon} size={18} color={theme.colors.primary} />
+    </View>
+    <View>
+      <Text style={{ fontSize: 11, fontWeight: '800', color: theme.colors.textSecondary, textTransform: 'uppercase' }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary, marginTop: 1 }}>{value}</Text>
+    </View>
+  </View>
+);
 
 export default HistoryScreen;
